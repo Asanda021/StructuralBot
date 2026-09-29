@@ -1,0 +1,1144 @@
+"""
+StructuralBot reinforcement engine.
+
+This module contains generic reinforcement utilities shared by:
+- Foundations
+- Columns
+- Beams
+- Slabs
+- Stairs
+- Structural walls
+
+Responsibilities:
+- Rebar area calculation
+- Rebar weight calculation
+- Reinforcement ratio
+- Bar quantity calculations
+- Spacing calculations
+- Standard diameter handling
+- Reinforcement bar creation
+- Reinforcement grouping
+- Basic reinforcement summaries
+
+Important:
+Code-specific minimum/maximum reinforcement rules,
+development lengths, lap lengths, anchorage, confinement,
+critical-region detailing and spacing limits must be provided
+by the selected design-code module.
+
+This module does NOT contain Telegram/UI/database logic.
+"""
+
+from __future__ import annotations
+
+import math
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import Any, Dict, Iterable, List, Optional, Sequence
+
+from core.models import (
+    ReinforcementBar,
+    ReinforcementType,
+    RebarShape,
+)
+
+
+# ============================================================
+# CONSTANTS
+# ============================================================
+
+PI = math.pi
+
+STEEL_DENSITY_KG_M3 = 7850.0
+
+STANDARD_REBAR_DIAMETERS_MM: Sequence[int] = (
+    6,
+    8,
+    10,
+    12,
+    14,
+    16,
+    18,
+    20,
+    22,
+    25,
+    28,
+    32,
+    36,
+    40,
+    45,
+    50,
+)
+
+
+# ============================================================
+# BASIC REBAR GEOMETRY
+# ============================================================
+
+
+def rebar_area_mm2(
+    diameter_mm: float,
+) -> float:
+    """
+    Calculate cross-sectional area of one circular rebar.
+
+    Formula:
+        A = π d² / 4
+
+    Input:
+        diameter in mm
+
+    Output:
+        area in mm²
+    """
+
+    diameter = float(diameter_mm)
+
+    if diameter <= 0:
+        raise ValueError(
+            "Rebar diameter must be greater than zero."
+        )
+
+    return PI * diameter**2 / 4.0
+
+
+def rebar_area_cm2(
+    diameter_mm: float,
+) -> float:
+    """
+    Calculate cross-sectional area in cm².
+    """
+
+    return rebar_area_mm2(
+        diameter_mm
+    ) / 100.0
+
+
+def rebar_area_m2(
+    diameter_mm: float,
+) -> float:
+    """
+    Calculate cross-sectional area in m².
+    """
+
+    return rebar_area_mm2(
+        diameter_mm
+    ) / 1_000_000.0
+
+
+# ============================================================
+# REBAR WEIGHT
+# ============================================================
+
+
+def rebar_weight_per_meter(
+    diameter_mm: float,
+) -> float:
+    """
+    Calculate theoretical reinforcement weight per meter.
+
+    Formula:
+        mass = density × area
+
+    Equivalent common approximation:
+        kg/m ≈ d² / 162
+
+    The density-based calculation is used here.
+    """
+
+    area_m2 = rebar_area_m2(
+        diameter_mm
+    )
+
+    return (
+        area_m2
+        * STEEL_DENSITY_KG_M3
+    )
+
+
+def rebar_weight(
+    diameter_mm: float,
+    length_m: float,
+    quantity: int = 1,
+) -> float:
+    """
+    Calculate total theoretical rebar weight.
+
+    Args:
+        diameter_mm:
+            Bar diameter in mm.
+
+        length_m:
+            Length of one bar in meters.
+
+        quantity:
+            Number of bars.
+    """
+
+    if length_m < 0:
+        raise ValueError(
+            "Rebar length cannot be negative."
+        )
+
+    if quantity < 0:
+        raise ValueError(
+            "Rebar quantity cannot be negative."
+        )
+
+    return (
+        rebar_weight_per_meter(
+            diameter_mm
+        )
+        * length_m
+        * quantity
+    )
+
+
+# ============================================================
+# REINFORCEMENT RATIO
+# ============================================================
+
+
+def reinforcement_ratio(
+    steel_area_mm2: float,
+    concrete_area_mm2: float,
+) -> float:
+    """
+    Calculate reinforcement ratio.
+
+    Formula:
+        ρ = As / Ac
+
+    Returned as a decimal.
+
+    Example:
+        0.01 = 1%
+    """
+
+    if steel_area_mm2 < 0:
+        raise ValueError(
+            "Steel area cannot be negative."
+        )
+
+    if concrete_area_mm2 <= 0:
+        raise ValueError(
+            "Concrete area must be greater than zero."
+        )
+
+    return (
+        steel_area_mm2
+        / concrete_area_mm2
+    )
+
+
+def reinforcement_percentage(
+    steel_area_mm2: float,
+    concrete_area_mm2: float,
+) -> float:
+    """
+    Calculate reinforcement ratio as percentage.
+    """
+
+    return (
+        reinforcement_ratio(
+            steel_area_mm2,
+            concrete_area_mm2,
+        )
+        * 100.0
+    )
+
+
+# ============================================================
+# TOTAL REBAR AREA
+# ============================================================
+
+
+def total_rebar_area(
+    diameter_mm: float,
+    quantity: int,
+) -> float:
+    """
+    Calculate total reinforcement area.
+
+    A_total = A_bar × number_of_bars
+    """
+
+    if quantity < 0:
+        raise ValueError(
+            "Quantity cannot be negative."
+        )
+
+    return (
+        rebar_area_mm2(
+            diameter_mm
+        )
+        * quantity
+    )
+
+
+# ============================================================
+# REQUIRED NUMBER OF BARS
+# ============================================================
+
+
+def required_bar_count(
+    required_area_mm2: float,
+    diameter_mm: float,
+) -> int:
+    """
+    Calculate the minimum integer number of bars needed
+    to provide at least the required steel area.
+
+    This is a mathematical utility only.
+
+    Code-specific rules such as minimum number of bars,
+    spacing limits and detailing requirements are handled
+    by the code module.
+    """
+
+    if required_area_mm2 < 0:
+        raise ValueError(
+            "Required steel area cannot be negative."
+        )
+
+    area_one_bar = rebar_area_mm2(
+        diameter_mm
+    )
+
+    if required_area_mm2 == 0:
+        return 0
+
+    return math.ceil(
+        required_area_mm2
+        / area_one_bar
+    )
+
+
+# ============================================================
+# REQUIRED DIAMETER / EQUIVALENCY
+# ============================================================
+
+
+def equivalent_bar_count(
+    current_diameter_mm: float,
+    current_quantity: int,
+    replacement_diameter_mm: float,
+) -> int:
+    """
+    Calculate the minimum replacement quantity based on
+    equal or greater steel cross-sectional area.
+
+    Important:
+        This function is ONLY the mathematical area-equivalency
+        layer.
+
+    Final engineering acceptance must be checked by the
+    selected design code and, where applicable, by the
+    member context.
+
+    Formula:
+        N_new × A_new >= N_old × A_old
+    """
+
+    if current_quantity <= 0:
+        raise ValueError(
+            "Current quantity must be greater than zero."
+        )
+
+    if current_diameter_mm <= 0:
+        raise ValueError(
+            "Current diameter must be greater than zero."
+        )
+
+    if replacement_diameter_mm <= 0:
+        raise ValueError(
+            "Replacement diameter must be greater than zero."
+        )
+
+    current_area = total_rebar_area(
+        current_diameter_mm,
+        current_quantity,
+    )
+
+    return required_bar_count(
+        current_area,
+        replacement_diameter_mm,
+    )
+
+
+def equivalent_rebar_area(
+    diameter_mm: float,
+    quantity: int,
+) -> float:
+    """
+    Return total steel area for equivalency calculations.
+    """
+
+    return total_rebar_area(
+        diameter_mm,
+        quantity,
+    )
+
+
+# ============================================================
+# SPACING
+# ============================================================
+
+
+def bars_from_spacing(
+    length_mm: float,
+    spacing_mm: float,
+) -> int:
+    """
+    Calculate the number of spaces along a length.
+
+    This is a geometric utility.
+
+    Code-specific edge-bar and spacing requirements must be
+    handled separately.
+    """
+
+    if length_mm <= 0:
+        raise ValueError(
+            "Length must be greater than zero."
+        )
+
+    if spacing_mm <= 0:
+        raise ValueError(
+            "Spacing must be greater than zero."
+        )
+
+    return max(
+        1,
+        math.ceil(
+            length_mm
+            / spacing_mm
+        ),
+    )
+
+
+def quantity_for_spacing(
+    length_mm: float,
+    spacing_mm: float,
+) -> int:
+    """
+    Calculate approximate bar quantity required along a length.
+
+    Number of bars is interpreted as:
+        number of spaces + 1
+
+    Final detailing rules may modify this value.
+    """
+
+    spaces = bars_from_spacing(
+        length_mm,
+        spacing_mm,
+    )
+
+    return spaces + 1
+
+
+def actual_spacing(
+    clear_length_mm: float,
+    quantity: int,
+) -> float:
+    """
+    Calculate actual equal spacing between bars.
+
+    Formula:
+        s = L / (n - 1)
+    """
+
+    if clear_length_mm <= 0:
+        raise ValueError(
+            "Clear length must be greater than zero."
+        )
+
+    if quantity < 2:
+        raise ValueError(
+            "At least two bars are required to calculate spacing."
+        )
+
+    return (
+        clear_length_mm
+        / (quantity - 1)
+    )
+
+
+# ============================================================
+# DIAMETER UTILITIES
+# ============================================================
+
+
+def normalize_diameter(
+    diameter_mm: float,
+) -> float:
+    """
+    Normalize diameter to float.
+    """
+
+    diameter = float(diameter_mm)
+
+    if diameter <= 0:
+        raise ValueError(
+            "Rebar diameter must be greater than zero."
+        )
+
+    return diameter
+
+
+def is_standard_diameter(
+    diameter_mm: float,
+) -> bool:
+    """
+    Check whether diameter is in the standard diameter list.
+    """
+
+    diameter = normalize_diameter(
+        diameter_mm
+    )
+
+    return diameter in STANDARD_REBAR_DIAMETERS_MM
+
+
+def next_standard_diameter(
+    diameter_mm: float,
+) -> Optional[int]:
+    """
+    Return the next standard diameter greater than
+    or equal to the supplied diameter.
+    """
+
+    diameter = normalize_diameter(
+        diameter_mm
+    )
+
+    for standard in STANDARD_REBAR_DIAMETERS_MM:
+        if standard >= diameter:
+            return standard
+
+    return None
+
+
+def previous_standard_diameter(
+    diameter_mm: float,
+) -> Optional[int]:
+    """
+    Return the largest standard diameter less than
+    or equal to the supplied diameter.
+    """
+
+    diameter = normalize_diameter(
+        diameter_mm
+    )
+
+    previous = None
+
+    for standard in STANDARD_REBAR_DIAMETERS_MM:
+        if standard > diameter:
+            break
+
+        previous = standard
+
+    return previous
+
+
+# ============================================================
+# REBAR CREATION
+# ============================================================
+
+
+def create_rebar(
+    *,
+    bar_mark: str,
+    diameter_mm: float,
+    quantity: int,
+    length_m: float,
+    bar_type: ReinforcementType,
+    grade: str = "",
+    location: str = "",
+    shape_code: str = "",
+    shape_dimensions: Optional[
+        Dict[str, float]
+    ] = None,
+    member_id: Optional[int] = None,
+    floor_id: Optional[int] = None,
+    metadata: Optional[
+        Dict[str, Any]
+    ] = None,
+) -> ReinforcementBar:
+    """
+    Create a standard ReinforcementBar object.
+
+    Length is the actual length of ONE physical piece.
+    """
+
+    if quantity <= 0:
+        raise ValueError(
+            "Rebar quantity must be greater than zero."
+        )
+
+    if length_m <= 0:
+        raise ValueError(
+            "Rebar length must be greater than zero."
+        )
+
+    diameter = normalize_diameter(
+        diameter_mm
+    )
+
+    shape = None
+
+    if shape_code:
+        shape = RebarShape(
+            shape_code=shape_code,
+            dimensions=shape_dimensions or {},
+        )
+
+    bar = ReinforcementBar(
+        bar_mark=bar_mark,
+        diameter=diameter,
+        quantity=int(quantity),
+        length=float(length_m),
+        bar_type=bar_type,
+        grade=grade,
+        location=location,
+        shape=shape,
+        member_id=member_id,
+        floor_id=floor_id,
+        metadata=metadata or {},
+    )
+
+    bar.calculate_total_length()
+
+    bar.weight = rebar_weight(
+        diameter_mm=diameter,
+        length_m=length_m,
+        quantity=quantity,
+    )
+
+    return bar
+
+
+# ============================================================
+# REBAR COLLECTION
+# ============================================================
+
+
+@dataclass
+class ReinforcementCollection:
+    """
+    Collection of reinforcement bars.
+
+    Used to aggregate bars before sending them to:
+    - BBS
+    - Cut List
+    - quantity takeoff
+    - reports
+    """
+
+    bars: List[ReinforcementBar]
+
+    def __init__(
+        self,
+        bars: Optional[
+            Iterable[ReinforcementBar]
+        ] = None,
+    ) -> None:
+        self.bars = list(
+            bars or []
+        )
+
+    def add(
+        self,
+        bar: ReinforcementBar,
+    ) -> None:
+        self.bars.append(bar)
+
+    def extend(
+        self,
+        bars: Iterable[ReinforcementBar],
+    ) -> None:
+        self.bars.extend(
+            bars
+        )
+
+    def total_length(self) -> float:
+        return sum(
+            (
+                bar.total_length
+                if bar.total_length is not None
+                else bar.length * bar.quantity
+            )
+            for bar in self.bars
+        )
+
+    def total_weight(self) -> float:
+        return sum(
+            (
+                bar.weight
+                if bar.weight is not None
+                else rebar_weight(
+                    bar.diameter,
+                    bar.length,
+                    bar.quantity,
+                )
+            )
+            for bar in self.bars
+        )
+
+    def total_quantity(self) -> int:
+        return sum(
+            bar.quantity
+            for bar in self.bars
+        )
+
+    def by_diameter(
+        self,
+    ) -> Dict[float, List[ReinforcementBar]]:
+        grouped: Dict[
+            float,
+            List[ReinforcementBar],
+        ] = defaultdict(list)
+
+        for bar in self.bars:
+            grouped[
+                bar.diameter
+            ].append(bar)
+
+        return dict(grouped)
+
+    def by_type(
+        self,
+    ) -> Dict[
+        ReinforcementType,
+        List[ReinforcementBar],
+    ]:
+        grouped: Dict[
+            ReinforcementType,
+            List[ReinforcementBar],
+        ] = defaultdict(list)
+
+        for bar in self.bars:
+            grouped[
+                bar.bar_type
+            ].append(bar)
+
+        return dict(grouped)
+
+    def summary(self) -> Dict[str, Any]:
+        """
+        Create a compact reinforcement summary.
+        """
+
+        diameter_summary: Dict[
+            float,
+            Dict[str, float],
+        ] = {}
+
+        for diameter, bars in self.by_diameter().items():
+            total_length = sum(
+                (
+                    bar.total_length
+                    if bar.total_length is not None
+                    else bar.length * bar.quantity
+                )
+                for bar in bars
+            )
+
+            total_weight = sum(
+                (
+                    bar.weight
+                    if bar.weight is not None
+                    else rebar_weight(
+                        bar.diameter,
+                        bar.length,
+                        bar.quantity,
+                    )
+                )
+                for bar in bars
+            )
+
+            total_quantity = sum(
+                bar.quantity
+                for bar in bars
+            )
+
+            diameter_summary[
+                diameter
+            ] = {
+                "quantity": total_quantity,
+                "total_length_m": total_length,
+                "weight_kg": total_weight,
+            }
+
+        return {
+            "total_bars": len(self.bars),
+            "total_quantity": self.total_quantity(),
+            "total_length_m": self.total_length(),
+            "total_weight_kg": self.total_weight(),
+            "by_diameter": diameter_summary,
+        }
+
+
+# ============================================================
+# REBAR SUMMARY HELPERS
+# ============================================================
+
+
+def summarize_rebar(
+    bars: Iterable[ReinforcementBar],
+) -> Dict[str, Any]:
+    """
+    Generate a project/member reinforcement summary.
+    """
+
+    collection = ReinforcementCollection(
+        bars
+    )
+
+    return collection.summary()
+
+
+def total_rebar_weight(
+    bars: Iterable[ReinforcementBar],
+) -> float:
+    """
+    Calculate total reinforcement weight.
+    """
+
+    return ReinforcementCollection(
+        bars
+    ).total_weight()
+
+
+def total_rebar_length(
+    bars: Iterable[ReinforcementBar],
+) -> float:
+    """
+    Calculate total reinforcement length.
+    """
+
+    return ReinforcementCollection(
+        bars
+    ).total_length()
+
+
+# ============================================================
+# STANDARD BAR WEIGHT TABLE
+# ============================================================
+
+
+def standard_diameter_weight_table() -> List[
+    Dict[str, float]
+]:
+    """
+    Generate theoretical kg/m values for standard diameters.
+    """
+
+    return [
+        {
+            "diameter_mm": diameter,
+            "kg_per_m": rebar_weight_per_meter(
+                diameter
+            ),
+        }
+        for diameter
+        in STANDARD_REBAR_DIAMETERS_MM
+    ]
+
+
+# ============================================================
+# COVER / EFFECTIVE DEPTH UTILITIES
+# ============================================================
+
+
+def effective_depth(
+    overall_depth_mm: float,
+    cover_mm: float,
+    bar_diameter_mm: float,
+) -> float:
+    """
+    Basic effective-depth calculation for a single
+    reinforcement layer.
+
+    Formula:
+        d = h - cover - φ/2
+
+    This is a geometric utility only.
+
+    Multiple reinforcement layers, stirrups and code-specific
+    detailing must be handled by the member/code layer.
+    """
+
+    if overall_depth_mm <= 0:
+        raise ValueError(
+            "Overall depth must be greater than zero."
+        )
+
+    if cover_mm < 0:
+        raise ValueError(
+            "Cover cannot be negative."
+        )
+
+    if bar_diameter_mm <= 0:
+        raise ValueError(
+            "Bar diameter must be greater than zero."
+        )
+
+    d = (
+        overall_depth_mm
+        - cover_mm
+        - bar_diameter_mm / 2.0
+    )
+
+    if d <= 0:
+        raise ValueError(
+            "Effective depth is not physically valid."
+        )
+
+    return d
+
+
+def effective_depth_with_stirrup(
+    overall_depth_mm: float,
+    cover_mm: float,
+    stirrup_diameter_mm: float,
+    longitudinal_diameter_mm: float,
+) -> float:
+    """
+    Effective depth when transverse reinforcement is
+    located between cover and longitudinal bars.
+
+    Formula:
+        d = h - cover - φ_stirrup - φ_longitudinal/2
+    """
+
+    if overall_depth_mm <= 0:
+        raise ValueError(
+            "Overall depth must be greater than zero."
+        )
+
+    if cover_mm < 0:
+        raise ValueError(
+            "Cover cannot be negative."
+        )
+
+    if stirrup_diameter_mm <= 0:
+        raise ValueError(
+            "Stirrup diameter must be greater than zero."
+        )
+
+    if longitudinal_diameter_mm <= 0:
+        raise ValueError(
+            "Longitudinal diameter must be greater than zero."
+        )
+
+    d = (
+        overall_depth_mm
+        - cover_mm
+        - stirrup_diameter_mm
+        - longitudinal_diameter_mm / 2.0
+    )
+
+    if d <= 0:
+        raise ValueError(
+            "Effective depth is not physically valid."
+        )
+
+    return d
+
+
+# ============================================================
+# DEVELOPMENT / SPLICE PLACEHOLDERS
+# ============================================================
+
+
+def require_code_based_length(
+    value: Optional[float],
+    name: str,
+) -> float:
+    """
+    Require a code-calculated engineering length.
+
+    This helper intentionally does NOT calculate lap length,
+    development length or anchorage.
+
+    Those values must come from the selected design-code module.
+    """
+
+    if value is None:
+        raise ValueError(
+            f"{name} must be supplied by the selected "
+            "design-code module."
+        )
+
+    if value <= 0:
+        raise ValueError(
+            f"{name} must be greater than zero."
+        )
+
+    return float(value)
+
+
+# ============================================================
+# REBAR DESIGN DATA
+# ============================================================
+
+
+@dataclass
+class ReinforcementDesign:
+    """
+    Generic reinforcement design container.
+
+    This is the bridge between a member calculation and
+    the actual reinforcement/BBS system.
+    """
+
+    required_area_mm2: float
+
+    selected_diameter_mm: float
+
+    selected_quantity: int
+
+    provided_area_mm2: float
+
+    spacing_mm: Optional[float] = None
+
+    bar_type: ReinforcementType = (
+        ReinforcementType.LONGITUDINAL
+    )
+
+    grade: str = ""
+
+    location: str = ""
+
+    metadata: Dict[str, Any] = None
+
+    def __post_init__(self) -> None:
+        if self.metadata is None:
+            self.metadata = {}
+
+    @property
+    def provided_ratio(
+        self,
+    ) -> float:
+        """
+        Ratio of provided area to required area.
+        """
+
+        if self.required_area_mm2 <= 0:
+            return 0.0
+
+        return (
+            self.provided_area_mm2
+            / self.required_area_mm2
+        )
+
+    @property
+    def area_surplus_mm2(
+        self,
+    ) -> float:
+        """
+        Additional steel area above required area.
+        """
+
+        return max(
+            0.0,
+            self.provided_area_mm2
+            - self.required_area_mm2,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "required_area_mm2": (
+                self.required_area_mm2
+            ),
+            "selected_diameter_mm": (
+                self.selected_diameter_mm
+            ),
+            "selected_quantity": (
+                self.selected_quantity
+            ),
+            "provided_area_mm2": (
+                self.provided_area_mm2
+            ),
+            "spacing_mm": self.spacing_mm,
+            "bar_type": self.bar_type.value,
+            "grade": self.grade,
+            "location": self.location,
+            "provided_ratio": self.provided_ratio,
+            "area_surplus_mm2": self.area_surplus_mm2,
+            "metadata": self.metadata,
+        }
+
+
+# ============================================================
+# DESIGN CREATION HELPER
+# ============================================================
+
+
+def create_reinforcement_design(
+    required_area_mm2: float,
+    diameter_mm: float,
+    *,
+    minimum_quantity: int = 1,
+    spacing_mm: Optional[float] = None,
+    bar_type: ReinforcementType = (
+        ReinforcementType.LONGITUDINAL
+    ),
+    grade: str = "",
+    location: str = "",
+    metadata: Optional[
+        Dict[str, Any]
+    ] = None,
+) -> ReinforcementDesign:
+    """
+    Create a basic reinforcement design from a required
+    steel area.
+
+    Important:
+        This does NOT replace code-specific reinforcement
+        design. Minimum/maximum ratios, spacing limits,
+        bar-count rules and detailing must be applied by
+        the selected design-code/member module.
+    """
+
+    if required_area_mm2 < 0:
+        raise ValueError(
+            "Required steel area cannot be negative."
+        )
+
+    if minimum_quantity < 1:
+        raise ValueError(
+            "Minimum quantity must be at least one."
+        )
+
+    quantity = required_bar_count(
+        required_area_mm2,
+        diameter_mm,
+    )
+
+    quantity = max(
+        quantity,
+        minimum_quantity,
+    )
+
+    provided_area = total_rebar_area(
+        diameter_mm,
+        quantity,
+    )
+
+    return ReinforcementDesign(
+        required_area_mm2=required_area_mm2,
+        selected_diameter_mm=float(
+            diameter_mm
+        ),
+        selected_quantity=quantity,
+        provided_area_mm2=provided_area,
+        spacing_mm=spacing_mm,
+        bar_type=bar_type,
+        grade=grade,
+        location=location,
+        metadata=metadata or {},
+    )
