@@ -125,6 +125,7 @@ def standards_menu():
       [InlineKeyboardButton("🇮🇷 مقررات ملی ایران",callback_data="standard|iran")],
       [InlineKeyboardButton("🇺🇸 ACI 318",callback_data="standard|aci")],
       [InlineKeyboardButton("🇪🇺 Eurocode 2",callback_data="standard|ec2")],
+      [InlineKeyboardButton("🇨🇳 China — GB/T 50010-2010(2024)",callback_data="standard|china")],
       [InlineKeyboardButton("⬅️ بازگشت",callback_data="settings")]
     ])
 
