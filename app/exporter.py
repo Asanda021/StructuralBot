@@ -120,8 +120,8 @@ def create_excel(result,project_name,path,lang=None):
     ws.append([L("rebar_buy",lang),total_buy])
     ws.append([L("stock",lang),total_bars])
     ps=result.get("project_settings",{})
-    ws.append(["Standard",ps.get("standard","")])
-    ws.append(["Language",ps.get("language","")])
+    ws.append([L("standard",lang),ps.get("standard","")])
+    ws.append([L("language",lang),ps.get("language","")])
     _style_sheet(ws)
 
     detail=wb.create_sheet(L("detail",lang)[:31])
