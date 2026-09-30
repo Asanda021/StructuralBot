@@ -1,0 +1,29 @@
+name: debug-python
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        file:
+          - bot.py
+          - app/db.py
+          - app/engine.py
+          - app/exporter.py
+          - app/i18n.py
+          - app/keyboards.py
+          - app/foundation_takeoff.py
+          - ai/assistant.py
+          - tests/smoke_test.py
+          - tests/foundation_takeoff_test.py
+    name: compile ${{ matrix.file }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m py_compile "${{ matrix.file }}"
