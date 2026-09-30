@@ -378,9 +378,7 @@ async def callback(update,context):
     if data=="home":
         context.user_data.clear(); await q.edit_message_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu()); return
     if data=="calc_mode":
-        context.user_data["calculation_mode"]=True
-        db.set_settings(update.effective_user.id,calc_mode="detailed")
-        await q.edit_message_text("🧮 <b>حالت محاسبه فعال شد</b>\n\nحالا پروژه جدید را شروع کن یا یک پروژه را ادامه بده.",parse_mode="HTML",reply_markup=main_menu()); return
+        await q.edit_message_text("🧮 <b>حالت متره</b>\n\nعمق گزارش را انتخاب کن.",parse_mode="HTML",reply_markup=calc_mode_menu()); return
     if data.startswith("mode|"):
         mode=data.split("|",1)[1]
         labels={"quick":"⚡ متره سریع","detailed":"🧮 متره دقیق","procurement":"🏗 متره اجرایی/خرید"}
