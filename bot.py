@@ -484,7 +484,7 @@ async def start_cmd(update,context):
     db.ensure_user(uid,update.effective_user.first_name or "")
     db.set_settings(uid)
     context.user_data.clear()
-    await update.message.reply_text("🏗 <b>StructuralBot</b>\n\n<b>متره جامع از روی نقشه</b>\n\nنسخه فعلی، ایده‌های محاسباتی و تجربه UX ربات قبلی را در یک معماری سبک و بدون Mini App جمع کرده است.\n\nابتدا حالت متره را انتخاب کن.",parse_mode="HTML",reply_markup=calc_mode_menu())
+    await update.message.reply_text("🏗 <b>StructuralBot</b>\n\n<b>متره جامع از روی نقشه</b>\n\nبرای شروع، روی دکمه زیر بزن.",parse_mode="HTML",reply_markup=calc_mode_menu())\n    await update.message.reply_text("منوی ثابت:",reply_markup=persistent_menu())
 
 def reset(context,name):
     context.user_data.clear(); context.user_data.update({"project_name":name,"members":[],"history":[]})
@@ -517,10 +517,9 @@ async def save_final(update,context):
 
 async def callback(update,context):
     q=update.callback_query; data=q.data or ""; await q.answer()
-    if data=="home":
-        context.user_data.clear(); await q.edit_message_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu()); return
+    if data=="home":\n        context.user_data.clear(); await q.edit_message_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu()); await q.message.reply_text("منوی ثابت:",reply_markup=persistent_menu()); return
     if data=="calc_mode":
-        await q.edit_message_text("🧮 <b>حالت متره</b>\n\nعمق گزارش را انتخاب کن.",parse_mode="HTML",reply_markup=calc_mode_menu()); return
+        await q.edit_message_text("🧮 <b>شروع برآورد</b>\n\nبرای ورود به موارد برآوردی، دکمه زیر را بزن.",parse_mode="HTML",reply_markup=calc_mode_menu()); return\n    if data=="start_estimate":\n        if not context.user_data.get("project_name"):\n            context.user_data["project_name"]="برآورد جدید"\n            context.user_data.setdefault("members",[])\n        await q.edit_message_text("📚 <b>موارد برآوردی</b>\\n\\nعضو سازه‌ای موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu()); return
     if data.startswith("mode|"):
         mode=data.split("|",1)[1]
         labels={"quick":"⚡ متره سریع","detailed":"🧮 متره دقیق","procurement":"🏗 متره اجرایی/خرید"}
@@ -845,7 +844,7 @@ async def finish_member(q,context):
     if idx is None: context.user_data.setdefault("members",[]).append(m)
     else: context.user_data["members"][idx]=m
     context.user_data["current_edit"]=None
-    await q.message.reply_text("⌨️ ورود اطلاعات این عضو تمام شد.", reply_markup=ReplyKeyboardRemove())
+    await q.message.reply_text("⌨️ ورود اطلاعات این عضو تمام شد.", reply_markup=persistent_menu())
     context.user_data["current_member_index"]=len(context.user_data.get("members",[]))-1 if idx is None else idx
     await q.edit_message_text(
         f"✅ <b>{m['member']}</b> محاسبه شد.\n\nحالا نتیجه این عضو را نهایی کن یا در صورت نیاز اصلاحش کن.",
@@ -920,10 +919,7 @@ async def message(update,context):
             context.user_data.pop(k,None)
         await update.message.reply_text("❌ <b>ورود این عضو لغو شد.</b>",parse_mode="HTML",reply_markup=section_menu())
         return
-    if text=="🏠 منو":
-        context.user_data.clear()
-        await update.message.reply_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu())
-        return
+    if text in ("🏠 خانه","🏠 منو"):\n        context.user_data.clear()\n        await update.message.reply_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu())\n        await update.message.reply_text("منوی ثابت:",reply_markup=persistent_menu())\n        return\n    if text=="📂 پروژه‌ها":\n        ps=db.projects(update.effective_user.id)\n        rows=[[InlineKeyboardButton(p[1],callback_data=f"open|{p[0]}")] for p in ps]\n        rows.append([InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")])\n        await update.message.reply_text("📂 <b>پروژه‌های من</b>",parse_mode="HTML",reply_markup=InlineKeyboardMarkup(rows))\n        return\n    if text=="🧮 شروع برآورد":\n        if not context.user_data.get("project_name"):\n            context.user_data["project_name"]="برآورد جدید"\n            context.user_data.setdefault("members",[])\n        await update.message.reply_text("📚 <b>موارد برآوردی</b>\\n\\nعضو سازه‌ای موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu())\n        return
     if text=="🔄 شروع مجدد":
         context.user_data.clear()
         await update.message.reply_text("🔄 <b>شروع مجدد</b>\n\nحالت محاسبه را دوباره فعال کن.",parse_mode="HTML",reply_markup=calc_mode_menu())
