@@ -443,6 +443,13 @@ async def callback(update,context):
         await q.edit_message_text("🏢 <b>اطلاعات ساختمان</b>\\n\\nنام پروژه، تعداد طبقات و مشخصات کلی پروژه در جریان «پروژه جدید» ثبت می‌شوند. هندسه هر عضو نیز مرحله‌به‌مرحله از نقشه گرفته می‌شود.",parse_mode="HTML",reply_markup=back_home()); return
     if data=="pricing":
         await q.edit_message_text("💰 <b>برآورد ریالی</b>\\n\\nمنوی آن در ساختار محصول قرار گرفت، اما نرخ‌گذاری تا پایدار شدن متره و گزارش‌های مصالح به‌صورت خودکار عددسازی نمی‌کند.",parse_mode="HTML",reply_markup=back_home()); return
+    if data=="rebar_equiv":
+        await q.edit_message_text("🔁 <b>معادل‌سازی میلگرد</b>\\n\\nقطرها را انتخاب کن؛ محاسبه بر اساس سطح مقطع اسمی انجام می‌شود و این ابزار فقط معادل‌سازی متره‌ای است.",parse_mode="HTML",reply_markup=rebar_equivalency_menu()); return
+    if data.startswith("eq|"):
+        _,a,b=data.split("|")
+        d1=float(a); d2=float(b)
+        ratio=(d1*d1)/(d2*d2)
+        await q.edit_message_text(f"🔁 <b>Φ{d1:g} ↔ Φ{d2:g}</b>\\n\\nبرای حفظ سطح مقطع: هر ۱ شاخه Φ{d1:g} معادل حدود <b>{ratio:.3f}</b> شاخه Φ{d2:g} است.\\n\\nاین فقط تبدیل مقدار متره است و جایگزین دیتیل طراحی نیست.",parse_mode="HTML",reply_markup=rebar_equivalency_menu()); return
     if data=="language":
         await q.edit_message_text("🌐 <b>انتخاب زبان رابط کاربری</b>",parse_mode="HTML",reply_markup=__import__("app.keyboards",fromlist=["language_menu"]).language_menu()); return
     if data.startswith("lang|"):
