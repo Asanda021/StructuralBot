@@ -133,14 +133,20 @@ def estimate_members(members):
     concrete_total=0.0
     for m in members:
         for c in m.get("components",[]):
-            if c.get("category")=="میلگرد" and c.get("unit")=="kg":
-                dia=None
-                note=str(c.get("note",""))
-                if "Φ" in note:
-                    try: dia=float(note.split("Φ",1)[1].split()[0])
-                    except Exception: dia=None
+            if c.get("category")=="میلگرد":
+                dia=c.get("diameter_mm")
                 if dia is not None:
-                    rebar_by_diameter[dia]["weight_kg"] += float(c["value"])
+                    key=float(dia)
+                    if c.get("unit")=="kg":
+                        rebar_by_diameter[key]["weight_kg"] += float(c["value"])
+                    elif c.get("unit")=="m":
+                        if "طول اجرا" in str(c.get("name","")):
+                            rebar_by_diameter[key]["length_m"] += float(c["value"])
+                        else:
+                            rebar_by_diameter[key]["procurement_length_m"] += float(c["value"])
+                    elif c.get("unit")=="شاخه":
+                        rebar_by_diameter[key]["branches"] += int(float(c["value"]))
+                        rebar_by_diameter[key]["procurement_weight_kg"] += float(c.get("procurement_weight_kg",0))
             if c.get("unit")=="m³" and "بتن" in str(c.get("name","")):
                 concrete_total += float(c["value"])
     return {"version":"takeoff-5.0","method":"drawing_driven_member_takeoff",
