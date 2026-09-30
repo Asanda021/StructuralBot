@@ -175,7 +175,6 @@ def calc_member(section,typ,v):
               {"name":"طول کل تیرچه","value":r["joist_total_length_m"],"unit":"m"},
               {"name":"بلوک/یونولیت","value":r["block_count"],"unit":"عدد","note":f"{r['block_kind']} | {r['block_length_m']}×{r['block_width_m']}m"}]
             if "thermal" in r: comps += rcomps("شبکه حرارتی دو جهت",r["thermal"],f"X={r['bars_each_direction'][0]} | Y={r['bars_each_direction'][1]}")
-            if "joan" in r["__dict__"] if False else False: pass
             if r.get("tie_beam_rebar"): comps += rcomps("کلاف/ژوئن",r["tie_beam_rebar"])
             if r.get("negative"): comps += rcomps("میلگرد منفی",r["negative"])
             if r.get("otka"): comps += rcomps("اتکا/ادکا",r["otka"])
