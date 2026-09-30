@@ -134,6 +134,23 @@ FOOTING_PRESETS = {
  "پی منفرد":[(1.5,1.5,0.50),(1.8,1.8,0.50),(2.0,2.0,0.50)]
 }
 
+COMPOUND_PRESETS = {
+    "ستون": {"30×30":[0.30,0.30],"35×35":[0.35,0.35],"40×40":[0.40,0.40],"40×50":[0.40,0.50],"50×50":[0.50,0.50]},
+    "تیر": {"30×50":[0.30,0.50],"30×60":[0.30,0.60],"35×60":[0.35,0.60],"40×70":[0.40,0.70]},
+}
+def compound_options(section, typ, label):
+    if section in ("ستون","تیر") and typ in COMPOUND_PRESETS.get(section,{}) and label in ("عرض ستون","عرض تیر"):
+        return [(typ, COMPOUND_PRESETS[section][typ])]
+    if section=="فونداسیون" and typ=="پی منفرد" and label=="طول":
+        return [("1.50×1.50×0.50",[1.50,1.50,0.50]),("1.80×1.80×0.50",[1.80,1.80,0.50]),("2.00×2.00×0.50",[2.00,2.00,0.50])]
+    return []
+def apply_compound_preset(context, values):
+    queue=context.user_data.get("current_queue",[])
+    for value in values:
+        if not queue: break
+        context.user_data.setdefault("current_history",[]).append(queue.pop(0))
+        context.user_data.setdefault("current_values",[]).append(value)
+    return len(values)
 def ready_options(section,typ,label):
     if section=="فونداسیون" and typ in FOOTING_PRESETS and label in ("طول","عرض","ضخامت"):
         vals=FOOTING_PRESETS[typ]
@@ -207,37 +224,52 @@ def schema(section,typ):
                 ("قطر حرارتی","mm"),("فاصله حرارتی","cm")]
     return [("مقدار/حجم بتن","m³"),("وزن میلگرد","kg")]
 
-def input_keyboard(rv=None, unit=""):
-    """Professional persistent keyboard shown above Telegram's typing area during numeric entry."""
+def progress_text(context):
+    schema_all=schema(context.user_data.get("current_section",""),context.user_data.get("current_type",""))
+    queue=context.user_data.get("current_queue",[])
+    completed=max(0,len(schema_all)-len(queue)); total=len(schema_all)
+    current=min(total,completed+1) if total else 0
+    filled=context.user_data.get("current_values",[])
+    summary=[f"{label}: {fmt(filled[i])} {unit}" for i,(label,unit) in enumerate(schema_all) if i<len(filled) and filled[i] is not None]
+    bar="🟩"*min(current-1,8)+"⬜"*max(0,min(total-current,8))
+    return current,total,bar,summary[-4:]
+
+def input_keyboard(values=None, unit="", compound=None):
     rows=[]
-    if rv is not None:
-        rows.append([KeyboardButton(f"⚡ مقدار آماده: {rv} {unit}")])
+    source=[(str(v),None) for v in values] if not compound else compound
+    row=[]
+    for title,_ in source:
+        row.append(KeyboardButton(f"⚡ {title}" + (f" {unit}" if not compound else "")))
+        if len(row)==2: rows.append(row); row=[]
+    if row: rows.append(row)
+    rows.append([KeyboardButton("✏️ ورود دستی")])
     rows.append([KeyboardButton("⬅️ مرحله قبل"), KeyboardButton("📋 ورودی‌ها")])
     rows.append([KeyboardButton("❌ لغو عضو"), KeyboardButton("🏠 منو")])
     rows.append([KeyboardButton("🔄 شروع مجدد")])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True, one_time_keyboard=False, is_persistent=True,
-                               input_field_placeholder="عدد را وارد کنید یا از منوی پایین انتخاب کنید")
+                               input_field_placeholder="مقدار آماده را انتخاب کن یا ورود دستی بزن")
 
-def field_menu(rv=None, unit=""):
-    rows=[]
-    if rv is not None:
-        rows.append([InlineKeyboardButton(f"⚡ مقدار آماده: {rv} {unit}",callback_data=f"ready|{rv}")])
-    rows.append([
-        InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back_field"),
-        InlineKeyboardButton("📋 ورودی‌ها",callback_data="show_inputs")
-    ])
-    rows.append([
-        InlineKeyboardButton("❌ لغو عضو",callback_data="cancel_member"),
-        InlineKeyboardButton("🏠 منو",callback_data="home")
-    ])
+def field_menu(values=None, unit="", compound=None):
+    rows=[]; source=compound if compound else [(str(v),None) for v in (values or [])]
+    row=[]
+    for title,_ in source:
+        row.append(InlineKeyboardButton(f"⚡ {title}" + (f" {unit}" if not compound else ""),callback_data=f"preset|{title}" if compound else f"ready|{title}"))
+        if len(row)==2: rows.append(row); row=[]
+    if row: rows.append(row)
+    rows.append([InlineKeyboardButton("✏️ ورود دستی",callback_data="manual")])
+    rows.append([InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back_field"),InlineKeyboardButton("📋 ورودی‌ها",callback_data="show_inputs")])
+    rows.append([InlineKeyboardButton("❌ لغو عضو",callback_data="cancel_member"),InlineKeyboardButton("🏠 منو",callback_data="home")])
     rows.append([InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
     return InlineKeyboardMarkup(rows)
 
-def ask_text(name,fields,section,typ):
+def ask_text(name,fields,section,typ,values=None,compound=None,context=None):
     label,unit=fields[0]
-    rv=ready_value(section,typ,label)
-    ready=f"\n⚡ مقدار آماده: <b>{rv}</b> {unit} (قابل ویرایش)" if rv is not None else ""
-    return f"✏️ <b>{name}</b>\n\n<b>{label}</b> ({unit}){ready}\nعدد را وارد کن.\n\n⚠️ اعداد آماده فقط میانبر ورود هستند؛ مقدار نهایی را با نقشه کنترل کن."
+    current,total,bar,summary=progress_text(context) if context else (1,len(fields),"",[])
+    if compound: ready="\n\n⚡ <b>ابعاد آماده:</b> "+" | ".join(x[0] for x in compound)
+    elif values: ready=f"\n\n⚡ <b>مقادیر آماده:</b> {' | '.join(str(v) for v in values)} {unit}"
+    else: ready=""
+    filled="\n📋 <b>ثبت‌شده:</b> "+" | ".join(summary) if summary else ""
+    return f"🏗 <b>{name}</b>\n\n<b>مرحله {current} از {total}</b>  {bar}\n\n🎯 <b>{label}</b> ({unit}){ready}{filled}\n\nیکی از گزینه‌های آماده را بزن یا «✏️ ورود دستی» را انتخاب کن.\n⚠️ گزینه‌های آماده فقط میانبر ورود هستند؛ مقدار نهایی باید با نقشه کنترل شود."
 
 def rcomps(title,r,note=""):
     n=int(r.get("count_bars",0)); branches=r.get("branches",0)
@@ -561,13 +593,17 @@ async def callback(update,context):
         await show_member_types(q,data.split("|",1)[1]); return
     if data.startswith("member|"):
         _,section,typ=data.split("|",2)
-        context.user_data.update({"current_section":section,"current_type":typ,"current_values":[],"current_queue":schema(section,typ),"current_history":[],"current_edit":None,"current_preset":presets_for(section,typ)})
+        sc=schema(section,typ)
+        preset_values=list(COMPOUND_PRESETS.get(section,{}).get(typ,[]))
+        context.user_data.update({"current_section":section,"current_type":typ,"current_values":preset_values,
+                                  "current_queue":sc[len(preset_values):],"current_history":[],"current_edit":None,"current_preset":presets_for(section,typ)})
         await ask_next(q,context); return
     if data.startswith("edit|"):
         idx=int(data.split("|")[1]); m=context.user_data["members"][idx]
-        context.user_data.update({"current_section":m["section"],"current_type":m["type"],"current_values":m.get("raw",[]),
-                                  "current_history":[],
-                                  "current_queue":schema(m["section"],m["type"]),"current_edit":idx,"current_preset":presets_for(m["section"],m["type"])})
+        raw=list(m.get("raw",[])); sc=schema(m["section"],m["type"])
+        preset_count=len(COMPOUND_PRESETS.get(m["section"],{}).get(m["type"],[]))
+        context.user_data.update({"current_section":m["section"],"current_type":m["type"],"current_values":raw[:preset_count],
+                                  "current_history":[],"current_queue":sc[preset_count:],"current_edit":idx,"current_preset":presets_for(m["section"],m["type"])})
         await ask_next(q,context); return
     if data.startswith("delete|"):
         idx=int(data.split("|")[1]); context.user_data["members"].pop(idx); await review(q,context); return
@@ -647,9 +683,18 @@ async def callback(update,context):
         if queue:
             await q.edit_message_text(f"✏️ <b>{queue[0][0]}</b> ({queue[0][1]})\n\nمقدار دلخواه را با عدد وارد کن.",parse_mode="HTML",reply_markup=field_menu([],queue[0][1]))
         return
+    if data.startswith("preset|"):
+        title=data.split("|",1)[1]; queue=context.user_data.get("current_queue",[])
+        if queue:
+            section=context.user_data.get("current_section",""); typ=context.user_data.get("current_type","")
+            opts=compound_options(section,typ,queue[0][0])
+            match=next((vals for name,vals in opts if name==title),None)
+            if match is not None:
+                apply_compound_preset(context,match)
+                await ask_next(q,context)
+        return
     if data.startswith("ready|"):
-        value=float(data.split("|",1)[1])
-        queue=context.user_data.get("current_queue",[])
+        value=float(data.split("|",1)[1]); queue=context.user_data.get("current_queue",[])
         if queue:
             context.user_data.setdefault("current_history",[]).append(queue[0])
             context.user_data["current_values"].append(value); queue.pop(0)
@@ -672,9 +717,9 @@ async def ask_next(q,context):
     queue=context.user_data.get("current_queue",[])
     if not queue:
         await finish_member(q,context); return
-    label,unit=queue[0]
-    options=ready_options(context.user_data["current_section"],context.user_data["current_type"],label)
-    await q.edit_message_text(ask_text(context.user_data["current_type"],queue,context.user_data["current_section"],context.user_data["current_type"],options),parse_mode="HTML",reply_markup=field_menu(options,unit))
+    label,unit=queue[0]; section=context.user_data["current_section"]; typ=context.user_data["current_type"]
+    options=ready_options(section,typ,label); compounds=compound_options(section,typ,label)
+    await q.edit_message_text(ask_text(typ,queue,section,typ,options,compounds,context),parse_mode="HTML",reply_markup=field_menu(options,unit,compounds))
 
 async def finish_member(q,context):
     section=context.user_data["current_section"]; typ=context.user_data["current_type"]; vals=context.user_data["current_values"]
@@ -701,7 +746,7 @@ async def message(update,context):
     if text=="✏️ ورود دستی":
         queue=context.user_data.get("current_queue",[])
         if queue:
-            await update.message.reply_text(f"✏️ {queue[0][0]} ({queue[0][1]})\nمقدار دلخواه را وارد کن.",reply_markup=input_keyboard([],queue[0][1]))
+            await update.message.reply_text(f"✏️ <b>مرحله {progress_text(context)[0]} از {progress_text(context)[1]}</b>\n🎯 {queue[0][0]} ({queue[0][1]})\nمقدار دلخواه را وارد کن.",parse_mode="HTML",reply_markup=input_keyboard([],queue[0][1],compound_options(context.user_data["current_section"],context.user_data["current_type"],queue[0][0])))
         return
     if text.startswith("⚡ "):
         parts=text.split()
@@ -766,10 +811,11 @@ async def ask_next_message(update,context):
     if context.user_data.get("current_queue"):
         label,unit=context.user_data["current_queue"][0]
         options=ready_options(context.user_data["current_section"],context.user_data["current_type"],label)
+        current,total,bar,_=progress_text(context)
         await update.message.reply_text(
-            f"⏳ ثبت شد.\n\nمرحله بعد: <b>{label}</b> ({unit})\nاز مقادیر آماده انتخاب کن یا ورود دستی را بزن.",
+            f"⏳ ثبت شد.\n\n<b>مرحله {current} از {total}</b>  {bar}\n🎯 <b>{label}</b> ({unit})\nاز گزینه‌های آماده انتخاب کن یا ورود دستی را بزن.",
             parse_mode="HTML",
-            reply_markup=input_keyboard(options,unit)
+            reply_markup=input_keyboard(options,unit,compound_options(context.user_data["current_section"],context.user_data["current_type"],label))
         )
     else:
         class Q:
