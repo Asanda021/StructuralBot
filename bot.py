@@ -675,17 +675,16 @@ async def callback(update,context):
     if data=="rebar_equiv":
         await q.edit_message_text(
             "🔁 <b>معادل‌سازی میلگرد</b>\n\n"
-            "۱) قطر میلگرد موجود را انتخاب کن.\n"
-            "۲) قطر جایگزین را انتخاب کن.\n"
-            "۳) تعداد میلگرد موجود را وارد کن.\n\n"
-            "مبنای محاسبه: حفظ حداقل همان سطح مقطع فولاد.",
+            "قطر و تعداد میلگرد فعلی را انتخاب کن؛ سپس قطر جایگزین را انتخاب کن.\n"
+            "تعداد میلگرد جایگزین را ربات بر اساس سطح مقطع محاسبه می‌کند.",
             parse_mode="HTML", reply_markup=rebar_equivalency_menu()
         ); return
     if data.startswith("eqsrc|"):
         source=int(data.split("|",1)[1])
         context.user_data["rebar_equiv_source"]=source
         await q.edit_message_text(
-            f"🔁 <b>قطر مبدأ: Φ{source}</b>\n\nحالا قطر جایگزین را انتخاب کن.",
+            f"🔁 <b>میلگرد فعلی: Φ{source}</b>\n\n"
+            "حالا <b>قطر میلگرد جایگزین</b> را انتخاب کن.",
             parse_mode="HTML", reply_markup=rebar_equiv_target_menu(source)
         ); return
     if data.startswith("eqdst|"):
@@ -693,14 +692,34 @@ async def callback(update,context):
         source=int(a); target=int(b)
         context.user_data["rebar_equiv_source"]=source
         context.user_data["rebar_equiv_target"]=target
-        context.user_data["rebar_equiv_awaiting_count"]=True
         await q.edit_message_text(
-            f"🔁 <b>معادل‌سازی Φ{source} → Φ{target}</b>\n\n"
-            "تعداد میلگرد مبدأ را وارد کن.\nمثال: <b>4</b> برای 4Φ16",
+            f"🔁 <b>Φ{source} → Φ{target}</b>\n\n"
+            "حالا <b>تعداد میلگرد فعلی</b> را انتخاب کن.",
+            parse_mode="HTML",
+            reply_markup=rebar_equiv_count_menu(source,target)
+        ); return
+    if data.startswith("eqcount|"):
+        _,a,b,c=data.split("|")
+        source=int(a); target=int(b); count=int(c)
+        area_old=count*math.pi*source*source/4.0
+        area_new_one=math.pi*target*target/4.0
+        new_count=math.ceil(area_old/area_new_one)
+        area_new=new_count*area_new_one
+        increase=(area_new/area_old-1.0)*100.0 if area_old else 0.0
+        await q.edit_message_text(
+            "🔁 <b>نتیجه معادل‌سازی میلگرد</b>\n\n"
+            f"میلگرد فعلی: <b>{count}Φ{source}</b>\n"
+            f"سطح مقطع فعلی: <b>{area_old:.2f} mm²</b>\n\n"
+            f"قطر جایگزین: <b>Φ{target}</b>\n"
+            f"تعداد جایگزین: <b>{new_count}Φ{target}</b>\n"
+            f"سطح مقطع جایگزین: <b>{area_new:.2f} mm²</b>\n"
+            f"افزایش سطح مقطع: <b>{increase:.2f}%</b>\n\n"
+            "📌 تعداد جایگزین رو به بالا گرد شده تا سطح مقطع فولاد کمتر از حالت فعلی نشود.\n"
+            "⚠️ این ابزار فقط معادل‌سازی تعداد/قطر بر اساس سطح مقطع است؛ کنترل فاصله و ضوابط اجرایی عضو باید انجام شود.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("⬅️ قطر جایگزین",callback_data=f"eqsrc|{source}")],
-                [InlineKeyboardButton("🏠 منو",callback_data="home")]
+                [InlineKeyboardButton("🔄 معادل‌سازی جدید",callback_data="rebar_equiv")],
+                [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
             ])
         ); return
     if data=="language":
@@ -1061,38 +1080,6 @@ async def finish_member(q,context):
 
 async def message(update,context):
     text=(update.message.text or "").strip().replace("،",".")
-    if context.user_data.get("rebar_equiv_awaiting_count"):
-        try:
-            count=float(text)
-            if count <= 0 or not count.is_integer(): raise ValueError
-            count=int(count)
-            d1=int(context.user_data["rebar_equiv_source"])
-            d2=int(context.user_data["rebar_equiv_target"])
-            area1=count*math.pi*d1*d1/4.0
-            area2_one=math.pi*d2*d2/4.0
-            new_count=math.ceil(area1/area2_one)
-            area2=new_count*area2_one
-            increase=(area2/area1-1.0)*100.0
-            context.user_data["rebar_equiv_awaiting_count"]=False
-            await update.message.reply_text(
-                f"🔁 <b>نتیجه معادل‌سازی میلگرد</b>\\n\\n"
-                f"میلگرد موجود: <b>{count}Φ{d1}</b>\\n"
-                f"سطح مقطع موجود: <b>{area1:.2f} mm²</b>\\n\\n"
-                f"قطر جایگزین: <b>Φ{d2}</b>\\n"
-                f"تعداد معادل: <b>{new_count}Φ{d2}</b>\\n"
-                f"سطح مقطع جایگزین: <b>{area2:.2f} mm²</b>\\n"
-                f"افزایش سطح مقطع: <b>{increase:.2f}%</b>\\n\\n"
-                "📌 تعداد جدید به عدد صحیح رو به بالا گرد می‌شود تا سطح مقطع کمتر نشود.\\n"
-                "⚠️ این ابزار معادل‌سازی متره‌ای است؛ کنترل فاصله، حداقل/حداکثر آرماتور و دیتیل اجرایی عضو همچنان لازم است.",
-                parse_mode="HTML",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔄 معادل‌سازی جدید",callback_data="rebar_equiv")],
-                    [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
-                ])
-            )
-        except ValueError:
-            await update.message.reply_text("❌ تعداد باید یک عدد صحیح مثبت باشد. مثال: 4")
-        return
     if context.user_data.get("awaiting_project_name"):
         if not text or len(text)>120: await update.message.reply_text("❌ نام پروژه نامعتبر است."); return
         reset(context,text); await update.message.reply_text(f"🏗 پروژه «{text}» ساخته شد.",reply_markup=section_menu()); return
