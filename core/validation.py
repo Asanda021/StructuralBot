@@ -1,1141 +1,2013 @@
 """
-StructuralBot input validation.
+StructuralBot - Core Validation
 
-This module validates engineering inputs before they reach
-the calculation engine.
+Central validation layer for StructuralBot.
 
 Responsibilities:
-- Numeric validation
-- Positive-value validation
-- Range validation
-- Integer validation
-- Diameter validation
-- Geometry validation
-- Required-field validation
-- Generic dictionary validation
-
-This module must remain independent from:
-- Telegram
-- Database
-- UI
-- PDF / Excel
-- Specific design-code implementations
+- Validate domain inputs before engineering calculations.
+- Keep validation independent from Telegram, AI and billing.
+- Provide reusable validation helpers.
+- Prevent silent defaults for engineering-critical values.
 """
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence
-
-
-# ============================================================
-# VALIDATION RESULT
-# ============================================================
-
-
-@dataclass
-class ValidationResult:
-    """
-    Standard result returned by validation functions.
-    """
-
-    valid: bool
-
-    errors: List[str]
-
-    warnings: List[str]
-
-    def add_error(self, message: str) -> None:
-        self.errors.append(message)
-        self.valid = False
-
-    def add_warning(self, message: str) -> None:
-        self.warnings.append(message)
-
-    @property
-    def has_errors(self) -> bool:
-        return bool(self.errors)
-
-    @property
-    def has_warnings(self) -> bool:
-        return bool(self.warnings)
-
-
-# ============================================================
-# BASIC HELPERS
-# ============================================================
-
-
-def is_number(value: Any) -> bool:
-    """
-    Return True when value is a finite real number.
-
-    Boolean values are intentionally rejected because
-    bool is a subclass of int in Python.
-    """
-
-    if isinstance(value, bool):
-        return False
-
-    if not isinstance(value, (int, float)):
-        return False
-
-    return math.isfinite(float(value))
-
-
-def is_integer(value: Any) -> bool:
-    """
-    Check whether a value represents an integer.
-    """
-
-    if isinstance(value, bool):
-        return False
-
-    if isinstance(value, int):
-        return True
-
-    if isinstance(value, float):
-        return math.isfinite(value) and value.is_integer()
-
-    return False
-
-
-def validate_number(
-    value: Any,
-    field_name: str,
-    *,
-    minimum: Optional[float] = None,
-    maximum: Optional[float] = None,
-    allow_zero: bool = True,
-) -> ValidationResult:
-    """
-    Validate a numeric value and optional range.
-    """
-
-    result = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
-    )
-
-    if not is_number(value):
-        result.add_error(
-            f"{field_name} must be a valid numeric value."
-        )
-        return result
-
-    numeric_value = float(value)
-
-    if not allow_zero and numeric_value == 0:
-        result.add_error(
-            f"{field_name} must not be zero."
-        )
-        return result
-
-    if minimum is not None and numeric_value < minimum:
-        result.add_error(
-            f"{field_name} must be greater than or equal to "
-            f"{minimum}."
-        )
-
-    if maximum is not None and numeric_value > maximum:
-        result.add_error(
-            f"{field_name} must be less than or equal to "
-            f"{maximum}."
-        )
-
-    return result
-
-
-def validate_positive(
-    value: Any,
-    field_name: str,
-) -> ValidationResult:
-    """
-    Validate a strictly positive number.
-    """
-
-    return validate_number(
-        value,
-        field_name,
-        minimum=0.0,
-        allow_zero=False,
-    )
-
-
-def validate_non_negative(
-    value: Any,
-    field_name: str,
-) -> ValidationResult:
-    """
-    Validate a number greater than or equal to zero.
-    """
-
-    return validate_number(
-        value,
-        field_name,
-        minimum=0.0,
-        allow_zero=True,
-    )
-
-
-def validate_integer(
-    value: Any,
-    field_name: str,
-    *,
-    minimum: Optional[int] = None,
-    maximum: Optional[int] = None,
-) -> ValidationResult:
-    """
-    Validate an integer value and optional range.
-    """
-
-    result = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
-    )
-
-    if not is_integer(value):
-        result.add_error(
-            f"{field_name} must be an integer."
-        )
-        return result
-
-    integer_value = int(value)
-
-    if minimum is not None and integer_value < minimum:
-        result.add_error(
-            f"{field_name} must be greater than or equal to "
-            f"{minimum}."
-        )
-
-    if maximum is not None and integer_value > maximum:
-        result.add_error(
-            f"{field_name} must be less than or equal to "
-            f"{maximum}."
-        )
-
-    return result
-
-
-# ============================================================
-# STRING VALIDATION
-# ============================================================
-
-
-def validate_required_string(
-    value: Any,
-    field_name: str,
-) -> ValidationResult:
-    """
-    Validate a required non-empty string.
-    """
-
-    result = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
-    )
-
-    if value is None:
-        result.add_error(
-            f"{field_name} is required."
-        )
-        return result
-
-    if not isinstance(value, str):
-        result.add_error(
-            f"{field_name} must be text."
-        )
-        return result
-
-    if not value.strip():
-        result.add_error(
-            f"{field_name} cannot be empty."
-        )
-
-    return result
-
-
-# ============================================================
-# REQUIRED FIELDS
-# ============================================================
-
-
-def validate_required_fields(
-    data: Dict[str, Any],
-    required_fields: Iterable[str],
-) -> ValidationResult:
-    """
-    Validate that all required fields exist and are not empty.
-    """
-
-    result = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
-    )
-
-    for field_name in required_fields:
-        if field_name not in data:
-            result.add_error(
-                f"Missing required field: {field_name}"
-            )
-            continue
-
-        value = data[field_name]
-
-        if value is None:
-            result.add_error(
-                f"Required field is empty: {field_name}"
-            )
-            continue
-
-        if isinstance(value, str) and not value.strip():
-            result.add_error(
-                f"Required field is empty: {field_name}"
-            )
-
-    return result
-
-
-# ============================================================
-# REBAR VALIDATION
-# ============================================================
-
-
-STANDARD_REBAR_DIAMETERS_MM: Sequence[float] = (
-    6,
-    8,
-    10,
-    12,
-    14,
-    16,
-    18,
-    20,
-    22,
-    25,
-    28,
-    32,
-    36,
-    40,
-    45,
-    50,
+from dataclasses import dataclass, field
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+
+from core.models import (
+    BeamType,
+    CalculationResult,
+    CircularGeometry,
+    ColumnType,
+    ConcreteMaterial,
+    EngineeringContext,
+    Floor,
+    FoundationType,
+    MaterialQuantity,
+    MemberType,
+    Project,
+    RectangularGeometry,
+    RebarShape,
+    ReinforcementBar,
+    SlabGeometry,
+    SlabType,
+    Splice,
+    SpliceType,
+    SteelMaterial,
+    StructuralMember,
+    StructureType,
+    UnitSystem,
 )
 
 
-def validate_rebar_diameter(
-    diameter: Any,
-    *,
-    allow_non_standard: bool = False,
-) -> ValidationResult:
-    """
-    Validate reinforcing bar diameter.
+# =====================================================================
+# EXCEPTIONS
+# =====================================================================
 
-    Diameter is expected in millimetres.
+class ValidationError(ValueError):
+    """Base validation exception."""
 
-    Non-standard diameters may be allowed when the selected
-    standard/code permits them.
-    """
 
-    result = validate_positive(
-        diameter,
-        "Rebar diameter",
-    )
+class RequiredFieldError(ValidationError):
+    """Raised when a required field is missing."""
 
-    if not result.valid:
-        return result
 
-    diameter_value = float(diameter)
+class NumericValidationError(ValidationError):
+    """Raised when a numeric value is invalid."""
 
-    if diameter_value > 100:
-        result.add_error(
-            "Rebar diameter is outside the supported range."
-        )
-        return result
 
-    if not allow_non_standard:
-        if diameter_value not in STANDARD_REBAR_DIAMETERS_MM:
-            result.add_warning(
-                "The selected diameter is not in the standard "
-                "rebar diameter list."
+class GeometryValidationError(ValidationError):
+    """Raised when geometry is invalid."""
+
+
+class MaterialValidationError(ValidationError):
+    """Raised when material data is invalid."""
+
+
+class ReinforcementValidationError(ValidationError):
+    """Raised when reinforcement data is invalid."""
+
+
+# =====================================================================
+# CONSTANTS
+# =====================================================================
+
+STANDARD_REBAR_DIAMETERS_MM: Tuple[float, ...] = (
+    6.0,
+    8.0,
+    10.0,
+    12.0,
+    14.0,
+    16.0,
+    18.0,
+    20.0,
+    22.0,
+    25.0,
+    28.0,
+    32.0,
+    36.0,
+    40.0,
+    45.0,
+    50.0,
+)
+
+DEFAULT_MAX_BAR_LENGTH_M = 12.0
+DEFAULT_MIN_COVER_MM = 15.0
+DEFAULT_MAX_COVER_MM = 150.0
+
+DEFAULT_MIN_CONCRETE_FC_MPA = 15.0
+DEFAULT_MAX_CONCRETE_FC_MPA = 100.0
+
+DEFAULT_MIN_STEEL_FY_MPA = 200.0
+DEFAULT_MAX_STEEL_FY_MPA = 1000.0
+
+
+# =====================================================================
+# RESULT OBJECTS
+# =====================================================================
+
+@dataclass(slots=True)
+class ValidationIssue:
+    field: str
+    message: str
+    code: str = "invalid"
+    severity: str = "error"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "field": self.field,
+            "message": self.message,
+            "code": self.code,
+            "severity": self.severity,
+        }
+
+
+@dataclass(slots=True)
+class ValidationResult:
+    valid: bool
+    issues: List[ValidationIssue] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+
+    @property
+    def errors(self) -> List[ValidationIssue]:
+        return [
+            issue
+            for issue in self.issues
+            if issue.severity == "error"
+        ]
+
+    def add_error(
+        self,
+        field: str,
+        message: str,
+        code: str = "invalid",
+    ) -> None:
+        self.issues.append(
+            ValidationIssue(
+                field=field,
+                message=message,
+                code=code,
+                severity="error",
             )
+        )
+        self.valid = False
 
-    return result
+    def add_warning(self, message: str) -> None:
+        if message and message not in self.warnings:
+            self.warnings.append(message)
+
+    def raise_if_invalid(self) -> None:
+        if not self.valid:
+            messages = "; ".join(
+                f"{issue.field}: {issue.message}"
+                for issue in self.errors
+            )
+            raise ValidationError(messages or "Validation failed.")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "valid": self.valid,
+            "issues": [
+                issue.to_dict()
+                for issue in self.issues
+            ],
+            "warnings": list(self.warnings),
+        }
 
 
-def validate_rebar_quantity(
-    quantity: Any,
-) -> ValidationResult:
-    """
-    Validate reinforcement bar count.
-    """
+# =====================================================================
+# BASIC HELPERS
+# =====================================================================
 
-    return validate_integer(
-        quantity,
-        "Rebar quantity",
-        minimum=1,
+def _is_bool(value: Any) -> bool:
+    return isinstance(value, bool)
+
+
+def is_number(value: Any) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not _is_bool(value)
     )
 
 
-def validate_rebar_length(
-    length: Any,
+def require_number(
+    value: Any,
+    field: str,
+    *,
+    minimum: Optional[float] = None,
+    maximum: Optional[float] = None,
+    allow_zero: bool = False,
+) -> float:
+    if value is None:
+        raise RequiredFieldError(
+            f"{field} is required."
+        )
+
+    if not is_number(value):
+        raise NumericValidationError(
+            f"{field} must be numeric."
+        )
+
+    numeric = float(value)
+
+    if not allow_zero and numeric <= 0:
+        raise NumericValidationError(
+            f"{field} must be greater than zero."
+        )
+
+    if allow_zero and numeric < 0:
+        raise NumericValidationError(
+            f"{field} cannot be negative."
+        )
+
+    if minimum is not None and numeric < minimum:
+        raise NumericValidationError(
+            f"{field} must be >= {minimum}."
+        )
+
+    if maximum is not None and numeric > maximum:
+        raise NumericValidationError(
+            f"{field} must be <= {maximum}."
+        )
+
+    return numeric
+
+
+def require_positive_number(
+    value: Any,
+    field: str,
     *,
     maximum: Optional[float] = None,
-) -> ValidationResult:
-    """
-    Validate actual cut-piece length.
-
-    The default upper limit is intentionally conservative.
-    A specific Cut List / stock-bar module may impose a
-    stricter limit such as the actual stock length.
-    """
-
-    if maximum is None:
-        maximum = 12.0
-
-    return validate_number(
-        length,
-        "Rebar length",
-        minimum=0.001,
+) -> float:
+    return require_number(
+        value,
+        field,
+        minimum=None,
         maximum=maximum,
         allow_zero=False,
     )
 
 
-# ============================================================
-# CONCRETE VALIDATION
-# ============================================================
-
-
-def validate_concrete_strength(
-    fck: Any,
-) -> ValidationResult:
-    """
-    Validate characteristic concrete compressive strength.
-
-    Unit:
-        MPa
-    """
-
-    return validate_number(
-        fck,
-        "Concrete compressive strength",
-        minimum=1.0,
-        maximum=150.0,
-        allow_zero=False,
+def require_non_negative_number(
+    value: Any,
+    field: str,
+    *,
+    maximum: Optional[float] = None,
+) -> float:
+    return require_number(
+        value,
+        field,
+        minimum=None,
+        maximum=maximum,
+        allow_zero=True,
     )
 
 
-def validate_steel_strength(
-    fy: Any,
-) -> ValidationResult:
-    """
-    Validate reinforcing steel yield strength.
+def require_integer(
+    value: Any,
+    field: str,
+    *,
+    minimum: Optional[int] = None,
+    maximum: Optional[int] = None,
+    allow_zero: bool = False,
+) -> int:
+    if value is None:
+        raise RequiredFieldError(
+            f"{field} is required."
+        )
 
-    Unit:
-        MPa
-    """
+    if _is_bool(value) or not isinstance(value, int):
+        raise NumericValidationError(
+            f"{field} must be an integer."
+        )
 
-    return validate_number(
-        fy,
-        "Steel yield strength",
-        minimum=1.0,
-        maximum=2000.0,
-        allow_zero=False,
+    if not allow_zero and value <= 0:
+        raise NumericValidationError(
+            f"{field} must be greater than zero."
+        )
+
+    if allow_zero and value < 0:
+        raise NumericValidationError(
+            f"{field} cannot be negative."
+        )
+
+    if minimum is not None and value < minimum:
+        raise NumericValidationError(
+            f"{field} must be >= {minimum}."
+        )
+
+    if maximum is not None and value > maximum:
+        raise NumericValidationError(
+            f"{field} must be <= {maximum}."
+        )
+
+    return value
+
+
+def require_string(
+    value: Any,
+    field: str,
+    *,
+    min_length: int = 1,
+    max_length: Optional[int] = None,
+) -> str:
+    if value is None:
+        raise RequiredFieldError(
+            f"{field} is required."
+        )
+
+    if not isinstance(value, str):
+        raise ValidationError(
+            f"{field} must be a string."
+        )
+
+    result = value.strip()
+
+    if len(result) < min_length:
+        raise ValidationError(
+            f"{field} is too short."
+        )
+
+    if max_length is not None and len(result) > max_length:
+        raise ValidationError(
+            f"{field} exceeds maximum length."
+        )
+
+    return result
+
+
+def optional_string(
+    value: Any,
+    field: str,
+    *,
+    max_length: Optional[int] = None,
+) -> Optional[str]:
+    if value is None:
+        return None
+
+    return require_string(
+        value,
+        field,
+        min_length=1,
+        max_length=max_length,
     )
 
 
-# ============================================================
+def ensure_enum(
+    value: Any,
+    enum_type: Any,
+    field: str,
+) -> Any:
+    if isinstance(value, enum_type):
+        return value
+
+    if isinstance(value, str):
+        try:
+            return enum_type(value)
+        except ValueError:
+            pass
+
+    allowed = ", ".join(
+        str(item.value)
+        for item in enum_type
+    )
+
+    raise ValidationError(
+        f"{field} must be one of: {allowed}."
+    )
+
+
+# =====================================================================
+# REBAR HELPERS
+# =====================================================================
+
+def validate_rebar_diameter(
+    diameter_mm: Any,
+    *,
+    require_standard: bool = True,
+) -> float:
+    diameter = require_positive_number(
+        diameter_mm,
+        "diameter_mm",
+        maximum=100.0,
+    )
+
+    if require_standard:
+        if diameter not in STANDARD_REBAR_DIAMETERS_MM:
+            raise ReinforcementValidationError(
+                f"Unsupported standard rebar diameter: {diameter_mm} mm."
+            )
+
+    return diameter
+
+
+def validate_rebar_quantity(
+    quantity: Any,
+) -> int:
+    return require_integer(
+        quantity,
+        "quantity",
+        minimum=1,
+        maximum=1_000_000,
+    )
+
+
+def validate_rebar_length(
+    length_m: Any,
+    *,
+    max_length_m: float = DEFAULT_MAX_BAR_LENGTH_M,
+    allow_overlength: bool = False,
+) -> float:
+    length = require_positive_number(
+        length_m,
+        "length_m",
+    )
+
+    if not allow_overlength and length > max_length_m:
+        raise ReinforcementValidationError(
+            f"Physical rebar piece length cannot exceed "
+            f"{max_length_m:g} m."
+        )
+
+    return length
+
+
+def validate_spacing(
+    spacing_mm: Any,
+    *,
+    minimum_mm: float = 1.0,
+    maximum_mm: float = 2000.0,
+) -> float:
+    return require_positive_number(
+        spacing_mm,
+        "spacing_mm",
+        maximum=maximum_mm,
+    ) if float(spacing_mm) >= minimum_mm else _raise(
+        ReinforcementValidationError(
+            f"spacing_mm must be >= {minimum_mm}."
+        )
+    )
+
+
+def _raise(error: Exception) -> Any:
+    raise error
+
+
+# =====================================================================
+# MATERIAL VALIDATION
+# =====================================================================
+
+def validate_concrete_material(
+    material: ConcreteMaterial,
+    *,
+    min_fc_mpa: float = DEFAULT_MIN_CONCRETE_FC_MPA,
+    max_fc_mpa: float = DEFAULT_MAX_CONCRETE_FC_MPA,
+) -> ValidationResult:
+    result = ValidationResult(valid=True)
+
+    try:
+        require_string(material.grade, "grade")
+    except ValidationError as exc:
+        result.add_error("grade", str(exc))
+
+    try:
+        require_number(
+            material.fc_mpa,
+            "fc_mpa",
+            minimum=min_fc_mpa,
+            maximum=max_fc_mpa,
+        )
+    except ValidationError as exc:
+        result.add_error("fc_mpa", str(exc))
+
+    try:
+        require_number(
+            material.density_kg_m3,
+            "density_kg_m3",
+            minimum=1000.0,
+            maximum=5000.0,
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "density_kg_m3",
+            str(exc),
+        )
+
+    return result
+
+
+def validate_steel_material(
+    material: SteelMaterial,
+    *,
+    min_fy_mpa: float = DEFAULT_MIN_STEEL_FY_MPA,
+    max_fy_mpa: float = DEFAULT_MAX_STEEL_FY_MPA,
+) -> ValidationResult:
+    result = ValidationResult(valid=True)
+
+    try:
+        require_string(material.grade, "grade")
+    except ValidationError as exc:
+        result.add_error("grade", str(exc))
+
+    try:
+        require_number(
+            material.fy_mpa,
+            "fy_mpa",
+            minimum=min_fy_mpa,
+            maximum=max_fy_mpa,
+        )
+    except ValidationError as exc:
+        result.add_error("fy_mpa", str(exc))
+
+    if material.fu_mpa is not None:
+        try:
+            require_number(
+                material.fu_mpa,
+                "fu_mpa",
+                minimum=material.fy_mpa,
+                maximum=2000.0,
+            )
+        except ValidationError as exc:
+            result.add_error("fu_mpa", str(exc))
+
+    try:
+        require_number(
+            material.density_kg_m3,
+            "density_kg_m3",
+            minimum=5000.0,
+            maximum=10000.0,
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "density_kg_m3",
+            str(exc),
+        )
+
+    return result
+
+
+# =====================================================================
 # GEOMETRY VALIDATION
-# ============================================================
-
+# =====================================================================
 
 def validate_rectangular_geometry(
-    width: Any,
-    height: Any,
-    *,
-    field_prefix: str = "Section",
+    geometry: RectangularGeometry,
 ) -> ValidationResult:
-    """
-    Validate rectangular member dimensions.
-    """
+    result = ValidationResult(valid=True)
 
-    result = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
-    )
+    for field_name in ("width_m", "depth_m"):
+        try:
+            require_positive_number(
+                getattr(geometry, field_name),
+                field_name,
+                maximum=1000.0,
+            )
+        except ValidationError as exc:
+            result.add_error(field_name, str(exc))
 
-    width_result = validate_positive(
-        width,
-        f"{field_prefix} width",
-    )
-
-    height_result = validate_positive(
-        height,
-        f"{field_prefix} height",
-    )
-
-    result.errors.extend(width_result.errors)
-    result.errors.extend(height_result.errors)
-
-    result.warnings.extend(width_result.warnings)
-    result.warnings.extend(height_result.warnings)
-
-    if result.errors:
-        result.valid = False
+    if geometry.height_m is not None:
+        try:
+            require_positive_number(
+                geometry.height_m,
+                "height_m",
+                maximum=1000.0,
+            )
+        except ValidationError as exc:
+            result.add_error("height_m", str(exc))
 
     return result
 
 
 def validate_circular_geometry(
-    diameter: Any,
-    *,
-    field_name: str = "Section diameter",
+    geometry: CircularGeometry,
 ) -> ValidationResult:
-    """
-    Validate circular member diameter.
-    """
+    result = ValidationResult(valid=True)
 
-    return validate_positive(
-        diameter,
-        field_name,
-    )
+    try:
+        require_positive_number(
+            geometry.diameter_m,
+            "diameter_m",
+            maximum=1000.0,
+        )
+    except ValidationError as exc:
+        result.add_error("diameter_m", str(exc))
+
+    if geometry.height_m is not None:
+        try:
+            require_positive_number(
+                geometry.height_m,
+                "height_m",
+                maximum=1000.0,
+            )
+        except ValidationError as exc:
+            result.add_error("height_m", str(exc))
+
+    return result
 
 
 def validate_slab_geometry(
-    length: Any,
-    width: Any,
-    thickness: Any,
+    geometry: SlabGeometry,
 ) -> ValidationResult:
-    """
-    Validate basic slab geometry.
-    """
+    result = ValidationResult(valid=True)
 
-    result = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
-    )
-
-    values = (
-        ("Slab length", length),
-        ("Slab width", width),
-        ("Slab thickness", thickness),
-    )
-
-    for field_name, value in values:
-        field_result = validate_positive(
-            value,
-            field_name,
-        )
-
-        result.errors.extend(
-            field_result.errors
-        )
-
-        result.warnings.extend(
-            field_result.warnings
-        )
-
-    if result.errors:
-        result.valid = False
+    for field_name in (
+        "length_m",
+        "width_m",
+        "thickness_m",
+    ):
+        try:
+            require_positive_number(
+                getattr(geometry, field_name),
+                field_name,
+                maximum=1000.0,
+            )
+        except ValidationError as exc:
+            result.add_error(field_name, str(exc))
 
     return result
 
 
-# ============================================================
-# COVER VALIDATION
-# ============================================================
+def validate_geometry(
+    geometry: Any,
+) -> ValidationResult:
+    if isinstance(geometry, RectangularGeometry):
+        return validate_rectangular_geometry(geometry)
 
+    if isinstance(geometry, CircularGeometry):
+        return validate_circular_geometry(geometry)
+
+    if isinstance(geometry, SlabGeometry):
+        return validate_slab_geometry(geometry)
+
+    result = ValidationResult(valid=False)
+    result.add_error(
+        "geometry",
+        "Unsupported geometry type.",
+        code="unsupported_geometry",
+    )
+    return result
+
+
+# =====================================================================
+# COVER VALIDATION
+# =====================================================================
 
 def validate_cover(
-    cover: Any,
+    cover_mm: Any,
     *,
-    minimum: float = 0.0,
-    maximum: float = 500.0,
-) -> ValidationResult:
-    """
-    Validate nominal concrete cover.
-
-    The actual minimum required cover must come from
-    the selected design code and exposure conditions.
-    """
-
-    return validate_number(
-        cover,
-        "Concrete cover",
-        minimum=minimum,
-        maximum=maximum,
-        allow_zero=True,
+    minimum_mm: float = DEFAULT_MIN_COVER_MM,
+    maximum_mm: float = DEFAULT_MAX_COVER_MM,
+) -> float:
+    cover = require_positive_number(
+        cover_mm,
+        "cover_mm",
+        maximum=maximum_mm,
     )
 
+    if cover < minimum_mm:
+        raise ValidationError(
+            f"cover_mm must be >= {minimum_mm:g} mm."
+        )
 
-# ============================================================
-# SPACING VALIDATION
-# ============================================================
-
-
-def validate_spacing(
-    spacing: Any,
-    *,
-    minimum: float = 0.001,
-    maximum: float = 5000.0,
-) -> ValidationResult:
-    """
-    Validate reinforcement spacing.
-    """
-
-    return validate_number(
-        spacing,
-        "Reinforcement spacing",
-        minimum=minimum,
-        maximum=maximum,
-        allow_zero=False,
-    )
+    return cover
 
 
-# ============================================================
+# =====================================================================
 # PROJECT VALIDATION
-# ============================================================
+# =====================================================================
 
-
-def validate_project_data(
-    project_data: Dict[str, Any],
+def validate_project(
+    project: Project,
 ) -> ValidationResult:
-    """
-    Validate basic project-level data.
+    result = ValidationResult(valid=True)
 
-    Engineering-specific rules are intentionally not handled
-    here. Those belong to the selected design-code module.
-    """
+    try:
+        require_string(project.project_id, "project_id")
+    except ValidationError as exc:
+        result.add_error("project_id", str(exc))
 
-    result = validate_required_fields(
-        project_data,
-        (
-            "name",
+    try:
+        require_string(project.name, "name")
+    except ValidationError as exc:
+        result.add_error("name", str(exc))
+
+    try:
+        ensure_enum(
+            project.structure_type,
+            StructureType,
             "structure_type",
-            "design_code",
+        )
+    except ValidationError as exc:
+        result.add_error("structure_type", str(exc))
+
+    try:
+        ensure_enum(
+            project.unit_system,
+            UnitSystem,
             "unit_system",
-        ),
-    )
+        )
+    except ValidationError as exc:
+        result.add_error("unit_system", str(exc))
 
-    if "name" in project_data:
-        name_result = validate_required_string(
-            project_data["name"],
-            "Project name",
+    if project.revision < 1:
+        result.add_error(
+            "revision",
+            "revision must be >= 1.",
         )
 
-        result.errors.extend(
-            name_result.errors
-        )
+    if project.design_code is not None:
+        try:
+            require_string(
+                project.design_code,
+                "design_code",
+            )
+        except ValidationError as exc:
+            result.add_error(
+                "design_code",
+                str(exc),
+            )
 
-    if result.errors:
-        result.valid = False
+    if project.code_edition is not None:
+        try:
+            require_string(
+                project.code_edition,
+                "code_edition",
+            )
+        except ValidationError as exc:
+            result.add_error(
+                "code_edition",
+                str(exc),
+            )
 
     return result
 
 
-# ============================================================
-# MEMBER INPUT VALIDATION
-# ============================================================
+# =====================================================================
+# FLOOR VALIDATION
+# =====================================================================
 
-
-def validate_member_data(
-    member_data: Dict[str, Any],
+def validate_floor(
+    floor: Floor,
 ) -> ValidationResult:
-    """
-    Generic validation for a structural member.
+    result = ValidationResult(valid=True)
 
-    Specific member modules should perform additional
-    engineering validation.
-    """
-
-    result = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
-    )
-
-    required_fields = (
-        "member_type",
+    for field_name in (
+        "floor_id",
+        "project_id",
         "name",
-    )
+    ):
+        try:
+            require_string(
+                getattr(floor, field_name),
+                field_name,
+            )
+        except ValidationError as exc:
+            result.add_error(
+                field_name,
+                str(exc),
+            )
 
-    required_result = validate_required_fields(
-        member_data,
-        required_fields,
-    )
-
-    result.errors.extend(
-        required_result.errors
-    )
-
-    result.warnings.extend(
-        required_result.warnings
-    )
-
-    if "name" in member_data:
-        name_result = validate_required_string(
-            member_data["name"],
-            "Member name",
+    if floor.revision < 1:
+        result.add_error(
+            "revision",
+            "revision must be >= 1.",
         )
-
-        result.errors.extend(
-            name_result.errors
-        )
-
-    if result.errors:
-        result.valid = False
 
     return result
 
 
-# ============================================================
-# COLUMN VALIDATION
-# ============================================================
+# =====================================================================
+# STRUCTURAL MEMBER VALIDATION
+# =====================================================================
 
-
-def validate_column_inputs(
-    inputs: Dict[str, Any],
+def validate_structural_member(
+    member: StructuralMember,
 ) -> ValidationResult:
-    """
-    Validate common reinforced-concrete column inputs.
+    result = ValidationResult(valid=True)
 
-    This function validates input integrity only.
+    for field_name in (
+        "member_id",
+        "project_id",
+    ):
+        try:
+            require_string(
+                getattr(member, field_name),
+                field_name,
+            )
+        except ValidationError as exc:
+            result.add_error(
+                field_name,
+                str(exc),
+            )
 
-    Code-specific requirements such as:
-    - minimum reinforcement ratio
-    - maximum reinforcement ratio
-    - slenderness
-    - interaction diagrams
-    - confinement
-    - critical-zone detailing
+    try:
+        ensure_enum(
+            member.member_type,
+            MemberType,
+            "member_type",
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "member_type",
+            str(exc),
+        )
 
-    belong to the selected design-code module.
-    """
+    try:
+        ensure_enum(
+            member.structure_type,
+            StructureType,
+            "structure_type",
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "structure_type",
+            str(exc),
+        )
 
-    result = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
+    if member.revision < 1:
+        result.add_error(
+            "revision",
+            "revision must be >= 1.",
+        )
+
+    if member.cover_mm is not None:
+        try:
+            validate_cover(member.cover_mm)
+        except ValidationError as exc:
+            result.add_error(
+                "cover_mm",
+                str(exc),
+            )
+
+    if member.geometry is not None:
+        geometry_result = validate_geometry(
+            member.geometry
+        )
+
+        for issue in geometry_result.issues:
+            result.issues.append(issue)
+
+        result.warnings.extend(
+            geometry_result.warnings
+        )
+
+        if not geometry_result.valid:
+            result.valid = False
+
+    if member.materials is not None:
+        if member.materials.concrete is not None:
+            material_result = validate_concrete_material(
+                member.materials.concrete
+            )
+
+            for issue in material_result.issues:
+                result.issues.append(
+                    ValidationIssue(
+                        field=f"materials.concrete.{issue.field}",
+                        message=issue.message,
+                        code=issue.code,
+                        severity=issue.severity,
+                    )
+                )
+
+            if not material_result.valid:
+                result.valid = False
+
+        if member.materials.reinforcement is not None:
+            steel_result = validate_steel_material(
+                member.materials.reinforcement
+            )
+
+            for issue in steel_result.issues:
+                result.issues.append(
+                    ValidationIssue(
+                        field=f"materials.reinforcement.{issue.field}",
+                        message=issue.message,
+                        code=issue.code,
+                        severity=issue.severity,
+                    )
+                )
+
+            if not steel_result.valid:
+                result.valid = False
+
+        if member.materials.structural_steel is not None:
+            steel_result = validate_steel_material(
+                member.materials.structural_steel
+            )
+
+            for issue in steel_result.issues:
+                result.issues.append(
+                    ValidationIssue(
+                        field=f"materials.structural_steel.{issue.field}",
+                        message=issue.message,
+                        code=issue.code,
+                        severity=issue.severity,
+                    )
+                )
+
+            if not steel_result.valid:
+                result.valid = False
+
+    return result
+
+
+# =====================================================================
+# REBAR SHAPE VALIDATION
+# =====================================================================
+
+def validate_rebar_shape(
+    shape: RebarShape,
+) -> ValidationResult:
+    result = ValidationResult(valid=True)
+
+    try:
+        require_string(
+            shape.shape_code,
+            "shape_code",
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "shape_code",
+            str(exc),
+        )
+
+    for key, value in shape.dimensions_mm.items():
+        try:
+            require_positive_number(
+                value,
+                f"dimensions_mm.{key}",
+                maximum=100_000.0,
+            )
+        except ValidationError as exc:
+            result.add_error(
+                f"dimensions_mm.{key}",
+                str(exc),
+            )
+
+    for angle in shape.bend_angles_deg:
+        try:
+            require_number(
+                angle,
+                "bend_angle",
+                minimum=0.0,
+                maximum=360.0,
+                allow_zero=True,
+            )
+        except ValidationError as exc:
+            result.add_error(
+                "bend_angles_deg",
+                str(exc),
+            )
+
+    return result
+
+
+# =====================================================================
+# REINFORCEMENT VALIDATION
+# =====================================================================
+
+def validate_reinforcement_bar(
+    bar: ReinforcementBar,
+    *,
+    max_piece_length_m: float = DEFAULT_MAX_BAR_LENGTH_M,
+) -> ValidationResult:
+    result = ValidationResult(valid=True)
+
+    for field_name in (
+        "bar_id",
+        "member_id",
+        "project_id",
+    ):
+        try:
+            require_string(
+                getattr(bar, field_name),
+                field_name,
+            )
+        except ValidationError as exc:
+            result.add_error(
+                field_name,
+                str(exc),
+            )
+
+    try:
+        validate_rebar_diameter(
+            bar.diameter_mm
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "diameter_mm",
+            str(exc),
+        )
+
+    try:
+        validate_rebar_quantity(
+            bar.quantity
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "quantity",
+            str(exc),
+        )
+
+    try:
+        validate_rebar_length(
+            bar.length_m,
+            max_length_m=max_piece_length_m,
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "length_m",
+            str(exc),
+        )
+
+    if bar.spacing_mm is not None:
+        try:
+            validate_spacing(
+                bar.spacing_mm
+            )
+        except ValidationError as exc:
+            result.add_error(
+                "spacing_mm",
+                str(exc),
+            )
+
+    if bar.development_length_m < 0:
+        result.add_error(
+            "development_length_m",
+            "development length cannot be negative.",
+        )
+
+    if bar.lap_length_m < 0:
+        result.add_error(
+            "lap_length_m",
+            "lap length cannot be negative.",
+        )
+
+    if bar.shape is not None:
+        shape_result = validate_rebar_shape(
+            bar.shape
+        )
+
+        for issue in shape_result.issues:
+            result.issues.append(issue)
+
+        if not shape_result.valid:
+            result.valid = False
+
+    if bar.source_revision is not None:
+        if bar.source_revision < 1:
+            result.add_error(
+                "source_revision",
+                "source_revision must be >= 1.",
+            )
+
+    return result
+
+
+# =====================================================================
+# SPLICE VALIDATION
+# =====================================================================
+
+def validate_splice(
+    splice: Splice,
+) -> ValidationResult:
+    result = ValidationResult(valid=True)
+
+    for field_name in (
+        "splice_id",
+        "member_id",
+        "bar_id",
+    ):
+        try:
+            require_string(
+                getattr(splice, field_name),
+                field_name,
+            )
+        except ValidationError as exc:
+            result.add_error(
+                field_name,
+                str(exc),
+            )
+
+    try:
+        ensure_enum(
+            splice.splice_type,
+            SpliceType,
+            "splice_type",
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "splice_type",
+            str(exc),
+        )
+
+    if splice.position_m is not None:
+        try:
+            require_non_negative_number(
+                splice.position_m,
+                "position_m",
+            )
+        except ValidationError as exc:
+            result.add_error(
+                "position_m",
+                str(exc),
+            )
+
+    if splice.length_m is not None:
+        try:
+            require_positive_number(
+                splice.length_m,
+                "length_m",
+            )
+        except ValidationError as exc:
+            result.add_error(
+                "length_m",
+                str(exc),
+            )
+
+    return result
+
+
+# =====================================================================
+# CALCULATION RESULT VALIDATION
+# =====================================================================
+
+def validate_calculation_result(
+    result_obj: CalculationResult,
+) -> ValidationResult:
+    result = ValidationResult(valid=True)
+
+    for field_name in (
+        "calculation_id",
+        "project_id",
+        "member_id",
+    ):
+        try:
+            require_string(
+                getattr(result_obj, field_name),
+                field_name,
+            )
+        except ValidationError as exc:
+            result.add_error(
+                field_name,
+                str(exc),
+            )
+
+    try:
+        ensure_enum(
+            result_obj.member_type,
+            MemberType,
+            "member_type",
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "member_type",
+            str(exc),
+        )
+
+    if result_obj.revision < 1:
+        result.add_error(
+            "revision",
+            "revision must be >= 1.",
+        )
+
+    for index, check in enumerate(result_obj.checks):
+        if not check.check_id:
+            result.add_error(
+                f"checks[{index}].check_id",
+                "check_id is required.",
+            )
+
+    for index, bar in enumerate(
+        result_obj.reinforcement
+    ):
+        bar_result = validate_reinforcement_bar(bar)
+
+        for issue in bar_result.issues:
+            result.issues.append(
+                ValidationIssue(
+                    field=f"reinforcement[{index}].{issue.field}",
+                    message=issue.message,
+                    code=issue.code,
+                    severity=issue.severity,
+                )
+            )
+
+        if not bar_result.valid:
+            result.valid = False
+
+    return result
+
+
+# =====================================================================
+# MATERIAL QUANTITY VALIDATION
+# =====================================================================
+
+def validate_material_quantity(
+    item: MaterialQuantity,
+) -> ValidationResult:
+    result = ValidationResult(valid=True)
+
+    for field_name in (
+        "item_id",
+        "project_id",
+        "material_type",
+        "unit",
+    ):
+        try:
+            require_string(
+                getattr(item, field_name),
+                field_name,
+            )
+        except ValidationError as exc:
+            result.add_error(
+                field_name,
+                str(exc),
+            )
+
+    try:
+        require_non_negative_number(
+            item.quantity,
+            "quantity",
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "quantity",
+            str(exc),
+        )
+
+    if item.revision < 1:
+        result.add_error(
+            "revision",
+            "revision must be >= 1.",
+        )
+
+    return result
+
+
+# =====================================================================
+# ENGINEERING CONTEXT VALIDATION
+# =====================================================================
+
+def validate_engineering_context(
+    context: EngineeringContext,
+) -> ValidationResult:
+    result = ValidationResult(valid=True)
+
+    structure_type = context.resolve_structure_type()
+
+    if structure_type is None:
+        result.add_error(
+            "structure_type",
+            "Structure type must be explicitly resolvable.",
+            code="missing_structure_type",
+        )
+    else:
+        try:
+            ensure_enum(
+                structure_type,
+                StructureType,
+                "structure_type",
+            )
+        except ValidationError as exc:
+            result.add_error(
+                "structure_type",
+                str(exc),
+            )
+
+    if context.project is not None:
+        project_result = validate_project(
+            context.project
+        )
+
+        for issue in project_result.issues:
+            result.issues.append(issue)
+
+        if not project_result.valid:
+            result.valid = False
+
+    if context.floor is not None:
+        floor_result = validate_floor(
+            context.floor
+        )
+
+        for issue in floor_result.issues:
+            result.issues.append(issue)
+
+        if not floor_result.valid:
+            result.valid = False
+
+    if context.member is not None:
+        member_result = validate_structural_member(
+            context.member
+        )
+
+        for issue in member_result.issues:
+            result.issues.append(issue)
+
+        if not member_result.valid:
+            result.valid = False
+
+    if context.revision < 1:
+        result.add_error(
+            "revision",
+            "revision must be >= 1.",
+        )
+
+    if context.design_code is None:
+        if context.project is None or context.project.design_code is None:
+            result.add_warning(
+                "No design code is configured in the engineering context."
+            )
+
+    return result
+
+
+# =====================================================================
+# SPECIALIZED INPUT VALIDATORS
+# =====================================================================
+
+@dataclass(slots=True)
+class FoundationInput:
+    foundation_type: FoundationType
+    length_m: float
+    width_m: float
+    thickness_m: float
+    depth_m: Optional[float] = None
+    soil_bearing_capacity_kpa: Optional[float] = None
+    axial_load_kn: Optional[float] = None
+    moment_x_knm: Optional[float] = None
+    moment_y_knm: Optional[float] = None
+    cover_mm: Optional[float] = None
+
+
+def validate_foundation_input(
+    data: FoundationInput,
+) -> ValidationResult:
+    result = ValidationResult(valid=True)
+
+    try:
+        ensure_enum(
+            data.foundation_type,
+            FoundationType,
+            "foundation_type",
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "foundation_type",
+            str(exc),
+        )
+
+    for field_name in (
+        "length_m",
+        "width_m",
+        "thickness_m",
+    ):
+        try:
+            require_positive_number(
+                getattr(data, field_name),
+                field_name,
+                maximum=1000.0,
+            )
+        except ValidationError as exc:
+            result.add_error(
+                field_name,
+                str(exc),
+            )
+
+    optional_positive = (
+        "depth_m",
+        "soil_bearing_capacity_kpa",
     )
 
-    if "width" in inputs:
-        result.errors.extend(
-            validate_positive(
-                inputs["width"],
-                "Column width",
-            ).errors
+    for field_name in optional_positive:
+        value = getattr(data, field_name)
+        if value is not None:
+            try:
+                require_positive_number(
+                    value,
+                    field_name,
+                )
+            except ValidationError as exc:
+                result.add_error(
+                    field_name,
+                    str(exc),
+                )
+
+    for field_name in (
+        "axial_load_kn",
+        "moment_x_knm",
+        "moment_y_knm",
+    ):
+        value = getattr(data, field_name)
+        if value is not None:
+            try:
+                require_number(
+                    value,
+                    field_name,
+                    allow_zero=True,
+                )
+            except ValidationError as exc:
+                result.add_error(
+                    field_name,
+                    str(exc),
+                )
+
+    if data.cover_mm is not None:
+        try:
+            validate_cover(data.cover_mm)
+        except ValidationError as exc:
+            result.add_error(
+                "cover_mm",
+                str(exc),
+            )
+
+    return result
+
+
+@dataclass(slots=True)
+class ColumnInput:
+    column_type: ColumnType
+    width_m: Optional[float] = None
+    depth_m: Optional[float] = None
+    diameter_m: Optional[float] = None
+    height_m: float = 3.0
+    axial_load_kn: Optional[float] = None
+    moment_x_knm: Optional[float] = None
+    moment_y_knm: Optional[float] = None
+    cover_mm: Optional[float] = None
+
+
+def validate_column_input(
+    data: ColumnInput,
+) -> ValidationResult:
+    result = ValidationResult(valid=True)
+
+    try:
+        ensure_enum(
+            data.column_type,
+            ColumnType,
+            "column_type",
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "column_type",
+            str(exc),
         )
 
-    if "depth" in inputs:
-        result.errors.extend(
-            validate_positive(
-                inputs["depth"],
-                "Column depth",
-            ).errors
+    if data.column_type == ColumnType.RECTANGULAR:
+        for field_name in (
+            "width_m",
+            "depth_m",
+        ):
+            if getattr(data, field_name) is None:
+                result.add_error(
+                    field_name,
+                    "Required for rectangular columns.",
+                    code="required",
+                )
+            else:
+                try:
+                    require_positive_number(
+                        getattr(data, field_name),
+                        field_name,
+                    )
+                except ValidationError as exc:
+                    result.add_error(
+                        field_name,
+                        str(exc),
+                    )
+
+    if data.column_type == ColumnType.CIRCULAR:
+        if data.diameter_m is None:
+            result.add_error(
+                "diameter_m",
+                "Required for circular columns.",
+                code="required",
+            )
+        else:
+            try:
+                require_positive_number(
+                    data.diameter_m,
+                    "diameter_m",
+                )
+            except ValidationError as exc:
+                result.add_error(
+                    "diameter_m",
+                    str(exc),
+                )
+
+    try:
+        require_positive_number(
+            data.height_m,
+            "height_m",
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "height_m",
+            str(exc),
         )
 
-    if "diameter" in inputs:
-        result.errors.extend(
-            validate_positive(
-                inputs["diameter"],
-                "Column diameter",
-            ).errors
+    for field_name in (
+        "axial_load_kn",
+        "moment_x_knm",
+        "moment_y_knm",
+    ):
+        value = getattr(data, field_name)
+        if value is not None:
+            try:
+                require_number(
+                    value,
+                    field_name,
+                    allow_zero=True,
+                )
+            except ValidationError as exc:
+                result.add_error(
+                    field_name,
+                    str(exc),
+                )
+
+    if data.cover_mm is not None:
+        try:
+            validate_cover(data.cover_mm)
+        except ValidationError as exc:
+            result.add_error(
+                "cover_mm",
+                str(exc),
+            )
+
+    return result
+
+
+@dataclass(slots=True)
+class BeamInput:
+    beam_type: BeamType
+    width_m: float
+    depth_m: float
+    span_m: float
+    uniform_load_kn_m: Optional[float] = None
+    point_load_kn: Optional[float] = None
+    point_load_position_m: Optional[float] = None
+    cover_mm: Optional[float] = None
+
+
+def validate_beam_input(
+    data: BeamInput,
+) -> ValidationResult:
+    result = ValidationResult(valid=True)
+
+    try:
+        ensure_enum(
+            data.beam_type,
+            BeamType,
+            "beam_type",
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "beam_type",
+            str(exc),
         )
 
-    if "height" in inputs:
-        result.errors.extend(
-            validate_positive(
-                inputs["height"],
-                "Column height",
-            ).errors
+    for field_name in (
+        "width_m",
+        "depth_m",
+        "span_m",
+    ):
+        try:
+            require_positive_number(
+                getattr(data, field_name),
+                field_name,
+            )
+        except ValidationError as exc:
+            result.add_error(
+                field_name,
+                str(exc),
+            )
+
+    if data.uniform_load_kn_m is not None:
+        try:
+            require_non_negative_number(
+                data.uniform_load_kn_m,
+                "uniform_load_kn_m",
+            )
+        except ValidationError as exc:
+            result.add_error(
+                "uniform_load_kn_m",
+                str(exc),
+            )
+
+    if data.point_load_kn is not None:
+        try:
+            require_non_negative_number(
+                data.point_load_kn,
+                "point_load_kn",
+            )
+        except ValidationError as exc:
+            result.add_error(
+                "point_load_kn",
+                str(exc),
+            )
+
+    if data.point_load_position_m is not None:
+        try:
+            require_non_negative_number(
+                data.point_load_position_m,
+                "point_load_position_m",
+            )
+
+        except ValidationError as exc:
+            result.add_error(
+                "point_load_position_m",
+                str(exc),
+            )
+
+        if (
+            data.point_load_position_m is not None
+            and data.span_m > 0
+            and data.point_load_position_m > data.span_m
+        ):
+            result.add_error(
+                "point_load_position_m",
+                "Point load position cannot exceed beam span.",
+            )
+
+    if data.cover_mm is not None:
+        try:
+            validate_cover(data.cover_mm)
+        except ValidationError as exc:
+            result.add_error(
+                "cover_mm",
+                str(exc),
+            )
+
+    return result
+
+
+@dataclass(slots=True)
+class SlabInput:
+    slab_type: SlabType
+    length_m: float
+    width_m: float
+    thickness_m: float
+    cover_mm: Optional[float] = None
+    uniform_load_kn_m2: Optional[float] = None
+
+
+def validate_slab_input(
+    data: SlabInput,
+) -> ValidationResult:
+    result = ValidationResult(valid=True)
+
+    try:
+        ensure_enum(
+            data.slab_type,
+            SlabType,
+            "slab_type",
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "slab_type",
+            str(exc),
         )
 
-    if "cover" in inputs:
-        result.errors.extend(
-            validate_cover(
-                inputs["cover"],
-            ).errors
-        )
+    for field_name in (
+        "length_m",
+        "width_m",
+        "thickness_m",
+    ):
+        try:
+            require_positive_number(
+                getattr(data, field_name),
+                field_name,
+            )
+        except ValidationError as exc:
+            result.add_error(
+                field_name,
+                str(exc),
+            )
 
-    if "rebar_diameter" in inputs:
-        result.errors.extend(
+    if data.uniform_load_kn_m2 is not None:
+        try:
+            require_non_negative_number(
+                data.uniform_load_kn_m2,
+                "uniform_load_kn_m2",
+            )
+        except ValidationError as exc:
+            result.add_error(
+                "uniform_load_kn_m2",
+                str(exc),
+            )
+
+    if data.cover_mm is not None:
+        try:
+            validate_cover(data.cover_mm)
+        except ValidationError as exc:
+            result.add_error(
+                "cover_mm",
+                str(exc),
+            )
+
+    return result
+
+
+@dataclass(slots=True)
+class EquivalencyInput:
+    source_diameter_mm: float
+    source_quantity: int
+    target_diameter_mm: float
+    target_quantity: Optional[int] = None
+
+
+def validate_equivalency_input(
+    data: EquivalencyInput,
+) -> ValidationResult:
+    result = ValidationResult(valid=True)
+
+    for field_name in (
+        "source_diameter_mm",
+        "target_diameter_mm",
+    ):
+        try:
             validate_rebar_diameter(
-                inputs["rebar_diameter"],
-                allow_non_standard=True,
-            ).errors
+                getattr(data, field_name)
+            )
+        except ValidationError as exc:
+            result.add_error(
+                field_name,
+                str(exc),
+            )
+
+    try:
+        validate_rebar_quantity(
+            data.source_quantity
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "source_quantity",
+            str(exc),
         )
 
-    if "rebar_count" in inputs:
-        result.errors.extend(
+    if data.target_quantity is not None:
+        try:
             validate_rebar_quantity(
-                inputs["rebar_count"],
-            ).errors
-        )
-
-    if result.errors:
-        result.valid = False
+                data.target_quantity
+            )
+        except ValidationError as exc:
+            result.add_error(
+                "target_quantity",
+                str(exc),
+            )
 
     return result
 
 
-# ============================================================
-# BEAM VALIDATION
-# ============================================================
-
-
-def validate_beam_inputs(
-    inputs: Dict[str, Any],
-) -> ValidationResult:
-    """
-    Validate common reinforced-concrete beam inputs.
-
-    Code-specific design checks are handled elsewhere.
-    """
-
-    result = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
-    )
-
-    fields = (
-        ("width", "Beam width"),
-        ("depth", "Beam depth"),
-        ("span", "Beam span"),
-    )
-
-    for key, label in fields:
-        if key in inputs:
-            field_result = validate_positive(
-                inputs[key],
-                label,
-            )
-
-            result.errors.extend(
-                field_result.errors
-            )
-
-    if "cover" in inputs:
-        result.errors.extend(
-            validate_cover(
-                inputs["cover"],
-            ).errors
-        )
-
-    if "rebar_diameter" in inputs:
-        result.errors.extend(
-            validate_rebar_diameter(
-                inputs["rebar_diameter"],
-                allow_non_standard=True,
-            ).errors
-        )
-
-    if result.errors:
-        result.valid = False
-
-    return result
-
-
-# ============================================================
-# FOUNDATION VALIDATION
-# ============================================================
-
-
-def validate_foundation_inputs(
-    inputs: Dict[str, Any],
-) -> ValidationResult:
-    """
-    Validate common foundation inputs.
-
-    Foundation bearing, punching, one-way shear and
-    reinforcement rules belong to the design-code layer.
-    """
-
-    result = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
-    )
-
-    fields = (
-        ("length", "Foundation length"),
-        ("width", "Foundation width"),
-        ("thickness", "Foundation thickness"),
-    )
-
-    for key, label in fields:
-        if key in inputs:
-            field_result = validate_positive(
-                inputs[key],
-                label,
-            )
-
-            result.errors.extend(
-                field_result.errors
-            )
-
-    if "cover" in inputs:
-        result.errors.extend(
-            validate_cover(
-                inputs["cover"],
-            ).errors
-        )
-
-    if "rebar_diameter" in inputs:
-        result.errors.extend(
-            validate_rebar_diameter(
-                inputs["rebar_diameter"],
-                allow_non_standard=True,
-            ).errors
-        )
-
-    if result.errors:
-        result.valid = False
-
-    return result
-
-
-# ============================================================
-# SLAB VALIDATION
-# ============================================================
-
-
-def validate_slab_inputs(
-    inputs: Dict[str, Any],
-) -> ValidationResult:
-    """
-    Validate common slab inputs.
-
-    Individual slab-system rules are implemented in the
-    relevant slab calculation modules.
-    """
-
-    result = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
-    )
-
-    fields = (
-        ("length", "Slab length"),
-        ("width", "Slab width"),
-        ("thickness", "Slab thickness"),
-    )
-
-    for key, label in fields:
-        if key in inputs:
-            field_result = validate_positive(
-                inputs[key],
-                label,
-            )
-
-            result.errors.extend(
-                field_result.errors
-            )
-
-    if "cover" in inputs:
-        result.errors.extend(
-            validate_cover(
-                inputs["cover"],
-            ).errors
-        )
-
-    if "rebar_diameter" in inputs:
-        result.errors.extend(
-            validate_rebar_diameter(
-                inputs["rebar_diameter"],
-                allow_non_standard=True,
-            ).errors
-        )
-
-    if result.errors:
-        result.valid = False
-
-    return result
-
-
-# ============================================================
-# EQUIVALENCY VALIDATION
-# ============================================================
-
-
-def validate_rebar_equivalency_inputs(
-    current_diameter: Any,
-    current_quantity: Any,
-    replacement_diameter: Any,
-) -> ValidationResult:
-    """
-    Validate inputs for the standalone rebar equivalency tool.
-
-    The actual replacement quantity is NOT calculated here.
-
-    It belongs to the engineering/code calculation layer.
-    """
-
-    result = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
-    )
-
-    current_diameter_result = validate_rebar_diameter(
-        current_diameter,
-        allow_non_standard=True,
-    )
-
-    quantity_result = validate_rebar_quantity(
-        current_quantity,
-    )
-
-    replacement_diameter_result = validate_rebar_diameter(
-        replacement_diameter,
-        allow_non_standard=True,
-    )
-
-    result.errors.extend(
-        current_diameter_result.errors
-    )
-
-    result.errors.extend(
-        quantity_result.errors
-    )
-
-    result.errors.extend(
-        replacement_diameter_result.errors
-    )
-
-    result.warnings.extend(
-        current_diameter_result.warnings
-    )
-
-    result.warnings.extend(
-        replacement_diameter_result.warnings
-    )
-
-    if result.errors:
-        result.valid = False
-
-    return result
-
-
-# ============================================================
-# CUT LIST VALIDATION
-# ============================================================
-
+# =====================================================================
+# CUT PIECE VALIDATION
+# =====================================================================
 
 def validate_cut_piece(
-    diameter: Any,
-    length: Any,
-    quantity: Any,
+    piece: Any,
     *,
-    stock_length: float = 12.0,
+    max_length_m: float = DEFAULT_MAX_BAR_LENGTH_M,
 ) -> ValidationResult:
-    """
-    Validate an actual reinforcement cut piece.
+    result = ValidationResult(valid=True)
 
-    A single physical piece must never exceed the selected
-    stock-bar length.
-    """
-
-    result = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
+    required_fields = (
+        "piece_id",
+        "bar_mark",
     )
 
-    diameter_result = validate_rebar_diameter(
-        diameter,
-        allow_non_standard=True,
-    )
+    for field_name in required_fields:
+        value = getattr(piece, field_name, None)
 
-    quantity_result = validate_rebar_quantity(
-        quantity,
-    )
+        try:
+            require_string(
+                value,
+                field_name,
+            )
+        except ValidationError as exc:
+            result.add_error(
+                field_name,
+                str(exc),
+            )
 
-    length_result = validate_rebar_length(
-        length,
-        maximum=stock_length,
-    )
+    try:
+        validate_rebar_diameter(
+            piece.diameter_mm
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "diameter_mm",
+            str(exc),
+        )
 
-    result.errors.extend(
-        diameter_result.errors
-    )
+    try:
+        validate_rebar_length(
+            piece.length_m,
+            max_length_m=max_length_m,
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "length_m",
+            str(exc),
+        )
 
-    result.errors.extend(
-        quantity_result.errors
-    )
-
-    result.errors.extend(
-        length_result.errors
-    )
-
-    result.warnings.extend(
-        diameter_result.warnings
-    )
-
-    if result.errors:
-        result.valid = False
+    try:
+        validate_rebar_quantity(
+            piece.quantity
+        )
+    except ValidationError as exc:
+        result.add_error(
+            "quantity",
+            str(exc),
+        )
 
     return result
 
 
-# ============================================================
-# VALIDATE MULTIPLE RESULTS
-# ============================================================
+# =====================================================================
+# BATCH VALIDATION
+# =====================================================================
 
-
-def merge_validation_results(
-    results: Iterable[ValidationResult],
+def validate_all(
+    objects: Iterable[Any],
 ) -> ValidationResult:
-    """
-    Merge multiple validation results into one result.
-    """
+    combined = ValidationResult(valid=True)
 
-    merged = ValidationResult(
-        valid=True,
-        errors=[],
-        warnings=[],
-    )
+    for index, obj in enumerate(objects):
+        validator = validator_for(obj)
 
-    for result in results:
-        merged.errors.extend(
-            result.errors
-        )
+        if validator is None:
+            combined.add_warning(
+                f"Object at index {index} has no registered validator."
+            )
+            continue
 
-        merged.warnings.extend(
+        result = validator(obj)
+
+        for issue in result.issues:
+            combined.issues.append(
+                ValidationIssue(
+                    field=f"[{index}].{issue.field}",
+                    message=issue.message,
+                    code=issue.code,
+                    severity=issue.severity,
+                )
+            )
+
+        combined.warnings.extend(
             result.warnings
         )
 
         if not result.valid:
-            merged.valid = False
+            combined.valid = False
 
-    return merged
-
-
-# ============================================================
-# ENGINEERING SAFETY CHECK
-# ============================================================
+    return combined
 
 
-def ensure_valid(
-    result: ValidationResult,
+def validator_for(
+    obj: Any,
+):
+    if isinstance(obj, Project):
+        return validate_project
+
+    if isinstance(obj, Floor):
+        return validate_floor
+
+    if isinstance(obj, StructuralMember):
+        return validate_structural_member
+
+    if isinstance(obj, ReinforcementBar):
+        return validate_reinforcement_bar
+
+    if isinstance(obj, Splice):
+        return validate_splice
+
+    if isinstance(obj, CalculationResult):
+        return validate_calculation_result
+
+    if isinstance(obj, MaterialQuantity):
+        return validate_material_quantity
+
+    if isinstance(obj, EngineeringContext):
+        return validate_engineering_context
+
+    return None
+
+
+# =====================================================================
+# ASSERTION HELPERS
+# =====================================================================
+
+def assert_valid(
+    obj: Any,
 ) -> None:
-    """
-    Raise ValueError when validation fails.
+    validator = validator_for(obj)
 
-    Calculation modules can use this before starting
-    an engineering calculation.
-    """
-
-    if not result.valid:
-        message = " | ".join(result.errors)
-
-        raise ValueError(
-            message or "Invalid engineering input."
+    if validator is None:
+        raise ValidationError(
+            f"No validator registered for {type(obj).__name__}."
         )
+
+    result = validator(obj)
+    result.raise_if_invalid()
+
+
+def validate_and_raise(
+    obj: Any,
+) -> ValidationResult:
+    validator = validator_for(obj)
+
+    if validator is None:
+        raise ValidationError(
+            f"No validator registered for {type(obj).__name__}."
+        )
+
+    result = validator(obj)
+    result.raise_if_invalid()
+    return result
+
+
+# =====================================================================
+# PUBLIC EXPORTS
+# =====================================================================
+
+__all__ = [
+    # Exceptions
+    "ValidationError",
+    "RequiredFieldError",
+    "NumericValidationError",
+    "GeometryValidationError",
+    "MaterialValidationError",
+    "ReinforcementValidationError",
+
+    # Constants
+    "STANDARD_REBAR_DIAMETERS_MM",
+    "DEFAULT_MAX_BAR_LENGTH_M",
+    "DEFAULT_MIN_COVER_MM",
+    "DEFAULT_MAX_COVER_MM",
+
+    # Result objects
+    "ValidationIssue",
+    "ValidationResult",
+
+    # Basic helpers
+    "is_number",
+    "require_number",
+    "require_positive_number",
+    "require_non_negative_number",
+    "require_integer",
+    "require_string",
+    "optional_string",
+    "ensure_enum",
+
+    # Rebar
+    "validate_rebar_diameter",
+    "validate_rebar_quantity",
+    "validate_rebar_length",
+    "validate_spacing",
+
+    # Materials
+    "validate_concrete_material",
+    "validate_steel_material",
+
+    # Geometry
+    "validate_rectangular_geometry",
+    "validate_circular_geometry",
+    "validate_slab_geometry",
+    "validate_geometry",
+    "validate_cover",
+
+    # Domain
+    "validate_project",
+    "validate_floor",
+    "validate_structural_member",
+    "validate_rebar_shape",
+    "validate_reinforcement_bar",
+    "validate_splice",
+    "validate_calculation_result",
+    "validate_material_quantity",
+    "validate_engineering_context",
+    "validate_cut_piece",
+
+    # Specialized inputs
+    "FoundationInput",
+    "ColumnInput",
+    "BeamInput",
+    "SlabInput",
+    "EquivalencyInput",
+
+    "validate_foundation_input",
+    "validate_column_input",
+    "validate_beam_input",
+    "validate_slab_input",
+    "validate_equivalency_input",
+
+    # Batch / assertions
+    "validate_all",
+    "validator_for",
+    "assert_valid",
+    "validate_and_raise",
+]
