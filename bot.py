@@ -1167,66 +1167,37 @@ def create_application() -> Application:
     )
 
     # =====================================================
-    # STATEFUL TEXT INPUTS
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, ai_message),
-        group=0,
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, column_message),
-        group=0,
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, beam_message),
-        group=0,
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, slab_message),
-        group=0,
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, equivalency_message),
-        group=0,
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, quantities_message),
-        group=0,
-    )
-
     # =====================================================
-    # STATEFUL TEXT INPUTS
+    # STATEFUL TEXT ROUTER
     # =====================================================
+    async def _stateful_text_router(update, context):
+        if context.user_data.get("awaiting_project_name"):
+            await project_name_message(update, context)
+            return
+        if context.user_data.get("column_waiting_manual_input"):
+            await receive_column_manual_input(update, context)
+            return
+        if context.user_data.get("beam_waiting_manual_input"):
+            await receive_beam_manual_input(update, context)
+            return
+        if context.user_data.get("slab_waiting_manual_input"):
+            await receive_slab_manual_input(update, context)
+            return
+        if context.user_data.get("equiv_waiting_count"):
+            await equivalency_message(update, context)
+            return
+        if context.user_data.get("quantity_waiting_value"):
+            await quantities_message(update, context)
+            return
+        if context.user_data.get("ai_waiting_message"):
+            await ai_message(update, context)
+            return
+        await unknown_text(update, context)
 
     application.add_handler(
-        get_column_message_handler(),
-        group=0,
-    )
-    application.add_handler(
-        get_beam_message_handler(),
-        group=0,
-    )
-    application.add_handler(
-        get_slab_message_handler(),
-        group=0,
-    )
-    application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
-            get_equivalency_message_handler(),
-        ),
-        group=0,
-    )
-    application.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            get_quantities_message_handler(),
-        ),
-        group=0,
-    )
-    application.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            ai_message,
+            _stateful_text_router,
         ),
         group=0,
     )
