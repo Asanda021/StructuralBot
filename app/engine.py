@@ -30,14 +30,16 @@ def grid_rebar(area_l, area_w, diameter_mm, spacing_cm, stock_length_m=12.0):
     len_x=nW*L; len_y=nL*W
     r=rebar_summary(diameter_mm,len_x+len_y,stock_length_m)
     r.update({"count_bars":nW+nL,"bars_each_direction":[nW,nL],
-              "length_each_direction_m":[len_x,len_y]})
+              "length_each_direction_m":[len_x,len_y],
+              "cut_lengths_m":[L]*nW+[W]*nL})
     return r
 
 def line_rebar(length_m, spacing_cm, diameter_mm, stock_length_m=12.0):
     L=_num(length_m); s=_num(spacing_cm)/100
     if s<=0: raise ValueError("فاصله میلگرد باید بزرگ‌تر از صفر باشد")
     count=math.ceil(L/s)+1
-    return {"count_bars":count, **rebar_summary(diameter_mm,count*L,stock_length_m)}
+    return {"count_bars":count,"cut_lengths_m":[L]*count,
+            **rebar_summary(diameter_mm,count*L,stock_length_m)}
 
 def adjusted_bar_length(straight_m, bend_m=0.0, hook_m=0.0, lap_m=0.0):
     return _num(straight_m)+_num(bend_m)+_num(hook_m)+_num(lap_m)
@@ -47,6 +49,7 @@ def repeated_bar_rebar(count, length_each_m, diameter_mm, stock_length_m=12.0,
     n=math.ceil(_num(count)); L=_num(length_each_m)
     cut_each=adjusted_bar_length(L,bend_m,hook_m,lap_m)
     return {"count_bars":n,"length_each_m":L,"cut_length_each_m":cut_each,
+            "cut_lengths_m":[cut_each]*n,
             "bend_m":_num(bend_m),"hook_m":_num(hook_m),"lap_m":_num(lap_m),
             **rebar_summary(diameter_mm,n*cut_each,stock_length_m,waste_percent)}
 
@@ -70,14 +73,13 @@ def calculate_slab(data):
     if coeff is None: coeff=meta.get("concrete_coeff")
     if coeff is None: coeff=_num(data.get("thickness",0))
     if coeff<=0: raise ValueError("ضریب بتن یا ضخامت سقف باید وارد شود")
-    concrete=area*float(coeff)
-    result={"area_m2":area,"concrete_m3":concrete,"concrete_coeff":float(coeff),"slab_type":typ}
     openings=data.get("openings") or []
-    if openings:
-        opening_area=sum(_num(op.get("length",0))*_num(op.get("width",0))*_num(op.get("count",1)) for op in openings)
-        opening_area=min(opening_area,area)
-        result["opening_area_m2"]=opening_area
-        result["net_area_m2"]=max(0.0,area-opening_area)
+    opening_area=sum(_num(op.get("length",0))*_num(op.get("width",0))*_num(op.get("count",1)) for op in openings)
+    opening_area=min(opening_area,area)
+    net_area=max(0.0,area-opening_area)
+    concrete=net_area*float(coeff)
+    result={"area_m2":area,"opening_area_m2":opening_area,"net_area_m2":net_area,
+            "concrete_m3":concrete,"concrete_coeff":float(coeff),"slab_type":typ}
     if meta.get("joist_factor"):
         spacing=_num(data.get("joist_spacing_cm",50))/100
         n=max(1,math.ceil(W/spacing)+1)
@@ -203,6 +205,7 @@ def estimate_members(members):
             "assumptions":["تیپ‌ها و اعداد آماده فقط میانبر ورود هستند و باید با نقشه تطبیق داده شوند.",
                            "مقادیر میلگرد اجرایی، طول، وزن و شاخه خرید جداگانه ثبت می‌شوند.",
                            "شاخه استاندارد پیش‌فرض ۱۲ متر است.",
+                           "برای بازشوهای سقف، حجم بتن از مساحت خالص کسر می‌شود؛ آرماتور اطراف بازشو باید از دیتیل نقشه وارد شود.",
                            "قطعات خم‌دار با طول مستقیم، خم، قلاب و وصله به‌صورت جداگانه قابل ثبت هستند؛ ضریب مخفی اعمال نمی‌شود.",
             "تعداد شاخه خرید بر اساس طول خرید و شاخه استاندارد محاسبه می‌شود؛ برای برش بهینه، Cut List واقعی قطعات لازم است.",
                            "این ابزار متره است و جایگزین طراحی یا کنترل نقشه مصوب نیست."]}
