@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>StructuralBot | متره هوشمند</title>
+<link rel="stylesheet" href="/webapp/styles.css">
+<script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+</head>
+<body>
+<div class="app-shell">
+  <div class="hero">
+    <div class="hero-grid"></div>
+    <div class="brand"><div class="brand-mark">SB</div><div><b>StructuralBot</b><span>متره هوشمند ساختمان</span></div></div>
+    <div class="hero-copy"><div class="eyebrow">SMART TAKEOFF • PRO</div><h1>نقشه را به <em>متره اجرایی</em> تبدیل کن.</h1><p>بتن، میلگرد، تیرچه، یونولیت و اجزای وابسته؛ یکجا، سریع و قابل گزارش.</p></div>
+    <div class="hero-stats"><div><b id="memberCount">0</b><span>عضو ثبت‌شده</span></div><div><b id="rebarWeight">0</b><span>kg میلگرد</span></div><div><b id="concreteVol">0</b><span>m³ بتن</span></div></div>
+  </div>
+
+  <main>
+    <section class="section-head"><div><span class="eyebrow">WORKSPACE</span><h2>از کجا شروع کنیم؟</h2></div><button class="ghost" id="themeBtn">◐</button></section>
+    <div class="quick-grid">
+      <button class="quick primary" data-section="سقف"><span>▦</span><b>سقف</b><small>تیرچه، وافل، دال</small></button>
+      <button class="quick" data-section="فونداسیون"><span>⬡</span><b>فونداسیون</b><small>پی و شناژ</small></button>
+      <button class="quick" data-section="ستون"><span>▥</span><b>ستون</b><small>تیپ‌های بازار</small></button>
+      <button class="quick" data-section="تیر"><span>━</span><b>تیر</b><small>بتن و آرماتور</small></button>
+      <button class="quick" data-section="دیوار"><span>▤</span><b>دیوار</b><small>قائم و افقی</small></button>
+      <button class="quick" data-section="پله"><span>⌁</span><b>پله</b><small>متره مرحله‌ای</small></button>
+    </div>
+
+    <section class="panel">
+      <div class="section-head"><div><span class="eyebrow">PROJECT</span><h2>پروژه فعلی</h2></div><button class="icon-btn" id="clearBtn">×</button></div>
+      <input id="projectName" class="field" placeholder="نام پروژه، مثلاً ساختمان ۵ طبقه"/>
+      <div id="members" class="members empty"><div class="empty-icon">⌘</div><b>هنوز عضوی اضافه نشده</b><span>یک بخش را انتخاب کن تا متره را شروع کنیم.</span></div>
+    </section>
+
+    <section class="panel report-panel">
+      <div class="section-head"><div><span class="eyebrow">LIVE REPORT</span><h2>گزارش لحظه‌ای</h2></div><span class="live-dot">● LIVE</span></div>
+      <div class="metric-row"><div><span>بتن</span><b id="rConcrete">0 m³</b></div><div><span>میلگرد</span><b id="rRebar">0 kg</b></div><div><span>شاخه ۱۲m</span><b id="rBranches">0</b></div></div>
+      <div class="action-row"><button id="exportBtn" class="action">📄 خروجی گزارش</button><button id="sendBtn" class="action">🚀 ارسال به ربات</button></div>
+    </section>
+  </main>
+  <div class="bottom-nav"><button class="active">⌂<small>خانه</small></button><button id="reportNav">▤<small>گزارش</small></button><button id="newNav">＋<small>عضو جدید</small></button><button id="botNav">☰<small>ربات</small></button></div>
+</div>
+<div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h3 id="modalTitle">افزودن عضو</h3><button id="closeModal">×</button></div><div id="modalBody"></div><button id="saveMember" class="main-action">محاسبه و افزودن</button></div></div>
+<script src="/webapp/app.js"></script>
+</body></html>
