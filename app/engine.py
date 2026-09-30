@@ -1,107 +1,115 @@
-import math
-
 def positive(*values):
     if any(float(v) <= 0 for v in values):
         raise ValueError("همه مقادیر باید بزرگ‌تر از صفر باشند")
 
+
+DEFAULT_REBAR_RATES = {
+    "فونداسیون": 110.0,
+    "ستون": 140.0,
+    "تیر": 130.0,
+    "سقف": 80.0,
+    "راه‌پله": 100.0,
+}
+
+
 def estimate_building(data):
-    positive(
-        data["floors"], data["area"], data["foundation_count"],
-        data["footing_w"], data["footing_l"], data["footing_t"],
-        data["columns_per_floor"], data["column_w"], data["column_d"], data["floor_h"],
-        data["beam_length_per_floor"], data["beam_w"], data["beam_h"],
-        data["slab_t"], data["stair_area_per_floor"], data["stair_t"]
-    )
+    required = [
+        "floors", "area", "foundation_count",
+        "footing_w", "footing_l", "footing_t",
+        "columns_per_floor", "column_w", "column_d", "floor_h",
+        "beam_length_per_floor", "beam_w", "beam_h",
+        "slab_t", "stair_area_per_floor", "stair_t",
+    ]
+    positive(*(data[k] for k in required))
 
     floors = data["floors"]
     area = data["area"]
 
-    footing_concrete = (
-        data["foundation_count"] * data["footing_w"] *
-        data["footing_l"] * data["footing_t"]
-    )
-    column_concrete = (
-        floors * data["columns_per_floor"] * data["column_w"] *
-        data["column_d"] * data["floor_h"]
-    )
-    beam_concrete = (
-        floors * data["beam_length_per_floor"] *
-        data["beam_w"] * data["beam_h"]
-    )
-    slab_concrete = floors * area * data["slab_t"]
-    stair_concrete = floors * data["stair_area_per_floor"] * data["stair_t"]
-
     concrete = {
-        "فونداسیون": footing_concrete,
-        "ستون": column_concrete,
-        "تیر": beam_concrete,
-        "سقف": slab_concrete,
-        "راه‌پله": stair_concrete,
+        "فونداسیون": data["foundation_count"] * data["footing_w"] * data["footing_l"] * data["footing_t"],
+        "ستون": floors * data["columns_per_floor"] * data["column_w"] * data["column_d"] * data["floor_h"],
+        "تیر": floors * data["beam_length_per_floor"] * data["beam_w"] * data["beam_h"],
+        "سقف": floors * area * data["slab_t"],
+        "راه‌پله": floors * data["stair_area_per_floor"] * data["stair_t"],
     }
-    total_concrete = sum(concrete.values())
 
-    footing_form = data["foundation_count"] * (
-        2 * (data["footing_w"] + data["footing_l"]) * data["footing_t"]
-    )
-    column_form = floors * data["columns_per_floor"] * (
-        2 * (data["column_w"] + data["column_d"]) * data["floor_h"]
-    )
-    beam_form = floors * data["beam_length_per_floor"] * (
-        2 * (data["beam_w"] + data["beam_h"])
-    )
-    slab_form = floors * area
-    stair_form = floors * data["stair_area_per_floor"] * 2
     formwork = {
-        "فونداسیون": footing_form,
-        "ستون": column_form,
-        "تیر": beam_form,
-        "سقف": slab_form,
-        "راه‌پله": stair_form,
+        "فونداسیون": data["foundation_count"] * 2 * (data["footing_w"] + data["footing_l"]) * data["footing_t"],
+        "ستون": floors * data["columns_per_floor"] * 2 * (data["column_w"] + data["column_d"]) * data["floor_h"],
+        "تیر": floors * data["beam_length_per_floor"] * 2 * (data["beam_w"] + data["beam_h"]),
+        "سقف": floors * area,
+        "راه‌پله": floors * data["stair_area_per_floor"] * 2,
     }
-    total_formwork = sum(formwork.values())
 
-    rates = data.get("rebar_rates", {
-        "فونداسیون": 110,
-        "ستون": 140,
-        "تیر": 130,
-        "سقف": 80,
-        "راه‌پله": 100,
-    })
+    rates = dict(DEFAULT_REBAR_RATES)
+    rates.update(data.get("rebar_rates", {}))
     rebar = {k: concrete[k] * rates[k] for k in concrete}
-    total_rebar = sum(rebar.values())
+
+    totals = {
+        "concrete_net": sum(concrete.values()),
+        "formwork_net": sum(formwork.values()),
+        "rebar_net": sum(rebar.values()),
+    }
+
+    waste = {
+        "concrete": float(data.get("concrete_waste_pct", 5.0)),
+        "rebar": float(data.get("rebar_waste_pct", 3.0)),
+    }
+
+    procurement = {
+        "concrete": totals["concrete_net"] * (1 + waste["concrete"] / 100),
+        "rebar": totals["rebar_net"] * (1 + waste["rebar"] / 100),
+    }
 
     return {
+        "version": "takeoff-1.0",
+        "method": "preliminary_quantities",
         "floors": floors,
-        "area": area,
+        "area_per_floor": area,
         "concrete": concrete,
-        "total_concrete": total_concrete,
         "formwork": formwork,
-        "total_formwork": total_formwork,
         "rebar": rebar,
-        "total_rebar": total_rebar,
-        "rebar_rates": rates,
+        "totals": totals,
+        "waste_pct": waste,
+        "procurement": procurement,
+        "rebar_rates_kg_m3": rates,
+        "assumptions": [
+            "مقادیر بتن، قالب و میلگرد بر اساس هندسه و ضرایب برآوردی واردشده محاسبه شده‌اند.",
+            "میلگرد جایگزین نقشه آرماتور، BBS یا لیستوفر اجرایی نیست.",
+            "مقادیر خرید بتن و میلگرد شامل پرت تعریف‌شده در تنظیمات برآورد هستند.",
+            "راه‌پله در این نسخه به‌صورت مساحت × ضخامت مدل شده است.",
+        ],
     }
+
 
 def format_estimate(result):
     lines = [
-        "📊 خلاصه متره ساختمان بتنی",
+        "📊 <b>متره و برآورد اولیه ساختمان بتنی</b>",
         "",
-        f"🏢 طبقات: {result['floors']:g}",
-        f"📐 زیربنای هر طبقه: {result['area']:g} m²",
+        f"🏢 تعداد طبقات: {result['floors']:g}",
+        f"📐 زیربنای هر طبقه: {result['area_per_floor']:,.2f} m²",
         "",
-        "🧱 بتن:",
+        "🧱 <b>بتن خالص</b>",
     ]
     for k, v in result["concrete"].items():
         lines.append(f"• {k}: {v:,.2f} m³")
-    lines += [f"• جمع بتن: {result['total_concrete']:,.2f} m³", "", "🪵 قالب‌بندی:"]
+    lines.append(f"• جمع بتن خالص: {result['totals']['concrete_net']:,.2f} m³")
+    lines.append(f"• بتن موردنیاز با {result['waste_pct']['concrete']:g}% پرت: {result['procurement']['concrete']:,.2f} m³")
+
+    lines += ["", "🪵 <b>قالب‌بندی</b>"]
     for k, v in result["formwork"].items():
         lines.append(f"• {k}: {v:,.2f} m²")
-    lines += [f"• جمع قالب: {result['total_formwork']:,.2f} m²", "", "🔩 میلگرد:"]
+    lines.append(f"• جمع قالب‌بندی: {result['totals']['formwork_net']:,.2f} m²")
+
+    lines += ["", "🔩 <b>میلگرد ـ برآورد وزنی</b>"]
     for k, v in result["rebar"].items():
         lines.append(f"• {k}: {v:,.0f} kg")
+    lines.append(f"• جمع خالص میلگرد: {result['totals']['rebar_net']:,.0f} kg")
+    lines.append(f"• میلگرد خرید با {result['waste_pct']['rebar']:g}% پرت: {result['procurement']['rebar']:,.0f} kg")
+
     lines += [
-        f"• جمع میلگرد برآوردی: {result['total_rebar']:,.0f} kg",
         "",
-        "⚠️ میلگرد در این نسخه بر اساس ضرایب برآوردی kg/m³ محاسبه می‌شود و جایگزین BBS یا لیستوفر اجرایی نیست.",
+        "⚠️ <b>مبنای محاسبه</b>",
+        "این خروجی «متره و برآورد اولیه» است. وزن میلگرد با ضرایب kg/m³ برآورد شده و برای خرید یا اجرا باید با نقشه‌های سازه و BBS کنترل شود.",
     ]
     return "\n".join(lines)
