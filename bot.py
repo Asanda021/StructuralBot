@@ -334,22 +334,29 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data in {"takeoff_concrete", "takeoff_rebar", "takeoff_formwork"}:
-        last = db.last_calc(update.effective_user.id)
+        last = db.last_estimate(update.effective_user.id)
         if not last:
             await q.edit_message_text(
-                "ابتدا یک پروژه بساز تا متره بتن، میلگرد و قالب‌بندی از روی اطلاعات همان پروژه نمایش داده شود.",
+                "ابتدا یک پروژه بساز تا مقادیر آن در این بخش نمایش داده شود.",
                 reply_markup=main_menu(),
             )
             return
+        result = last["result"]
         title = {
-            "takeoff_concrete": "🧱 متره بتن",
-            "takeoff_rebar": "🔩 متره میلگرد",
-            "takeoff_formwork": "🪵 متره قالب‌بندی",
+            "takeoff_concrete": "🧱 جدول مقادیر بتن",
+            "takeoff_rebar": "🔩 جدول برآورد میلگرد",
+            "takeoff_formwork": "🪵 جدول مقادیر قالب‌بندی",
         }[data]
-        await q.edit_message_text(
-            f"{title}\n\n{last[1]}",
-            reply_markup=back_home(),
-        )
+        source = {
+            "takeoff_concrete": result["concrete"],
+            "takeoff_rebar": result["rebar"],
+            "takeoff_formwork": result["formwork"],
+        }[data]
+        unit = {"takeoff_concrete": "m³", "takeoff_rebar": "kg", "takeoff_formwork": "m²"}[data]
+        lines = [f"<b>{title}</b>", f"📁 پروژه: {last['project_name']}", "", "<pre>آیتم                 مقدار</pre>"]
+        for name, value in source.items():
+            lines.append(f"• {name}: <b>{value:,.2f}</b> {unit}")
+        await q.edit_message_text("\n".join(lines), parse_mode="HTML", reply_markup=back_home())
         return
 
     if data == "reports":
