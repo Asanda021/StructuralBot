@@ -6,7 +6,7 @@ from telegram.error import BadRequest
 from app.db import Database
 from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, multi_face_grid_rebar, repeated_bar_rebar, format_estimate
 from app.exporter import create_excel, create_pdf
-from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu
+from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu
 
 TOKEN=os.getenv("BOT_TOKEN")
 DB_PATH=os.getenv("DATABASE_PATH","/tmp/structuralbot.db")
@@ -388,6 +388,63 @@ async def callback(update,context):
         context.user_data["calc_mode"]=mode
         db.set_settings(update.effective_user.id,calc_mode=mode)
         await q.edit_message_text(f"✅ <b>{labels.get(mode,mode)}</b> فعال شد.\n\nورودی‌های اصلی از نقشه گرفته می‌شوند و در پایان، بتن/میلگرد/شاخه خرید و Cut List طبق اطلاعات موجود گزارش می‌شوند.",parse_mode="HTML",reply_markup=main_menu()); return
+    if data=="settings":
+        s=db.settings(update.effective_user.id)
+        msg=(f"⚙️ <b>تنظیمات متره</b>\\n\\n"
+             f"زبان: <b>{s.get('language','fa')}</b>\\n"
+             f"واحد: <b>{s.get('unit_system','metric')}</b>\\n"
+             f"حالت متره: <b>{s.get('calc_mode','detailed')}</b>\\n"
+             f"بتن: <b>{s.get('concrete_grade','C25')}</b>\\n"
+             f"میلگرد: <b>{s.get('rebar_grade','A3')}</b>\\n"
+             f"مرجع: <b>{s.get('standard','iran')}</b>\\n"
+             f"شاخه خرید: <b>{s.get('stock_length_m',12):g}m</b>\\n\\n"
+             "این گزینه‌ها فقط مشخصات پروژه/گزارش هستند و هیچ طراحی سازه‌ای را خودکار نمی‌کنند.")
+        await q.edit_message_text(msg,parse_mode="HTML",reply_markup=settings_menu()); return
+    if data=="account":
+        await q.edit_message_text("👤 <b>حساب کاربری</b>\\n\\nپروژه‌های ذخیره‌شده و آخرین متره‌های شما از این بخش مدیریت می‌شوند.",parse_mode="HTML",reply_markup=back_home()); return
+    if data=="takeoff_menu":
+        await q.edit_message_text("📦 <b>انتخاب نوع متره</b>",parse_mode="HTML",reply_markup=takeoff_menu()); return
+    if data.startswith("takeoff|"):
+        kind=data.split("|",1)[1]
+        titles={"concrete":"🧱 بتن","rebar":"🔩 میلگرد","formwork":"🪵 قالب‌بندی","materials":"🧱 مصالح"}
+        if kind=="rebar":
+            await q.edit_message_text("🔩 <b>میلگرد</b>\\n\\nمتره میلگرد از روی دیتیل نقشه انجام می‌شود. برای معادل‌سازی قطرها از گزینه زیر استفاده کن.",parse_mode="HTML",reply_markup=rebar_equivalency_menu()); return
+        if kind=="concrete":
+            await q.edit_message_text("🧱 <b>بتن</b>\\n\\nهندسه اعضا یک‌بار از روی نقشه وارد می‌شود و حجم بتن در همان عضو محاسبه می‌گردد.",parse_mode="HTML",reply_markup=section_menu()); return
+        if kind=="formwork":
+            await q.edit_message_text("🪵 <b>قالب‌بندی</b>\\n\\nساختار منوی قالب‌بندی فعال شد؛ مقادیر باید از هندسه واقعی عضو و دیتیل اجرایی پروژه استخراج شوند.",parse_mode="HTML",reply_markup=section_menu()); return
+        await q.edit_message_text("🧱 <b>مصالح</b>\\n\\nمصالح متره‌شده شامل بتن، میلگرد، تیرچه/یونولیت و اجزای اجرایی در گزارش جامع جمع می‌شوند.",parse_mode="HTML",reply_markup=report_menu()); return
+    if data=="units":
+        await q.edit_message_text("📏 <b>سیستم واحد</b>",parse_mode="HTML",reply_markup=units_menu()); return
+    if data.startswith("unit|"):
+        val=data.split("|",1)[1]
+        db.set_settings(update.effective_user.id,unit_system=val)
+        await q.edit_message_text(f"✅ سیستم واحد روی <b>{val}</b> ذخیره شد.",parse_mode="HTML",reply_markup=settings_menu()); return
+    if data=="standards":
+        await q.edit_message_text("📐 <b>مرجع گزارش</b>\\n\\nاین انتخاب فقط به‌عنوان مشخصات/مرجع گزارش ذخیره می‌شود؛ StructuralBot در این پروژه طراحی سازه انجام نمی‌دهد.",parse_mode="HTML",reply_markup=standards_menu()); return
+    if data.startswith("standard|"):
+        val=data.split("|",1)[1]
+        db.set_settings(update.effective_user.id,standard=val)
+        await q.edit_message_text("✅ مرجع گزارش ذخیره شد.",reply_markup=settings_menu()); return
+    if data=="concrete_settings":
+        await q.edit_message_text("🏗 <b>رده بتن</b>",parse_mode="HTML",reply_markup=concrete_settings_menu()); return
+    if data.startswith("concrete_grade|"):
+        val=data.split("|",1)[1]
+        db.set_settings(update.effective_user.id,concrete_grade=val)
+        await q.edit_message_text(f"✅ رده بتن <b>{val}</b> ذخیره شد.",parse_mode="HTML",reply_markup=settings_menu()); return
+    if data=="rebar_settings":
+        await q.edit_message_text("🔩 <b>گرید میلگرد</b>",parse_mode="HTML",reply_markup=rebar_settings_menu()); return
+    if data.startswith("rebar_grade|"):
+        val=data.split("|",1)[1]
+        db.set_settings(update.effective_user.id,rebar_grade=val)
+        await q.edit_message_text(f"✅ گرید میلگرد <b>{val}</b> ذخیره شد.",parse_mode="HTML",reply_markup=settings_menu()); return
+    if data=="stock_length":
+        db.set_settings(update.effective_user.id,stock_length_m=12.0)
+        await q.edit_message_text("📏 طول شاخه استاندارد خرید فعلاً <b>۱۲ متر</b> است.",parse_mode="HTML",reply_markup=settings_menu()); return
+    if data=="building_info":
+        await q.edit_message_text("🏢 <b>اطلاعات ساختمان</b>\\n\\nنام پروژه، تعداد طبقات و مشخصات کلی پروژه در جریان «پروژه جدید» ثبت می‌شوند. هندسه هر عضو نیز مرحله‌به‌مرحله از نقشه گرفته می‌شود.",parse_mode="HTML",reply_markup=back_home()); return
+    if data=="pricing":
+        await q.edit_message_text("💰 <b>برآورد ریالی</b>\\n\\nمنوی آن در ساختار محصول قرار گرفت، اما نرخ‌گذاری تا پایدار شدن متره و گزارش‌های مصالح به‌صورت خودکار عددسازی نمی‌کند.",parse_mode="HTML",reply_markup=back_home()); return
     if data=="language":
         await q.edit_message_text("🌐 <b>انتخاب زبان رابط کاربری</b>",parse_mode="HTML",reply_markup=__import__("app.keyboards",fromlist=["language_menu"]).language_menu()); return
     if data.startswith("lang|"):
