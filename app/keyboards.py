@@ -6,6 +6,7 @@ def main_menu():
       [InlineKeyboardButton("🏢 اطلاعات ساختمان",callback_data="building_info")],
       [InlineKeyboardButton("🧱 بتن",callback_data="takeoff|concrete"),InlineKeyboardButton("🔩 میلگرد",callback_data="takeoff|rebar")],
       [InlineKeyboardButton("🪵 قالب‌بندی",callback_data="takeoff|formwork"),InlineKeyboardButton("🧱 مصالح",callback_data="takeoff|materials")],
+      [InlineKeyboardButton("🔁 معادل‌سازی میلگرد",callback_data="rebar_equiv")],
       [InlineKeyboardButton("🏗 اجزای سازه",callback_data="continue_project"),InlineKeyboardButton("📋 ورودی‌های پروژه",callback_data="project_inputs")],
       [InlineKeyboardButton("📊 جدول جامع",callback_data="table"),InlineKeyboardButton("📄 PDF / Excel",callback_data="exports")],
       [InlineKeyboardButton("💰 برآورد ریالی",callback_data="pricing")],
