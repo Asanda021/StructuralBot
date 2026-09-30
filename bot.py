@@ -140,7 +140,7 @@ from handlers.main_menu import (
 # ---------------------------------------------------------
 
 from handlers.projects import (
-    projects_callback,
+    project_callback,
     project_name_message,
 )
 
@@ -408,7 +408,7 @@ async def project_router(
     ) or data.startswith(
         "projects:"
     ):
-        await projects_callback(
+        await project_callback(
             update,
             context,
         )
