@@ -141,6 +141,7 @@ from handlers.main_menu import (
 
 from handlers.projects import (
     projects_callback,
+    project_name_message,
 )
 
 
@@ -168,7 +169,7 @@ from handlers.foundation import (
 
 from handlers.columns import (
     columns_callback,
-    get_column_message_handler,
+    receive_column_manual_input,
 )
 
 
@@ -178,7 +179,7 @@ from handlers.columns import (
 
 from handlers.beams import (
     beams_callback,
-    get_beam_message_handler,
+    receive_beam_manual_input,
 )
 
 
@@ -188,7 +189,7 @@ from handlers.beams import (
 
 from handlers.slabs import (
     slabs_callback,
-    get_slab_message_handler,
+    receive_slab_manual_input,
 )
 
 
@@ -207,7 +208,7 @@ from handlers.rebar import (
 
 from handlers.equivalency import (
     equivalency_callback,
-    get_equivalency_message_handler,
+    equivalency_message,
 )
 
 
@@ -217,7 +218,7 @@ from handlers.equivalency import (
 
 from handlers.quantities import (
     quantities_callback,
-    get_quantities_message_handler,
+    quantities_message,
 )
 
 
