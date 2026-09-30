@@ -41,30 +41,112 @@ def presets_for(section,typ):
         return {"beam_width":w,"beam_height":d}
     return {}
 
-# Quick-entry values are convenience only; they are never used silently.
-READY={
- "تعداد":1, "تعداد ستون":1, "تعداد تیر":1,
- "طول":1.2, "عرض":1.2, "ضخامت":0.5, "ارتفاع":3.0,
- "عرض ستون":0.3, "عمق ستون":0.3, "عرض تیر":0.3, "ارتفاع تیر":0.5,
- "فاصله تیرچه":50, "قطر حرارتی":8, "فاصله حرارتی":25,
- "قطر شبکه پایین":16, "فاصله شبکه پایین":20,
- "قطر شبکه بالا":0, "فاصله شبکه بالا":0,
- "قطر سنجاقی":10, "فاصله سنجاقی":25,
- "قطر خاموت":10, "فاصله خاموت":20,
- "فاصله خاموت عادی":20, "فاصله خاموت بحرانی":10,
- "قطر میلگرد طولی":16, "تعداد میلگرد طولی هر ستون":8, "تعداد میلگرد طولی هر تیر":4, "تعداد میلگرد پایینی هر تیر":4, "قطر میلگرد پایینی":16, "تعداد میلگرد بالایی هر تیر":2, "قطر میلگرد بالایی":16,
- "قطر میلگرد تقویتی":16, "قطر کمرکش":12, "تعداد وجه مسلح":2,
- "طول هر خاموت":1.0, "طول هر سنجاقی":0.8,
- "طول هر میلگرد تقویتی":2.0, "طول هر کمرکش":1.0,
- "تعداد میلگرد تقویتی هر تیر":2, "تعداد سنجاقی هر تیر":2, "تعداد میلگرد کمرکش":2,
- "ضریب بتن":0.18, "طول یونولیت":1.0, "عرض یونولیت":0.5,
+# Ready values: broad engineering shortcuts to minimize typing.
+# These are editable input presets only; they never replace drawing/detail information.
+READY_OPTIONS = {
+ "تعداد":[1,2,3,4,5,6,8,10,12,16,20],
+ "تعداد ستون":[1,2,3,4,6,8,10,12,16,20],
+ "تعداد تیر":[1,2,3,4,6,8,10,12,16,20],
+ "تعداد دیوار":[1,2,3,4,5,6,8,10],
+ "تعداد بازشو":[0,1,2,3,4,5],
+ "طول":[1.0,1.2,1.5,1.8,2.0,2.2,2.5,2.8,3.0,3.2,3.5,4.0,4.5,5.0,6.0],
+ "عرض":[1.0,1.2,1.5,1.8,2.0,2.2,2.5,2.8,3.0,3.5,4.0,4.5,5.0,6.0],
+ "طول سقف":[3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,12.0,15.0],
+ "عرض سقف":[3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,12.0],
+ "طول دیوار":[2.0,3.0,4.0,5.0,6.0,8.0,10.0],
+ "ضخامت":[0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50,0.60],
+ "ضخامت مگر":[0.08,0.10,0.12,0.15],
+ "ضخامت/ارتفاع مؤثر سقف":[0.15,0.20,0.25,0.30,0.35],
+ "ضخامت کل سقف":[0.20,0.25,0.30,0.35,0.40],
+ "ضخامت لایه رویه/تاپینگ":[0.04,0.05,0.06,0.07,0.08],
+ "ضخامت دیوار":[0.15,0.20,0.25,0.30,0.35,0.40],
+ "عرض ستون":[0.30,0.35,0.40,0.45,0.50,0.60],
+ "عمق ستون":[0.30,0.35,0.40,0.45,0.50,0.60],
+ "ارتفاع":[2.5,2.7,2.8,3.0,3.2,3.5,4.0],
+ "عرض تیر":[0.25,0.30,0.35,0.40,0.45,0.50],
+ "ارتفاع تیر":[0.40,0.45,0.50,0.55,0.60,0.70,0.80],
+ "فاصله تیرچه":[40,45,50,55,60],
+ "فاصله ماژول":[5,10,15,20,25,30],
+ "فاصله حرارتی":[10,12.5,15,17.5,20,22.5,25,27.5,30,35,40,45],
+ "فاصله قائم":[10,12.5,15,17.5,20,22.5,25,30],
+ "فاصله افقی":[10,12.5,15,17.5,20,22.5,25,30],
+ "فاصله شبکه پایین":[10,12.5,15,17.5,20,22.5,25,30],
+ "فاصله شبکه بالا":[10,12.5,15,17.5,20,22.5,25,30],
+ "فاصله خاموت":[10,12.5,15,17.5,20,22.5,25,30],
+ "فاصله خاموت عادی":[10,12.5,15,17.5,20,22.5,25,30],
+ "فاصله خاموت بحرانی":[8,10,12.5,15,17.5,20],
+ "فاصله سنجاقی":[10,15,20,25,30],
+ "قطر حرارتی":[6,8,10,12],
+ "قطر شبکه پایین":[10,12,14,16,18,20],
+ "قطر شبکه بالا":[10,12,14,16,18,20],
+ "قطر قائم":[10,12,14,16,18,20],
+ "قطر افقی":[8,10,12,14,16],
+ "قطر میلگرد طولی":[12,14,16,18,20,22,25,28,32],
+ "قطر میلگرد پایینی":[12,14,16,18,20,22,25,28,32],
+ "قطر میلگرد بالایی":[10,12,14,16,18,20,22,25,28,32],
+ "قطر میلگرد تقویتی":[12,14,16,18,20,22,25,28,32],
+ "قطر خاموت":[8,10,12],
+ "قطر سنجاقی":[8,10,12],
+ "قطر کلاف/ژوئن":[8,10,12,14,16],
+ "قطر سنجاقی ژوئن":[8,10],
+ "قطر میلگرد منفی":[10,12,14,16,18,20],
+ "قطر اتکا/ادکا":[10,12,14,16,18],
+ "قطر کمرکش":[10,12,14,16],
+ "تعداد میلگرد طولی هر ستون":[4,6,8,10,12,14,16],
+ "تعداد میلگرد طولی هر شناژ":[4,6,8,10],
+ "تعداد میلگرد پایینی هر تیر":[2,3,4,5,6,8],
+ "تعداد میلگرد بالایی هر تیر":[2,3,4,5,6],
+ "تعداد میلگرد تقویتی هر تیر":[1,2,3,4,5,6],
+ "تعداد سنجاقی هر تیر":[1,2,3,4,6,8],
+ "تعداد میلگرد کمرکش":[1,2,3,4,6,8],
+ "تعداد وجه مسلح":[1,2],
+ "تعداد سنجاقی هر فونداسیون":[0,2,4,6,8,10,12],
+ "تعداد میلگرد انتظار":[0,2,4,6,8,10,12,16],
+ "تعداد کلاف میانی/ژوئن":[0,1,2,3,4,5,6],
+ "تعداد سنجاقی ژوئن":[0,2,4,6,8,10,12],
+ "تعداد میلگرد منفی":[0,2,4,6,8,10,12,16,20],
+ "تعداد اتکا/ادکا":[0,2,4,6,8,10,12,16,20],
+ "ضریب بتن":[0.18,0.23],
+ "طول یونولیت":[1.0,1.2,1.5,2.0],
+ "عرض یونولیت":[0.40,0.50,0.60],
+ "طول یونولیت/بلوک":[1.0,1.2,1.5,2.0],
+ "عرض یونولیت/بلوک":[0.40,0.50,0.60],
+ "طول ماژول خالی":[0.50,0.60,0.70,0.80],
+ "عرض ماژول خالی":[0.50,0.60,0.70,0.80],
+ "ارتفاع ماژول خالی":[0.15,0.20,0.25,0.30],
+ "طول بازشو":[0.60,0.80,1.0,1.2,1.5,2.0],
+ "عرض بازشو":[0.60,0.80,1.0,1.2,1.5,2.0],
+ "مساحت":[2.0,3.0,4.0,5.0,6.0,8.0,10.0,12.0],
+ "ضخامت مگر":[0.08,0.10,0.12,0.15],
+ "طول هر خاموت":[0.80,1.00,1.20,1.40,1.60,1.80,2.00],
+ "طول هر سنجاقی":[0.50,0.60,0.80,1.00,1.20],
+ "طول هر سنجاقی ژوئن":[0.30,0.40,0.50,0.60,0.80],
+ "طول هر کلاف/ژوئن":[2.0,3.0,4.0,5.0,6.0],
+ "طول هر میلگرد تقویتی":[1.5,2.0,2.5,3.0,4.0],
+ "طول هر میلگرد منفی":[1.0,1.5,2.0,2.5,3.0],
+ "طول هر اتکا/ادکا":[0.50,0.60,0.80,1.00,1.20],
+ "طول هر انتظار":[0.80,1.00,1.20,1.50,2.00],
+ "طول هر کمرکش":[1.0,1.5,2.0,2.5,3.0],
 }
 
-def ready_value(section,typ,label):
+# Exact common isolated-footing presets requested for fast drawing entry.
+FOOTING_PRESETS = {
+ "پی منفرد":[(1.5,1.5,0.50),(1.8,1.8,0.50),(2.0,2.0,0.50)]
+}
+
+def ready_options(section,typ,label):
+    if section=="فونداسیون" and typ in FOOTING_PRESETS and label in ("طول","عرض","ضخامت"):
+        vals=FOOTING_PRESETS[typ]
+        idx={"طول":0,"عرض":1,"ضخامت":2}[label]
+        return list(dict.fromkeys(x[idx] for x in vals))
     if label=="ضریب بتن":
-        if "دوبل" in typ: return 0.23
-        if "تک" in typ: return 0.18
-    return READY.get(label)
+        if "دوبل" in typ: return [0.23]
+        if "تک" in typ: return [0.18]
+    return READY_OPTIONS.get(label, [])
+
+def ready_value(section,typ,label):
+    vals=ready_options(section,typ,label)
+    return vals[0] if vals else None
 
 def schema(section,typ):
     if section=="سقف":
@@ -558,6 +640,11 @@ async def callback(update,context):
         else:
             await q.edit_message_text("📚 <b>بخش سازه</b>",parse_mode="HTML",reply_markup=section_menu())
         return
+    if data=="manual":
+        queue=context.user_data.get("current_queue",[])
+        if queue:
+            await q.edit_message_text(f"✏️ <b>{queue[0][0]}</b> ({queue[0][1]})\n\nمقدار دلخواه را با عدد وارد کن.",parse_mode="HTML",reply_markup=field_menu([],queue[0][1]))
+        return
     if data.startswith("ready|"):
         value=float(data.split("|",1)[1])
         queue=context.user_data.get("current_queue",[])
@@ -584,12 +671,8 @@ async def ask_next(q,context):
     if not queue:
         await finish_member(q,context); return
     label,unit=queue[0]
-    if context.user_data.get("current_preset") and label in ("عرض ستون","عمق ستون","عرض تیر","ارتفاع تیر"):
-        p=context.user_data["current_preset"]; key={"عرض ستون":"width","عمق ستون":"depth","عرض تیر":"beam_width","ارتفاع تیر":"beam_height"}[label]
-        context.user_data["current_values"].append(p[key]); context.user_data["current_queue"].pop(0); await ask_next(q,context); return
-    rv=ready_value(context.user_data["current_section"],context.user_data["current_type"],label)
-    extra=[InlineKeyboardButton(f"⚡ استفاده از مقدار آماده: {rv} {unit}",callback_data=f"ready|{rv}")] if rv is not None else None
-    await q.edit_message_text(ask_text(context.user_data["current_type"],queue,context.user_data["current_section"],context.user_data["current_type"]),parse_mode="HTML",reply_markup=field_menu(rv,unit))
+    options=ready_options(context.user_data["current_section"],context.user_data["current_type"],label)
+    await q.edit_message_text(ask_text(context.user_data["current_type"],queue,context.user_data["current_section"],context.user_data["current_type"]),parse_mode="HTML",reply_markup=field_menu(options,unit))
 
 async def finish_member(q,context):
     section=context.user_data["current_section"]; typ=context.user_data["current_type"]; vals=context.user_data["current_values"]
@@ -613,13 +696,19 @@ async def message(update,context):
         if not text or len(text)>120: await update.message.reply_text("❌ نام پروژه نامعتبر است."); return
         reset(context,text); await update.message.reply_text(f"🏗 پروژه «{text}» ساخته شد.",reply_markup=section_menu()); return
     # Professional actions from the keyboard attached to Telegram's typing area.
-    if text.startswith("⚡ مقدار آماده:"):
+    if text=="✏️ ورود دستی":
         queue=context.user_data.get("current_queue",[])
         if queue:
-            rv=ready_value(context.user_data.get("current_section",""),context.user_data.get("current_type",""),queue[0][0])
-            if rv is not None:
-                context.user_data.setdefault("current_history",[]).append(queue[0])
-                context.user_data["current_values"].append(rv)
+            await update.message.reply_text(f"✏️ {queue[0][0]} ({queue[0][1]})\nمقدار دلخواه را وارد کن.",reply_markup=input_keyboard([],queue[0][1]))
+        return
+    if text.startswith("⚡ "):
+        parts=text.split()
+        if len(parts)>=2:
+            try: value=float(parts[1].replace("،","."))
+            except ValueError: value=None
+            if value is not None and context.user_data.get("current_queue"):
+                context.user_data.setdefault("current_history",[]).append(context.user_data["current_queue"][0])
+                context.user_data["current_values"].append(value)
                 context.user_data["current_queue"].pop(0)
                 await ask_next_message(update,context)
                 return
@@ -644,7 +733,7 @@ async def message(update,context):
             lines += ["",f"⏳ مرحله فعلی: <b>{queue[0][0]}</b> ({queue[0][1]})"]
         await update.message.reply_text("\n".join(lines),parse_mode="HTML",
             reply_markup=input_keyboard(
-                ready_value(context.user_data.get("current_section",""),context.user_data.get("current_type",""),queue[0][0]) if queue else None,
+                ready_options(context.user_data.get("current_section",""),context.user_data.get("current_type",""),queue[0][0]) if queue else [],
                 queue[0][1] if queue else ""))
         return
     if text=="❌ لغو عضو":
