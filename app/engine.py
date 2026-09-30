@@ -88,34 +88,52 @@ def estimate_building(data):
     }
 
 
+def _table(title, rows, unit):
+    lines = [f"<b>{title}</b>", "<pre>آیتم                 مقدار</pre>"]
+    for name, value in rows:
+        lines.append(f"• {name}: {value:,.2f} {unit}")
+    return lines
+
+
 def format_estimate(result):
     lines = [
-        "📊 <b>متره و برآورد اولیه ساختمان بتنی</b>",
+        "📊 <b>گزارش برآورد مقادیر ساختمان بتنی</b>",
         "",
-        f"🏢 تعداد طبقات: {result['floors']:g}",
+        f"🏢 طبقات: {result['floors']:g}",
         f"📐 زیربنای هر طبقه: {result['area_per_floor']:,.2f} m²",
         "",
-        "🧱 <b>بتن خالص</b>",
     ]
-    for k, v in result["concrete"].items():
-        lines.append(f"• {k}: {v:,.2f} m³")
-    lines.append(f"• جمع بتن خالص: {result['totals']['concrete_net']:,.2f} m³")
-    lines.append(f"• بتن موردنیاز با {result['waste_pct']['concrete']:g}% پرت: {result['procurement']['concrete']:,.2f} m³")
 
-    lines += ["", "🪵 <b>قالب‌بندی</b>"]
-    for k, v in result["formwork"].items():
-        lines.append(f"• {k}: {v:,.2f} m²")
-    lines.append(f"• جمع قالب‌بندی: {result['totals']['formwork_net']:,.2f} m²")
+    lines += _table(
+        "🧱 جدول مقادیر بتن",
+        list(result["concrete"].items()) + [("جمع بتن خالص", result["totals"]["concrete_net"])],
+        "m³",
+    )
+    lines.append(f"🛒 بتن خرید با {result['waste_pct']['concrete']:g}% پرت: {result['procurement']['concrete']:,.2f} m³")
+    lines.append("")
 
-    lines += ["", "🔩 <b>میلگرد ـ برآورد وزنی</b>"]
-    for k, v in result["rebar"].items():
-        lines.append(f"• {k}: {v:,.0f} kg")
-    lines.append(f"• جمع خالص میلگرد: {result['totals']['rebar_net']:,.0f} kg")
-    lines.append(f"• میلگرد خرید با {result['waste_pct']['rebar']:g}% پرت: {result['procurement']['rebar']:,.0f} kg")
+    lines += _table(
+        "🪵 جدول مقادیر قالب‌بندی",
+        list(result["formwork"].items()) + [("جمع قالب‌بندی", result["totals"]["formwork_net"])],
+        "m²",
+    )
+    lines.append("")
+
+    lines += _table(
+        "🔩 جدول برآورد میلگرد",
+        list(result["rebar"].items()) + [("جمع میلگرد خالص", result["totals"]["rebar_net"])],
+        "kg",
+    )
+    lines.append(f"🛒 میلگرد خرید با {result['waste_pct']['rebar']:g}% پرت: {result['procurement']['rebar']:,.0f} kg")
+    lines.append("")
 
     lines += [
+        "📌 <b>جمع‌بندی</b>",
+        f"• بتن خالص: {result['totals']['concrete_net']:,.2f} m³",
+        f"• قالب‌بندی: {result['totals']['formwork_net']:,.2f} m²",
+        f"• میلگرد خالص: {result['totals']['rebar_net']:,.0f} kg",
         "",
         "⚠️ <b>مبنای محاسبه</b>",
-        "این خروجی «متره و برآورد اولیه» است. وزن میلگرد با ضرایب kg/m³ برآورد شده و برای خرید یا اجرا باید با نقشه‌های سازه و BBS کنترل شود.",
+        "این خروجی «برآورد اولیه» است. وزن میلگرد با ضرایب kg/m³ برآورد شده و برای خرید یا اجرا باید با نقشه‌های سازه و BBS کنترل شود.",
     ]
     return "\n".join(lines)
