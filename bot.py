@@ -1,6 +1,6 @@
 import logging, os, threading, tempfile, math
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
 from telegram.error import BadRequest
 from app.db import Database
@@ -105,6 +105,17 @@ def schema(section,typ):
         return [("تعداد","عدد"),("مساحت","m²"),("ضخامت","m"),("قطر میلگرد اصلی","mm"),("فاصله اصلی","cm"),
                 ("قطر حرارتی","mm"),("فاصله حرارتی","cm")]
     return [("مقدار/حجم بتن","m³"),("وزن میلگرد","kg")]
+
+def input_keyboard(rv=None, unit=""):
+    """Professional persistent keyboard shown above Telegram's typing area during numeric entry."""
+    rows=[]
+    if rv is not None:
+        rows.append([KeyboardButton(f"⚡ مقدار آماده: {rv} {unit}")])
+    rows.append([KeyboardButton("⬅️ مرحله قبل"), KeyboardButton("📋 ورودی‌ها")])
+    rows.append([KeyboardButton("❌ لغو عضو"), KeyboardButton("🏠 منو")])
+    rows.append([KeyboardButton("🔄 شروع مجدد")])
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True, one_time_keyboard=False, is_persistent=True,
+                               input_field_placeholder="عدد را وارد کنید یا از منوی پایین انتخاب کنید")
 
 def field_menu(rv=None, unit=""):
     rows=[]
@@ -378,7 +389,7 @@ async def ask_next(q,context):
         context.user_data["current_values"].append(p[key]); context.user_data["current_queue"].pop(0); await ask_next(q,context); return
     rv=ready_value(context.user_data["current_section"],context.user_data["current_type"],label)
     extra=[InlineKeyboardButton(f"⚡ استفاده از مقدار آماده: {rv} {unit}",callback_data=f"ready|{rv}")] if rv is not None else None
-    await q.edit_message_text(ask_text(context.user_data["current_type"],queue,context.user_data["current_section"],context.user_data["current_type"]),parse_mode="HTML",reply_markup=back_home(extra))
+    await q.edit_message_text(ask_text(context.user_data["current_type"],queue,context.user_data["current_section"],context.user_data["current_type"]),parse_mode="HTML",reply_markup=field_menu(rv,unit))
 
 async def finish_member(q,context):
     section=context.user_data["current_section"]; typ=context.user_data["current_type"]; vals=context.user_data["current_values"]
@@ -390,6 +401,7 @@ async def finish_member(q,context):
     if idx is None: context.user_data.setdefault("members",[]).append(m)
     else: context.user_data["members"][idx]=m
     context.user_data["current_edit"]=None
+    await q.message.reply_text("⌨️ ورود اطلاعات این عضو تمام شد.", reply_markup=ReplyKeyboardRemove())
     await q.edit_message_text(f"✅ <b>{m['member']}</b> محاسبه شد.\n\nبتن، میلگرد، طول، وزن، شاخه و اجزای وابسته در همین مرحله ثبت شدند.",parse_mode="HTML",
                                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")],
                                                                    [InlineKeyboardButton("🔎 بازبینی",callback_data="finish_takeoff")],
@@ -400,6 +412,55 @@ async def message(update,context):
     if context.user_data.get("awaiting_project_name"):
         if not text or len(text)>120: await update.message.reply_text("❌ نام پروژه نامعتبر است."); return
         reset(context,text); await update.message.reply_text(f"🏗 پروژه «{text}» ساخته شد.",reply_markup=section_menu()); return
+    # Professional actions from the keyboard attached to Telegram's typing area.
+    if text.startswith("⚡ مقدار آماده:"):
+        queue=context.user_data.get("current_queue",[])
+        if queue:
+            rv=ready_value(context.user_data.get("current_section",""),context.user_data.get("current_type",""),queue[0][0])
+            if rv is not None:
+                context.user_data.setdefault("current_history",[]).append(queue[0])
+                context.user_data["current_values"].append(rv)
+                context.user_data["current_queue"].pop(0)
+                await ask_next_message(update,context)
+                return
+    if text=="⬅️ مرحله قبل":
+        values=context.user_data.get("current_values",[])
+        history=context.user_data.get("current_history",[])
+        queue=context.user_data.get("current_queue",[])
+        if values and history:
+            values.pop()
+            queue.insert(0,history.pop())
+            await ask_next_message(update,context)
+        return
+    if text=="📋 ورودی‌ها":
+        queue=context.user_data.get("current_queue",[])
+        values=context.user_data.get("current_values",[])
+        history=context.user_data.get("current_history",[])
+        lines=["📋 <b>وضعیت ورود اطلاعات</b>","",f"عضو: <b>{context.user_data.get('current_type','')}</b>"]
+        for i,(label,unit) in enumerate(history):
+            if i < len(values):
+                lines.append(f"✅ {label}: <b>{fmt(values[i])}</b> {unit}")
+        if queue:
+            lines += ["",f"⏳ مرحله فعلی: <b>{queue[0][0]}</b> ({queue[0][1]})"]
+        await update.message.reply_text("\n".join(lines),parse_mode="HTML",
+            reply_markup=input_keyboard(
+                ready_value(context.user_data.get("current_section",""),context.user_data.get("current_type",""),queue[0][0]) if queue else None,
+                queue[0][1] if queue else ""))
+        return
+    if text=="❌ لغو عضو":
+        for k in ("current_section","current_type","current_values","current_queue","current_history","current_edit","current_preset"):
+            context.user_data.pop(k,None)
+        await update.message.reply_text("❌ <b>ورود این عضو لغو شد.</b>",parse_mode="HTML",reply_markup=section_menu())
+        return
+    if text=="🏠 منو":
+        context.user_data.clear()
+        await update.message.reply_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu())
+        return
+    if text=="🔄 شروع مجدد":
+        context.user_data.clear()
+        await update.message.reply_text("🔄 <b>شروع مجدد</b>\n\nحالت محاسبه را دوباره فعال کن.",parse_mode="HTML",reply_markup=calc_mode_menu())
+        return
+
     queue=context.user_data.get("current_queue")
     if queue:
         try: value=float(text)
@@ -420,7 +481,7 @@ async def ask_next_message(update,context):
             buttons.append([InlineKeyboardButton(f"⚡ استفاده از مقدار آماده: {rv} {unit}",callback_data=f"ready|{rv}")])
         buttons.append([InlineKeyboardButton("⬅️ اصلاح مرحله قبل",callback_data="back_field")])
         buttons.append([InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
-        await update.message.reply_text(f"⏳ ثبت شد.\n\nمرحله بعد: <b>{label}</b> ({unit}){ready}",parse_mode="HTML",reply_markup=field_menu(rv,unit))
+        await update.message.reply_text(f"⏳ ثبت شد.\n\nمرحله بعد: <b>{label}</b> ({unit}){ready}",parse_mode="HTML",reply_markup=input_keyboard(rv,unit))
     else:
         class Q:
             async def edit_message_text(self,*a,**kw): await update.message.reply_text(*a,**kw)
