@@ -93,10 +93,15 @@ LANGUAGE_SELECTED_TEXT = {
 # ---------------------------------------------------------------------
 
 try:
-    from database import get_user, create_user
+    from database import (
+        get_user_by_telegram_id,
+        create_user,
+        update_user_preferences,
+    )
 except ImportError:
-    get_user = None
+    get_user_by_telegram_id = None
     create_user = None
+    update_user_preferences = None
 
 
 # ---------------------------------------------------------------------
@@ -117,7 +122,7 @@ def _is_existing_user(user_id: int) -> bool:
         return False
 
     try:
-        user = get_user(user_id)
+        user = get_user_by_telegram_id(user_id)
         return user is not None
     except Exception:
         return False
@@ -325,6 +330,107 @@ async def language_callback(
             selected_text
             + "\n\n"
             + _next_step_text(language)
+            , reply_markup=unit_system_keyboard()
+        )
+
+
+# ---------------------------------------------------------------------
+# UNIT SYSTEM SELECTION
+# ---------------------------------------------------------------------
+
+UNIT_SYSTEMS = {
+    "SI": {
+        "name": "🇮🇷 متریک / SI",
+        "description": "m, cm, kg, kN, MPa",
+    },
+    "IMPERIAL": {
+        "name": "🇺🇸 Imperial",
+        "description": "ft, in, lb, psi",
+    },
+}
+
+
+def unit_system_keyboard() -> InlineKeyboardMarkup:
+    """Build the unit-system selection keyboard."""
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    UNIT_SYSTEMS["SI"]["name"],
+                    callback_data="unit:SI",
+                ),
+                InlineKeyboardButton(
+                    UNIT_SYSTEMS["IMPERIAL"]["name"],
+                    callback_data="unit:IMPERIAL",
+                ),
+            ]
+        ]
+    )
+
+
+UNIT_SELECTED_TEXT = {
+    "fa": {
+        "SI": "✅ سیستم واحد متریک (SI) انتخاب شد.",
+        "IMPERIAL": "✅ سیستم واحد Imperial انتخاب شد.",
+    },
+    "en": {
+        "SI": "✅ SI metric unit system selected.",
+        "IMPERIAL": "✅ Imperial unit system selected.",
+    },
+}
+
+
+async def unit_system_callback(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    """Handle unit-system selection and finish onboarding."""
+    query = update.callback_query
+    if query is None:
+        return
+
+    await query.answer()
+
+    data = query.data or ""
+    if not data.startswith("unit:"):
+        return
+
+    unit_system = data.split(":", 1)[1]
+    if unit_system not in UNIT_SYSTEMS:
+        await query.answer("Invalid unit system.", show_alert=True)
+        return
+
+    context.user_data["unit_system"] = unit_system
+    context.user_data["onboarding_required"] = False
+    context.user_data["open_main_menu"] = True
+
+    user_id = _telegram_user_id(update)
+    if user_id is not None and update_user_preferences is not None:
+        try:
+            update_user_preferences(
+                user_id=user_id,
+                language=context.user_data.get("language", "fa"),
+                unit_system=unit_system,
+            )
+        except Exception:
+            # Session state remains authoritative for the current interaction.
+            pass
+
+    language = context.user_data.get("language", "fa")
+    selected = UNIT_SELECTED_TEXT.get(
+        language,
+        UNIT_SELECTED_TEXT["en"],
+    ).get(
+        unit_system,
+        UNIT_SELECTED_TEXT["en"]["SI"],
+    )
+
+    if query.message is not None:
+        await query.message.edit_text(
+            selected
+            + "\n\n"
+            + "🏗️ تنظیمات اولیه کامل شد.\n"
+            + "از منوی اصلی می‌توانید پروژه و محاسبات خود را شروع کنید."
         )
 
 
