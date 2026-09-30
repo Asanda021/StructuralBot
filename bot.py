@@ -1271,6 +1271,10 @@ def main() -> None:
     Application entry point.
     """
 
+    # Render Web Service requires an HTTP listener.
+    if os.getenv("PORT"):
+        start_health_server()
+
     logger.info(
         "Initializing StructuralBot..."
     )
