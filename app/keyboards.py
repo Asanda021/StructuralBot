@@ -3,10 +3,8 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton,
 def main_menu():
     return InlineKeyboardMarkup([
       [InlineKeyboardButton("🏗 پروژه جدید",callback_data="new_project"),InlineKeyboardButton("📂 پروژه‌های من",callback_data="projects")],
-      [InlineKeyboardButton("🧱 فونداسیون",callback_data="sec|فونداسیون"),InlineKeyboardButton("🏛 ستون‌ها",callback_data="sec|ستون")],
-      [InlineKeyboardButton("➖ تیرها",callback_data="sec|تیر"),InlineKeyboardButton("🏗 سقف‌ها",callback_data="sec|سقف")],
-      [InlineKeyboardButton("🧱 دیوارها",callback_data="walls_menu"),InlineKeyboardButton("🪜 راه‌پله",callback_data="sec|پله")],
-      [InlineKeyboardButton("➕ ادامه متره",callback_data="continue_project"),InlineKeyboardButton("📋 جدول جامع",callback_data="table")],
+      [InlineKeyboardButton("🧮 شروع برآورد",callback_data="start_estimate"),InlineKeyboardButton("➕ ادامه برآورد",callback_data="continue_project")],
+      [InlineKeyboardButton("📋 جدول جامع",callback_data="table")],
       [InlineKeyboardButton("📊 آخرین گزارش",callback_data="reports"),InlineKeyboardButton("📄 Excel + PDF",callback_data="exports")],
       [InlineKeyboardButton("🏢 اطلاعات ساختمان",callback_data="building_info"),InlineKeyboardButton("📋 ورودی‌های پروژه",callback_data="project_inputs")],
       [InlineKeyboardButton("🛠 ابزارهای متره",callback_data="takeoff_menu"),InlineKeyboardButton("🔁 معادل‌سازی میلگرد",callback_data="rebar_equiv")],
