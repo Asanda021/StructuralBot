@@ -32,7 +32,7 @@ def line_rebar(length_m, spacing_cm, diameter_mm, stock_length_m=12.0):
     L=_num(length_m); s=_num(spacing_cm)/100
     if s<=0: raise ValueError("فاصله میلگرد باید بزرگ‌تر از صفر باشد")
     count=math.ceil(L/s)+1
-    return {"count_bars":count, **rebar_summary(diameter_mm,count*L if False else count,stock_length_m)}
+    return {"count_bars":count, **rebar_summary(diameter_mm,count*L,stock_length_m)}
 
 def repeated_bar_rebar(count, length_each_m, diameter_mm, stock_length_m=12.0):
     n=math.ceil(_num(count)); L=_num(length_each_m)
