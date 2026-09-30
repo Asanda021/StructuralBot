@@ -1,6 +1,6 @@
 import logging, os, threading, tempfile, math, html
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
 from telegram.error import BadRequest
 from app.db import Database
@@ -613,7 +613,7 @@ async def callback(update,context):
     if data=="home":
         context.user_data.clear()
         await q.edit_message_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu())
-        await q.message.reply_text("",reply_markup=ReplyKeyboardRemove())
+        await q.message.reply_text("منوی ثابت",reply_markup=persistent_menu())
         return
     if data=="calc_mode":
         await q.edit_message_text("🧮 <b>شروع برآورد</b>\n\nبرای ورود به موارد برآوردی، دکمه زیر را بزن.",parse_mode="HTML",reply_markup=calc_mode_menu())
