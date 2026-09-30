@@ -111,6 +111,11 @@ def main():
     assert not qa["ok"]
     assert qa["warnings"]
 
+    # Stair takeoff must not invent square geometry for reinforcement.
+    stair = __import__("bot").calc_member("پله", "پله بتنی", [1, 12.0, 0.18, 12, 20, 8, 25])
+    assert any(x["name"] == "میلگرد اصلی - قطر" for x in stair)
+    assert not any(x["name"] == "میلگرد اصلی - تعداد قطعه" for x in stair)
+
     # QA must flag a rebar piece longer than the default 12m stock bar.
     oversize = quality_check_members([{
         "section": "تیر",
