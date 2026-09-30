@@ -484,8 +484,8 @@ async def start_cmd(update,context):
     db.ensure_user(uid,update.effective_user.first_name or "")
     db.set_settings(uid)
     context.user_data.clear()
-    await update.message.reply_text("🏗 <b>StructuralBot</b>\n\n<b>متره جامع از روی نقشه</b>\n\nبرای شروع، روی دکمه زیر بزن.",parse_mode="HTML",reply_markup=calc_mode_menu())\n    await update.message.reply_text("منوی ثابت:",reply_markup=persistent_menu())
-
+    await update.message.reply_text("🏗 <b>StructuralBot</b>\n\n<b>متره جامع از روی نقشه</b>\n\nبرای شروع، روی دکمه زیر بزن.",parse_mode="HTML",reply_markup=calc_mode_menu())
+    await update.message.reply_text("منوی ثابت:",reply_markup=persistent_menu())
 def reset(context,name):
     context.user_data.clear(); context.user_data.update({"project_name":name,"members":[],"history":[]})
 
@@ -517,13 +517,20 @@ async def save_final(update,context):
 
 async def callback(update,context):
     q=update.callback_query; data=q.data or ""; await q.answer()
-    if data=="home":\n        context.user_data.clear(); await q.edit_message_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu()); await q.message.reply_text("منوی ثابت:",reply_markup=persistent_menu()); return
+    if data=="home":
+        context.user_data.clear()
+        await q.edit_message_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu())
+        await q.message.reply_text("منوی ثابت:",reply_markup=persistent_menu())
+        return
     if data=="calc_mode":
-        await q.edit_message_text("🧮 <b>شروع برآورد</b>\n\nبرای ورود به موارد برآوردی، دکمه زیر را بزن.",parse_mode="HTML",reply_markup=calc_mode_menu()); return\n    if data=="start_estimate":\n        if not context.user_data.get("project_name"):\n            context.user_data["project_name"]="برآورد جدید"\n            context.user_data.setdefault("members",[])\n        await q.edit_message_text("📚 <b>موارد برآوردی</b>\\n\\nعضو سازه‌ای موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu()); return
-    if data.startswith("mode|"):
-        mode=data.split("|",1)[1]
-        labels={"quick":"⚡ متره سریع","detailed":"🧮 متره دقیق","procurement":"🏗 متره اجرایی/خرید"}
-        context.user_data["calculation_mode"]=True
+        await q.edit_message_text("🧮 <b>شروع برآورد</b>\n\nبرای ورود به موارد برآوردی، دکمه زیر را بزن.",parse_mode="HTML",reply_markup=calc_mode_menu())
+        return
+    if data=="start_estimate":
+        if not context.user_data.get("project_name"):
+            context.user_data["project_name"]="برآورد جدید"
+            context.user_data.setdefault("members",[])
+        await q.edit_message_text("📚 <b>موارد برآوردی</b>\n\nعضو سازه‌ای موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu())
+        return
         context.user_data["calc_mode"]=mode
         db.set_settings(update.effective_user.id,calc_mode=mode)
         await q.edit_message_text(f"✅ <b>{labels.get(mode,mode)}</b> فعال شد.\n\nورودی‌های اصلی از نقشه گرفته می‌شوند و در پایان، بتن/میلگرد/شاخه خرید و Cut List طبق اطلاعات موجود گزارش می‌شوند.",parse_mode="HTML",reply_markup=main_menu()); return
@@ -925,11 +932,11 @@ async def message(update,context):
         await update.message.reply_text("منوی ثابت:",reply_markup=persistent_menu())
         return
     if text=="📂 پروژه‌ها":
-        ps=db.projects(update.effective_user.id)\n        rows=[[InlineKeyboardButton(p[1],callback_data=f"open|{p[0]}")] for p in ps]\n        rows.append([InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")])\n        await update.message.reply_text("📂 <b>پروژه‌های من</b>",parse_mode="HTML",reply_markup=InlineKeyboardMarkup(rows))\n        return\n    if text=="🧮 شروع برآورد":
-        if not context.user_data.get("project_name"):\n            context.user_data["project_name"]="برآورد جدید"\n            context.user_data.setdefault("members",[])\n        await update.message.reply_text("📚 <b>موارد برآوردی</b>\\n\\nعضو سازه‌ای موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu())\n        return
-    if text=="🔄 شروع مجدد":
-        context.user_data.clear()
-        await update.message.reply_text("🔄 <b>شروع مجدد</b>\n\nحالت محاسبه را دوباره فعال کن.",parse_mode="HTML",reply_markup=calc_mode_menu())
+        ps=db.projects(update.effective_user.id)
+        rows=[[InlineKeyboardButton(p[1],callback_data=f"open|{p[0]}")] for p in ps]
+        rows.append([InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")])
+        await update.message.reply_text("📂 <b>پروژه‌های من</b>",parse_mode="HTML",reply_markup=InlineKeyboardMarkup(rows))
+        return
         return
 
     queue=context.user_data.get("current_queue")
@@ -991,3 +998,9 @@ def main():
     app.run_polling(drop_pending_updates=True)
 
 if __name__=="__main__": main()
+    if text=="🧮 شروع برآورد":
+        if not context.user_data.get("project_name"):
+            context.user_data["project_name"]="برآورد جدید"
+            context.user_data.setdefault("members",[])
+        await update.message.reply_text("📚 <b>موارد برآوردی</b>\n\nعضو سازه‌ای موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu())
+        return
