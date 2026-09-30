@@ -1,51 +1,107 @@
 import math
 
-def _positive(*xs):
-    if any(x <= 0 for x in xs):
-        raise ValueError("values must be positive")
+def positive(*values):
+    if any(float(v) <= 0 for v in values):
+        raise ValueError("همه مقادیر باید بزرگ‌تر از صفر باشند")
 
-def foundation_calc(width, length, thickness):
-    _positive(width, length, thickness)
-    v = width * length * thickness
-    return {"حجم بتن (m³)": v, "سطح تقریبی قالب (m²)": 2*(width+length)*thickness + width*length}
+def estimate_building(data):
+    positive(
+        data["floors"], data["area"], data["foundation_count"],
+        data["footing_w"], data["footing_l"], data["footing_t"],
+        data["columns_per_floor"], data["column_w"], data["column_d"], data["floor_h"],
+        data["beam_length_per_floor"], data["beam_w"], data["beam_h"],
+        data["slab_t"], data["stair_area_per_floor"], data["stair_t"]
+    )
 
-def column_calc(width, depth, height):
-    _positive(width, depth, height)
-    return {"حجم بتن (m³)": width*depth*height, "سطح جانبی تقریبی (m²)": 2*(width+depth)*height}
+    floors = data["floors"]
+    area = data["area"]
 
-def beam_calc(width, height, length):
-    _positive(width, height, length)
-    return {"حجم بتن (m³)": width*height*length, "سطح جانبی تقریبی (m²)": 2*(width+height)*length}
+    footing_concrete = (
+        data["foundation_count"] * data["footing_w"] *
+        data["footing_l"] * data["footing_t"]
+    )
+    column_concrete = (
+        floors * data["columns_per_floor"] * data["column_w"] *
+        data["column_d"] * data["floor_h"]
+    )
+    beam_concrete = (
+        floors * data["beam_length_per_floor"] *
+        data["beam_w"] * data["beam_h"]
+    )
+    slab_concrete = floors * area * data["slab_t"]
+    stair_concrete = floors * data["stair_area_per_floor"] * data["stair_t"]
 
-def slab_calc(thickness, length, width):
-    _positive(thickness, length, width)
-    return {"حجم بتن (m³)": thickness*length*width, "مساحت سقف (m²)": length*width}
+    concrete = {
+        "فونداسیون": footing_concrete,
+        "ستون": column_concrete,
+        "تیر": beam_concrete,
+        "سقف": slab_concrete,
+        "راه‌پله": stair_concrete,
+    }
+    total_concrete = sum(concrete.values())
 
-def concrete_for_dimensions(a, b, c):
-    _positive(a, b, c)
-    v = a*b*c
-    return {"حجم بتن (m³)": v, "بتن با 5٪ پرت (m³)": v*1.05}
+    footing_form = data["foundation_count"] * (
+        2 * (data["footing_w"] + data["footing_l"]) * data["footing_t"]
+    )
+    column_form = floors * data["columns_per_floor"] * (
+        2 * (data["column_w"] + data["column_d"]) * data["floor_h"]
+    )
+    beam_form = floors * data["beam_length_per_floor"] * (
+        2 * (data["beam_w"] + data["beam_h"])
+    )
+    slab_form = floors * area
+    stair_form = floors * data["stair_area_per_floor"] * 2
+    formwork = {
+        "فونداسیون": footing_form,
+        "ستون": column_form,
+        "تیر": beam_form,
+        "سقف": slab_form,
+        "راه‌پله": stair_form,
+    }
+    total_formwork = sum(formwork.values())
 
-def rebar_equivalent(d1, d2):
-    _positive(d1, d2)
-    a1 = math.pi*d1**2/4
-    a2 = math.pi*d2**2/4
+    rates = data.get("rebar_rates", {
+        "فونداسیون": 110,
+        "ستون": 140,
+        "تیر": 130,
+        "سقف": 80,
+        "راه‌پله": 100,
+    })
+    rebar = {k: concrete[k] * rates[k] for k in concrete}
+    total_rebar = sum(rebar.values())
+
     return {
-        f"سطح مقطع Φ{d1:g} (mm²)": a1,
-        f"سطح مقطع Φ{d2:g} (mm²)": a2,
-        f"تعداد Φ{d2:g} معادل 1×Φ{d1:g}": a1/a2,
+        "floors": floors,
+        "area": area,
+        "concrete": concrete,
+        "total_concrete": total_concrete,
+        "formwork": formwork,
+        "total_formwork": total_formwork,
+        "rebar": rebar,
+        "total_rebar": total_rebar,
+        "rebar_rates": rates,
     }
 
-def bbs_cutlist(diameter, count, length):
-    _positive(diameter, count, length)
-    pieces = math.ceil(length / 12)
-    total_length = count * length
-    kg_per_m = diameter**2 / 162
-    total_weight = total_length * kg_per_m
-    return {
-        "تعداد میلگرد": count,
-        "طول هر میلگرد (m)": length,
-        "تعداد قطعه 12 متری موردنیاز": pieces * count,
-        "طول کل (m)": total_length,
-        "وزن تقریبی (kg)": total_weight,
-    }
+def format_estimate(result):
+    lines = [
+        "📊 خلاصه متره ساختمان بتنی",
+        "",
+        f"🏢 طبقات: {result['floors']:g}",
+        f"📐 زیربنای هر طبقه: {result['area']:g} m²",
+        "",
+        "🧱 بتن:",
+    ]
+    for k, v in result["concrete"].items():
+        lines.append(f"• {k}: {v:,.2f} m³")
+    lines += [f"• جمع بتن: {result['total_concrete']:,.2f} m³", "", "🪵 قالب‌بندی:"]
+    for k, v in result["formwork"].items():
+        lines.append(f"• {k}: {v:,.2f} m²")
+    lines += [f"• جمع قالب: {result['total_formwork']:,.2f} m²", "", "🔩 میلگرد:"]
+    for k, v in result["rebar"].items():
+        lines.append(f"• {k}: {v:,.0f} kg")
+    lines += [
+        f"• جمع میلگرد برآوردی: {result['total_rebar']:,.0f} kg",
+        "",
+        "⚠️ میلگرد در این نسخه بر اساس ضرایب برآوردی kg/m³ محاسبه می‌شود و جایگزین BBS یا لیستوفر اجرایی نیست.",
+    ]
+    return "\n".join(lines)
