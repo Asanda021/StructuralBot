@@ -162,7 +162,7 @@ def rcomps(title,r,note=""):
     dia=f"Φ{r['diameter_mm']:g}"
     return [
       {"name":f"{title} - تعداد قطعه","value":n,"unit":"عدد","note":note,"category":"میلگرد","diameter_mm":r["diameter_mm"]},
-      {"name":f"{title} - طول اجرا","value":r["length_m"],"unit":"m","note":dia,"category":"میلگرد","diameter_mm":r["diameter_mm"]},
+      {"name":f"{title} - طول اجرا","value":r["length_m"],"unit":"m","note":dia,"category":"میلگرد","diameter_mm":r["diameter_mm"],"cut_lengths_m":r.get("cut_lengths_m",[])},
       {"name":f"{title} - وزن اجرا","value":r["weight_kg"],"unit":"kg","note":dia,"category":"میلگرد","diameter_mm":r["diameter_mm"]},
       {"name":f"{title} - شاخه خرید","value":branches,"unit":"شاخه","note":f"{dia} | شاخه {r['stock_length_m']:g}m | وزن خرید {r['procurement_weight_kg']:.2f}kg","category":"میلگرد","diameter_mm":r["diameter_mm"],"procurement_weight_kg":r["procurement_weight_kg"]},
       {"name":f"{title} - طول خرید","value":r.get("procurement_length_m",r["length_m"]),"unit":"m","note":f"{dia} | پرت {r.get('waste_percent',0):g}%","category":"میلگرد","diameter_mm":r["diameter_mm"]}
