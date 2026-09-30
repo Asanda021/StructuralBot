@@ -153,6 +153,7 @@ from handlers.projects import (
 
 from handlers.calculations import (
     calculations_callback,
+    member_callback,
 )
 
 
@@ -357,33 +358,21 @@ async def main_menu_router(
 
     data = query.data or ""
 
-    if (
-        data.startswith("navigation:")
-        or data.startswith("menu:")
-        or data.startswith("calc:")
-        or data.startswith("restart:")
-        or data in {
-            "home",
-            "main_menu",
-            "navigation:main",
-        }
-    ):
-        await main_menu_callback(
-            update,
-            context,
-        )
-
+    if data.startswith("navigation:") or data.startswith("navigation_") or data.startswith("nav:") or data in {"home", "main_menu"}:
+        await navigation_callback(update, context)
         return
 
-    # Keep navigation callback available for legacy
-    # navigation identifiers.
-    if data.startswith(
-        "navigation_"
-    ):
-        await navigation_callback(
-            update,
-            context,
-        )
+    if data.startswith("menu:"):
+        action = data.split(":", 1)[1]
+        if action in {"back", "home"}:
+            await navigation_callback(update, context)
+        else:
+            await main_menu_callback(update, context)
+        return
+
+    if data.startswith("restart:"):
+        await main_menu_callback(update, context)
+        return
 
 
 # =========================================================
@@ -435,11 +424,7 @@ async def calculation_router(
 
     data = query.data or ""
 
-    if data.startswith(
-        "calculation:"
-    ) or data.startswith(
-        "calculations:"
-    ):
+    if data.startswith("calculation:") or data.startswith("calculations:") or data.startswith("calc:"):
         await calculations_callback(
             update,
             context,
@@ -1008,12 +993,18 @@ def create_application() -> Application:
     application.add_handler(
         CallbackQueryHandler(
             calculation_router,
-            pattern=(
-                r"^(?:"
-                r"calculation"
-                r"|calculations"
-                r"):.*$"
-            ),
+            pattern=r"^(?:calculation|calculations|calc):.*$",
+        )
+    )
+
+    # =====================================================
+    # STRUCTURAL MEMBERS
+    # =====================================================
+
+    application.add_handler(
+        CallbackQueryHandler(
+            member_callback,
+            pattern=r"^member:.*$",
         )
     )
 
