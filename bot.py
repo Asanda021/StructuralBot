@@ -20,7 +20,7 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.send_response(200 if self.path in ("/","/health") else 404)
         self.send_header("Content-Type","text/plain"); self.end_headers(); self.wfile.write(body)
     def log_message(self,*_): pass
-def health_server(): ThreadingHTTPServer(("0.0.0.0",PORT),HealthHandler).serve_forever()
+def health_server(): ThreadingHTTPServer(("0.0.0.0",PORT),HealthHandler).serve_forever()\n\ndef miniapp_server(): ThreadingHTTPServer(("0.0.0.0",PORT+1),MiniAppHandler).serve_forever()\n\nMINIAPP_URL=os.getenv("MINIAPP_URL","https://structuralbot.onrender.com/miniapp")
 
 def fmt(v):
     return f"{float(v):,.3f}".rstrip("0").rstrip(".")
@@ -493,7 +493,7 @@ async def error_handler(update,context):
 
 def main():
     if not TOKEN: raise RuntimeError("BOT_TOKEN environment variable is not set")
-    db.init(); threading.Thread(target=health_server,daemon=True).start()
+    db.init(); threading.Thread(target=health_server,daemon=True).start(); threading.Thread(target=miniapp_server,daemon=True).start()
     app=Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start",start_cmd)); app.add_handler(CallbackQueryHandler(callback)); app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,message)); app.add_error_handler(error_handler)
     log.info("Starting StructuralBot - drawing-driven takeoff v4")
