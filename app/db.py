@@ -15,6 +15,10 @@ class Database:
             CREATE TABLE IF NOT EXISTS project_estimates(id INTEGER PRIMARY KEY AUTOINCREMENT,project_id INTEGER NOT NULL,inputs_json TEXT NOT NULL,result_json TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE);
             CREATE TABLE IF NOT EXISTS calculations(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER,title TEXT NOT NULL,result TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL);\n            CREATE TABLE IF NOT EXISTS user_settings(user_id INTEGER PRIMARY KEY,language TEXT NOT NULL DEFAULT "fa",calc_mode TEXT NOT NULL DEFAULT "detailed",unit_system TEXT NOT NULL DEFAULT "metric",concrete_grade TEXT NOT NULL DEFAULT "C25",rebar_grade TEXT NOT NULL DEFAULT "A3",standard TEXT NOT NULL DEFAULT "iran",stock_length_m REAL NOT NULL DEFAULT 12.0);
             """)
+            cols={row[1] for row in c.execute("PRAGMA table_info(user_settings)").fetchall()}
+            migrations={"unit_system":"TEXT NOT NULL DEFAULT 'metric'","concrete_grade":"TEXT NOT NULL DEFAULT 'C25'","rebar_grade":"TEXT NOT NULL DEFAULT 'A3'","standard":"TEXT NOT NULL DEFAULT 'iran'","stock_length_m":"REAL NOT NULL DEFAULT 12.0"}
+            for name,definition in migrations.items():
+                if name not in cols: c.execute(f"ALTER TABLE user_settings ADD COLUMN {name} {definition}")
     def ensure_user(self,user_id,name):
         with self.connect() as c: c.execute("INSERT INTO users(user_id,name) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET name=excluded.name",(user_id,name))
     def add_project(self,user_id,name):
