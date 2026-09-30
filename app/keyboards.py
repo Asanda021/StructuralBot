@@ -2,8 +2,12 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton,
 
 def main_menu():
     return InlineKeyboardMarkup([
-      [InlineKeyboardButton("🏗 پروژه جدید",callback_data="new_project"),InlineKeyboardButton("📂 پروژه‌ها",callback_data="projects"),InlineKeyboardButton("📊 آخرین گزارش",callback_data="reports")],
-      [InlineKeyboardButton("➕ ادامه متره",callback_data="continue_project"),InlineKeyboardButton("📋 جدول جامع",callback_data="table"),InlineKeyboardButton("📄 خروجی",callback_data="exports")],
+      [InlineKeyboardButton("🏗 پروژه جدید",callback_data="new_project"),InlineKeyboardButton("📂 پروژه‌ها",callback_data="projects")],
+      [InlineKeyboardButton("🧱 فونداسیون",callback_data="sec|فونداسیون"),InlineKeyboardButton("🏛 ستون‌ها",callback_data="sec|ستون")],
+      [InlineKeyboardButton("➖ تیرها",callback_data="sec|تیر"),InlineKeyboardButton("🏗 سقف‌ها",callback_data="sec|سقف")],
+      [InlineKeyboardButton("🧱 دیوارها",callback_data="sec|دیوار"),InlineKeyboardButton("🪜 راه‌پله",callback_data="sec|پله")],
+      [InlineKeyboardButton("➕ ادامه متره",callback_data="continue_project"),InlineKeyboardButton("📋 جدول جامع",callback_data="table")],
+      [InlineKeyboardButton("📊 آخرین گزارش",callback_data="reports"),InlineKeyboardButton("📄 Excel + PDF",callback_data="exports")],
       [InlineKeyboardButton("⚙️ تنظیمات",callback_data="settings"),InlineKeyboardButton("🌐 زبان",callback_data="language"),InlineKeyboardButton("❓ راهنما",callback_data="help")]
     ])
 
