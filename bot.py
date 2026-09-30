@@ -224,10 +224,25 @@ def schema(section,typ):
                     ("تعداد میلگرد طولی هر شناژ","عدد"),("قطر میلگرد طولی","mm"),
                     ("قطر خاموت","mm"),("فاصله خاموت","cm"),("طول هر خاموت","m"),
                     ("تعداد میلگرد انتظار","عدد"),("طول هر انتظار","m"),("قطر میلگرد انتظار","mm")]
-        return [("تعداد","عدد"),("طول","m"),("عرض","m"),("ضخامت","m"),
-                ("قطر میلگرد شبکه پایین","mm"),("فاصله میلگرد شبکه پایین","cm"),
-                ("قطر میلگرد شبکه بالا","mm"),("فاصله میلگرد شبکه بالا","cm"),
-                ("تعداد میلگرد انتظار","عدد"),("طول هر انتظار","m"),("قطر میلگرد انتظار","mm")]
+        common=[
+            ("تعداد","عدد"),("طول","m"),("عرض","m"),("ضخامت","m"),
+        ]
+        if typ=="پی نواری":
+            return common+[
+                ("قطر میلگرد طولی","mm"),("فاصله میلگرد طولی","cm"),
+                ("قطر میلگرد عرضی","mm"),("فاصله میلگرد عرضی","cm"),
+                ("تعداد میلگرد تقویتی","عدد"),("طول هر میلگرد تقویتی","m"),("قطر میلگرد تقویتی","mm"),
+                ("تعداد میلگرد انتظار ستون","عدد"),("طول هر انتظار ستون","m"),("قطر انتظار ستون","mm"),
+                ("تعداد انتظار راه‌پله","عدد"),("طول هر انتظار راه‌پله","m"),("قطر انتظار راه‌پله","mm"),
+                ("تعداد چاله آسانسور","عدد"),("طول چاله آسانسور","m"),("عرض چاله آسانسور","m"),("عمق چاله آسانسور","m"),
+            ]
+        return common+[
+            ("قطر میلگرد شبکه پایین","mm"),("فاصله میلگرد شبکه پایین","cm"),
+            ("قطر میلگرد شبکه بالا","mm"),("فاصله میلگرد شبکه بالا","cm"),
+            ("تعداد میلگرد تقویتی","عدد"),("طول هر میلگرد تقویتی","m"),("قطر میلگرد تقویتی","mm"),
+            ("تعداد میلگرد انتظار ستون","عدد"),("طول هر انتظار ستون","m"),("قطر انتظار ستون","mm"),
+            ("تعداد چاله آسانسور","عدد"),("طول چاله آسانسور","m"),("عرض چاله آسانسور","m"),("عمق چاله آسانسور","m"),
+        ]
     if section=="ستون":
         return [("تعداد ستون","عدد"),("عرض ستون","m"),("عمق ستون","m"),("ارتفاع","m"),
                 ("تعداد میلگرد طولی هر ستون","عدد"),("قطر میلگرد طولی","mm"),
@@ -470,16 +485,45 @@ def calc_member(section,typ,v):
             if en and elen and ed:
                 comps += rcomps("میلگرد انتظار شناژ",repeated_bar_rebar(n*en,elen,ed))
             return comps
-        n,L,W,T,bd,bs,td,ts,en,elen,ed=v
+        if typ=="پی نواری":
+            n,L,W,T,ld,ls,wd,ws,rcount,rlen,rd,ecount,elen,ed,secount,selen,sed,pc,pL,pW,pD=v
+            comps=[{"name":"بتن فونداسیون","value":n*L*W*T,"unit":"m³"},{"name":"مساحت فونداسیون","value":n*L*W,"unit":"m²"}]
+            if ld and ls:
+                comps += rcomps("میلگرد طولی",grid_direction_rebar(L,W,ld,ls,"X",n))
+            if wd and ws:
+                comps += rcomps("میلگرد عرضی",grid_direction_rebar(L,W,wd,ws,"Y",n))
+            if rcount and rlen and rd:
+                comps += rcomps("میلگرد تقویتی",repeated_bar_rebar(n*rcount,rlen,rd))
+            if ecount and elen and ed:
+                comps += rcomps("میلگرد انتظار ستون",repeated_bar_rebar(n*ecount,elen,ed))
+            if secount and selen and sed:
+                comps += rcomps("انتظار راه‌پله",repeated_bar_rebar(n*secount,selen,sed))
+            if pc and pL and pW and pD:
+                comps.append({"name":"چاله آسانسور","value":n*pc*pL*pW*pD,"unit":"m³","note":f"{pc:g} عدد | {pL:g}×{pW:g}m | عمق {pD:g}m"})
+            return comps
+
+        n,L,W,T,bd,bs,td,ts,rcount,rlen,rd,ecount,elen,ed,pc,pL,pW,pD=v
         comps=[{"name":"بتن فونداسیون","value":n*L*W*T,"unit":"m³"},{"name":"مساحت فونداسیون","value":n*L*W,"unit":"m²"}]
-        if bd and bs:
-            comps += rcomps("میلگرد شبکه پایین - X",grid_direction_rebar(L,W,bd,bs,"X",n))
-            comps += rcomps("میلگرد شبکه پایین - Y",grid_direction_rebar(L,W,bd,bs,"Y",n))
-        if td and ts:
-            comps += rcomps("میلگرد شبکه بالا - X",grid_direction_rebar(L,W,td,ts,"X",n))
-            comps += rcomps("میلگرد شبکه بالا - Y",grid_direction_rebar(L,W,td,ts,"Y",n))
-        if en and elen and ed:
-            comps += rcomps("میلگرد انتظار",repeated_bar_rebar(n*en,elen,ed))
+        if typ=="پی رادیه":
+            if bd and bs:
+                comps += rcomps("میلگرد شبکه پایین - X",grid_direction_rebar(L,W,bd,bs,"X",n))
+                comps += rcomps("میلگرد شبکه پایین - Y",grid_direction_rebar(L,W,bd,bs,"Y",n))
+            if td and ts:
+                comps += rcomps("میلگرد شبکه بالا - X",grid_direction_rebar(L,W,td,ts,"X",n))
+                comps += rcomps("میلگرد شبکه بالا - Y",grid_direction_rebar(L,W,td,ts,"Y",n))
+        else:
+            if bd and bs:
+                comps += rcomps("میلگرد پایین - راستای طول",grid_direction_rebar(L,W,bd,bs,"X",n))
+                comps += rcomps("میلگرد پایین - راستای عرض",grid_direction_rebar(L,W,bd,bs,"Y",n))
+            if td and ts:
+                comps += rcomps("میلگرد بالا - راستای طول",grid_direction_rebar(L,W,td,ts,"X",n))
+                comps += rcomps("میلگرد بالا - راستای عرض",grid_direction_rebar(L,W,td,ts,"Y",n))
+        if rcount and rlen and rd:
+            comps += rcomps("میلگرد تقویتی",repeated_bar_rebar(n*rcount,rlen,rd))
+        if ecount and elen and ed:
+            comps += rcomps("میلگرد انتظار ستون",repeated_bar_rebar(n*ecount,elen,ed))
+        if pc and pL and pW and pD:
+            comps.append({"name":"چاله آسانسور","value":n*pc*pL*pW*pD,"unit":"m³","note":f"{pc:g} عدد | {pL:g}×{pW:g}m | عمق {pD:g}m"})
         return comps
 
     if section=="ستون":
