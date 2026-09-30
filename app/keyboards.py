@@ -31,12 +31,6 @@ def language_menu(initial=False):
     return InlineKeyboardMarkup(rows)
 
 
-def persistent_menu():
-    return ReplyKeyboardMarkup([
-        [KeyboardButton("🏠 خانه"), KeyboardButton("📂 پروژه‌ها"), KeyboardButton("🧮 شروع برآورد")]
-    ], resize_keyboard=True, one_time_keyboard=False, is_persistent=True,
-       input_field_placeholder="خانه | پروژه‌ها | شروع برآورد")
-
 def back_home(extra=None):
     rows=[]
     if extra: rows.append(extra)
