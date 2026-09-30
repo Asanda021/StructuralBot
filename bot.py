@@ -673,12 +673,36 @@ async def callback(update,context):
     if data=="pricing":
         await q.edit_message_text("💰 <b>برآورد ریالی</b>\\n\\nمنوی آن در ساختار محصول قرار گرفت، اما نرخ‌گذاری تا پایدار شدن متره و گزارش‌های مصالح به‌صورت خودکار عددسازی نمی‌کند.",parse_mode="HTML",reply_markup=back_home()); return
     if data=="rebar_equiv":
-        await q.edit_message_text("🔁 <b>معادل‌سازی میلگرد</b>\\n\\nقطرها را انتخاب کن؛ محاسبه بر اساس سطح مقطع اسمی انجام می‌شود و این ابزار فقط معادل‌سازی متره‌ای است.",parse_mode="HTML",reply_markup=rebar_equivalency_menu()); return
-    if data.startswith("eq|"):
+        await q.edit_message_text(
+            "🔁 <b>معادل‌سازی میلگرد</b>\n\n"
+            "۱) قطر میلگرد موجود را انتخاب کن.\n"
+            "۲) قطر جایگزین را انتخاب کن.\n"
+            "۳) تعداد میلگرد موجود را وارد کن.\n\n"
+            "مبنای محاسبه: حفظ حداقل همان سطح مقطع فولاد.",
+            parse_mode="HTML", reply_markup=rebar_equivalency_menu()
+        ); return
+    if data.startswith("eqsrc|"):
+        source=int(data.split("|",1)[1])
+        context.user_data["rebar_equiv_source"]=source
+        await q.edit_message_text(
+            f"🔁 <b>قطر مبدأ: Φ{source}</b>\n\nحالا قطر جایگزین را انتخاب کن.",
+            parse_mode="HTML", reply_markup=rebar_equiv_target_menu(source)
+        ); return
+    if data.startswith("eqdst|"):
         _,a,b=data.split("|")
-        d1=float(a); d2=float(b)
-        ratio=(d1*d1)/(d2*d2)
-        await q.edit_message_text(f"🔁 <b>Φ{d1:g} ↔ Φ{d2:g}</b>\\n\\nبرای حفظ سطح مقطع: هر ۱ شاخه Φ{d1:g} معادل حدود <b>{ratio:.3f}</b> شاخه Φ{d2:g} است.\\n\\nاین فقط تبدیل مقدار متره است و جایگزین دیتیل طراحی نیست.",parse_mode="HTML",reply_markup=rebar_equivalency_menu()); return
+        source=int(a); target=int(b)
+        context.user_data["rebar_equiv_source"]=source
+        context.user_data["rebar_equiv_target"]=target
+        context.user_data["rebar_equiv_awaiting_count"]=True
+        await q.edit_message_text(
+            f"🔁 <b>معادل‌سازی Φ{source} → Φ{target}</b>\n\n"
+            "تعداد میلگرد مبدأ را وارد کن.\nمثال: <b>4</b> برای 4Φ16",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("⬅️ قطر جایگزین",callback_data=f"eqsrc|{source}")],
+                [InlineKeyboardButton("🏠 منو",callback_data="home")]
+            ])
+        ); return
     if data=="language":
         await q.edit_message_text("🌐 <b>انتخاب زبان رابط کاربری</b>",parse_mode="HTML",reply_markup=language_menu()); return
     if data.startswith("lang|"):
@@ -1037,6 +1061,38 @@ async def finish_member(q,context):
 
 async def message(update,context):
     text=(update.message.text or "").strip().replace("،",".")
+    if context.user_data.get("rebar_equiv_awaiting_count"):
+        try:
+            count=float(text)
+            if count <= 0 or not count.is_integer(): raise ValueError
+            count=int(count)
+            d1=int(context.user_data["rebar_equiv_source"])
+            d2=int(context.user_data["rebar_equiv_target"])
+            area1=count*math.pi*d1*d1/4.0
+            area2_one=math.pi*d2*d2/4.0
+            new_count=math.ceil(area1/area2_one)
+            area2=new_count*area2_one
+            increase=(area2/area1-1.0)*100.0
+            context.user_data["rebar_equiv_awaiting_count"]=False
+            await update.message.reply_text(
+                f"🔁 <b>نتیجه معادل‌سازی میلگرد</b>\\n\\n"
+                f"میلگرد موجود: <b>{count}Φ{d1}</b>\\n"
+                f"سطح مقطع موجود: <b>{area1:.2f} mm²</b>\\n\\n"
+                f"قطر جایگزین: <b>Φ{d2}</b>\\n"
+                f"تعداد معادل: <b>{new_count}Φ{d2}</b>\\n"
+                f"سطح مقطع جایگزین: <b>{area2:.2f} mm²</b>\\n"
+                f"افزایش سطح مقطع: <b>{increase:.2f}%</b>\\n\\n"
+                "📌 تعداد جدید به عدد صحیح رو به بالا گرد می‌شود تا سطح مقطع کمتر نشود.\\n"
+                "⚠️ این ابزار معادل‌سازی متره‌ای است؛ کنترل فاصله، حداقل/حداکثر آرماتور و دیتیل اجرایی عضو همچنان لازم است.",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔄 معادل‌سازی جدید",callback_data="rebar_equiv")],
+                    [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+                ])
+            )
+        except ValueError:
+            await update.message.reply_text("❌ تعداد باید یک عدد صحیح مثبت باشد. مثال: 4")
+        return
     if context.user_data.get("awaiting_project_name"):
         if not text or len(text)>120: await update.message.reply_text("❌ نام پروژه نامعتبر است."); return
         reset(context,text); await update.message.reply_text(f"🏗 پروژه «{text}» ساخته شد.",reply_markup=section_menu()); return
