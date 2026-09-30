@@ -25,6 +25,7 @@ Important:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import sys
@@ -913,11 +914,14 @@ def create_application() -> Application:
     # Build application
     # -----------------------------------------------------
 
-    application = (
-        ApplicationBuilder()
-        .token(BOT_TOKEN)
-        .build()
-    )
+    builder = ApplicationBuilder().token(BOT_TOKEN)
+
+    # Render Free uses a public Web Service. In that mode we receive
+    # Telegram updates through our own HTTPS webhook instead of polling.
+    if os.getenv("RENDER_EXTERNAL_URL"):
+        builder = builder.updater(None)
+
+    application = builder.build()
 
     runtime.application = application
 
@@ -1230,36 +1234,100 @@ def create_application() -> Application:
 
 
 # =========================================================
-# RENDER WEB SERVICE HEALTH SERVER
+# RENDER FREE WEBHOOK SERVER
 # =========================================================
 
+def run_render_webhook(application: Application) -> None:
+    """
+    Run StructuralBot as a Render Free Web Service.
 
-def start_health_server() -> None:
-    """Start a tiny HTTP health endpoint for Render Web Service."""
-    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    Telegram sends updates to /telegram. Updates are placed into the
+    PTB application's asyncio queue. / and /health are lightweight
+    health endpoints for Render.
+    """
+    from http import HTTPStatus
     from threading import Thread
+    from flask import Flask, Response, request
 
+    external_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
     port = int(os.getenv("PORT", "10000"))
+    webhook_secret = os.getenv("WEBHOOK_SECRET", "").strip()
 
-    class HealthHandler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            if self.path in ("/", "/health"):
-                body = b"StructuralBot OK"
-                self.send_response(200)
-                self.send_header("Content-Type", "text/plain; charset=utf-8")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-                return
-            self.send_response(404)
-            self.end_headers()
+    if not external_url:
+        raise RuntimeError("RENDER_EXTERNAL_URL is required for webhook mode.")
 
-        def log_message(self, format, *args):
-            return
+    webhook_url = f"{external_url}/telegram"
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
-    server = ThreadingHTTPServer(("0.0.0.0", port), HealthHandler)
-    Thread(target=server.serve_forever, daemon=True).start()
-    logger.info("Render health server listening on port %s", port)
+    app = Flask("StructuralBot")
+
+    @app.get("/")
+    @app.get("/health")
+    def health():
+        return Response("StructuralBot OK", status=HTTPStatus.OK, mimetype="text/plain")
+
+    @app.post("/telegram")
+    def telegram_webhook():
+        if webhook_secret:
+            supplied = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+            if supplied != webhook_secret:
+                return Response("Unauthorized", status=HTTPStatus.UNAUTHORIZED)
+
+        try:
+            payload = request.get_json(silent=False)
+            update = Update.de_json(data=payload, bot=application.bot)
+            future = asyncio.run_coroutine_threadsafe(
+                application.update_queue.put(update),
+                loop,
+            )
+            future.result(timeout=10)
+            return Response("OK", status=HTTPStatus.OK)
+        except Exception:
+            logger.exception("Failed to accept Telegram webhook update.")
+            return Response("Bad Request", status=HTTPStatus.BAD_REQUEST)
+
+    async def start():
+        await application.initialize()
+        await application.bot.set_webhook(
+            url=webhook_url,
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=False,
+            secret_token=webhook_secret or None,
+        )
+        await application.start()
+        logger.info("Telegram webhook configured: %s", webhook_url)
+        logger.info("StructuralBot webhook service is running on port %s", port)
+
+    loop.run_until_complete(start())
+
+    server_thread = Thread(
+        target=lambda: app.run(
+            host="0.0.0.0",
+            port=port,
+            threaded=True,
+            use_reloader=False,
+        ),
+        daemon=True,
+    )
+    server_thread.start()
+
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        async def shutdown():
+            try:
+                await application.bot.delete_webhook(drop_pending_updates=False)
+            except Exception:
+                logger.exception("Failed to delete Telegram webhook.")
+            if application.running:
+                await application.stop()
+            await application.shutdown()
+
+        loop.run_until_complete(shutdown())
+        loop.close()
 
 
 # =========================================================
@@ -1269,46 +1337,25 @@ def start_health_server() -> None:
 def main() -> None:
     """
     Application entry point.
+
+    Render Web Service -> webhook mode.
+    Local development -> polling mode.
     """
 
-    # Render Web Service requires an HTTP listener.
-    if os.getenv("PORT"):
-        start_health_server()
+    logger.info("Initializing StructuralBot...")
 
-    logger.info(
-        "Initializing StructuralBot..."
-    )
-
-    # -----------------------------------------------------
-    # Database
-    # -----------------------------------------------------
-
-    logger.info(
-        "Initializing database..."
-    )
-
+    logger.info("Initializing database...")
     initialize_database()
-
     runtime.database_initialized = True
 
-    # -----------------------------------------------------
-    # Telegram application
-    # -----------------------------------------------------
-
-    logger.info(
-        "Creating Telegram application..."
-    )
-
+    logger.info("Creating Telegram application...")
     application = create_application()
 
-    logger.info(
-        "StructuralBot is starting..."
-    )
+    if os.getenv("RENDER_EXTERNAL_URL"):
+        run_render_webhook(application)
+        return
 
-    # -----------------------------------------------------
-    # Polling
-    # -----------------------------------------------------
-
+    logger.info("StructuralBot is starting in local polling mode...")
     application.run_polling(
         allowed_updates=Update.ALL_TYPES,
         drop_pending_updates=False,
