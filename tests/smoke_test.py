@@ -70,7 +70,7 @@ def main():
     # Foundation mesh: repeated units must preserve explicit cut pieces.
     import bot
     foundation = bot.calc_member("فونداسیون", "پی منفرد",
-        [2, 2.0, 1.8, 0.45, 12, 20, 10, 25, 4, 1.0, 16])
+        [2, 2.0, 1.8, 0.45, 12, 20, 10, 25, 4, 1.0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     concrete = next(x for x in foundation if x["name"] == "بتن فونداسیون")
     bottom = next(x for x in foundation if x["name"] == "میلگرد شبکه پایین - X - تعداد قطعه")
     top = next(x for x in foundation if x["name"] == "میلگرد شبکه بالا - X - تعداد قطعه")
