@@ -763,14 +763,12 @@ async def message(update,context):
 async def ask_next_message(update,context):
     if context.user_data.get("current_queue"):
         label,unit=context.user_data["current_queue"][0]
-        rv=ready_value(context.user_data["current_section"],context.user_data["current_type"],label)
-        ready=f"\n⚡ مقدار آماده: {rv} {unit}" if rv is not None else ""
-        buttons=[]
-        if rv is not None:
-            buttons.append([InlineKeyboardButton(f"⚡ استفاده از مقدار آماده: {rv} {unit}",callback_data=f"ready|{rv}")])
-        buttons.append([InlineKeyboardButton("⬅️ اصلاح مرحله قبل",callback_data="back_field")])
-        buttons.append([InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
-        await update.message.reply_text(f"⏳ ثبت شد.\n\nمرحله بعد: <b>{label}</b> ({unit}){ready}",parse_mode="HTML",reply_markup=input_keyboard(rv,unit))
+        options=ready_options(context.user_data["current_section"],context.user_data["current_type"],label)
+        await update.message.reply_text(
+            f"⏳ ثبت شد.\n\nمرحله بعد: <b>{label}</b> ({unit})\nاز مقادیر آماده انتخاب کن یا ورود دستی را بزن.",
+            parse_mode="HTML",
+            reply_markup=input_keyboard(options,unit)
+        )
     else:
         class Q:
             async def edit_message_text(self,*a,**kw): await update.message.reply_text(*a,**kw)
