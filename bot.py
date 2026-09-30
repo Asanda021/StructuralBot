@@ -1037,12 +1037,26 @@ async def error_handler(update,context):
     if isinstance(context.error,BadRequest) and "Message is not modified" in str(context.error): return
     log.error("Unhandled bot error: %s",context.error,exc_info=context.error)
 
+def bot_worker():
+    while True:
+        try:
+            app=Application.builder().token(TOKEN).build()
+            app.add_handler(CommandHandler("start",start_cmd))
+            app.add_handler(CallbackQueryHandler(callback))
+            app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,message))
+            app.add_error_handler(error_handler)
+            log.info("Starting StructuralBot - drawing-driven takeoff v5")
+            app.run_polling(drop_pending_updates=True, stop_signals=None)
+        except Exception as exc:
+            log.error("Telegram worker stopped; retrying in 5s: %s",exc,exc_info=exc)
+            import time
+            time.sleep(5)
+
 def main():
-    if not TOKEN: raise RuntimeError("BOT_TOKEN environment variable is not set")
-    db.init(); threading.Thread(target=health_server,daemon=True).start()
-    app=Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start",start_cmd)); app.add_handler(CallbackQueryHandler(callback)); app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,message)); app.add_error_handler(error_handler)
-    log.info("Starting StructuralBot - drawing-driven takeoff v4")
-    app.run_polling(drop_pending_updates=True)
+    if not TOKEN:
+        raise RuntimeError("BOT_TOKEN environment variable is not set")
+    db.init()
+    threading.Thread(target=bot_worker,daemon=True,name="telegram-worker").start()
+    health_server()
 
 if __name__=="__main__": main()
