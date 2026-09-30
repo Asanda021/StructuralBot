@@ -446,5 +446,5 @@ async def navigation_callback(
 
     data = query.data or ""
 
-    if data == "navigation:main":
+    if data in {"navigation:main", "nav:home", "nav:back", "menu:home", "menu:back", "home", "main_menu"}:
         await show_main_menu(update, context)
