@@ -58,6 +58,17 @@ def main():
     assert slab["thermal"]["length_m"] > 0
     assert slab["opening_area_m2"] == 2
 
+    # Foundation mesh: repeated units must preserve explicit cut pieces.
+    import bot
+    foundation = bot.calc_member("فونداسیون", "پی منفرد",
+        [2, 2.0, 1.8, 0.45, 12, 20, 10, 25, 4, 1.0, 8, 4, 1.2, 16])
+    concrete = next(x for x in foundation if x["name"] == "بتن فونداسیون")
+    bottom = next(x for x in foundation if x["name"] == "شبکه پایین دو جهت - تعداد قطعه")
+    pins = next(x for x in foundation if x["name"] == "سنجاقی پی - تعداد قطعه")
+    assert abs(concrete["value"] - 3.24) < 1e-9
+    assert bottom["value"] > 0
+    assert pins["value"] == 8
+
     # U-Boot/waffle geometric takeoff path is expected to be supplied by bot.
     # Here we validate the generic slab engine remains usable for solid slabs.
     solid = calculate_slab({
