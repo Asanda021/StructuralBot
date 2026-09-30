@@ -183,6 +183,25 @@ def cut_list_by_diameter(members, stock_length_m=12.0):
         }
     return result
 
+def validate_takeoff_geometry(members):
+    """Validate drawing-derived geometry without inventing missing values."""
+    warnings=[]
+    for i,m in enumerate(members,1):
+        label=f"{i}. {m.get('member',m.get('type','عضو'))}"
+        for comp in m.get("components",[]):
+            if comp.get("category")=="میلگرد" and comp.get("unit")=="m" and "طول اجرا" in str(comp.get("name","")):
+                cuts=comp.get("cut_lengths_m") or []
+                for cut in cuts:
+                    if float(cut) > 12.0 + 1e-9:
+                        warnings.append(f"{label}: قطعه میلگرد {float(cut):g}m از شاخه ۱۲m بزرگ‌تر است؛ وصله/تفکیک قطعه لازم است.")
+            if comp.get("unit") in ("m","m²","m³","kg","عدد","شاخه"):
+                try:
+                    if float(comp.get("value",0)) < 0:
+                        warnings.append(f"{label}: مقدار منفی در {comp.get('name','آیتم')}.")
+                except (TypeError, ValueError):
+                    warnings.append(f"{label}: مقدار نامعتبر در {comp.get('name','آیتم')}.")
+    return warnings
+
 def quality_check_members(members):
     """Pre-export QA: flags missing or ambiguous takeoff inputs without inventing values."""
     warnings=[]
@@ -202,6 +221,8 @@ def quality_check_members(members):
                 dia=c.get("diameter_mm")
                 if dia is None or float(dia)<=0:
                     warnings.append(f"{label}: قطر میلگرد برای {c.get('name','میلگرد')} مشخص نیست.")
+    warnings.extend(validate_takeoff_geometry(members))
+    warnings=list(dict.fromkeys(warnings))
     return {"ok":not warnings,"warnings":warnings,"checked_members":len(members)}
 
 def estimate_members(members):
