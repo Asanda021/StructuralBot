@@ -745,11 +745,41 @@ async def callback(update,context):
         context.user_data["project_name"]="پروژه جدید"
         context.user_data["members"]=[]
         await q.edit_message_text("🏗 <b>پروژه جدید</b>\n\nحالا اعضای سازه را از روی نقشه اضافه کن.",parse_mode="HTML",reply_markup=section_menu()); return
-    if data in ("start_estimate","continue_project","choose_section"):
+    if data=="start_estimate":
+        context.user_data.clear()
+        context.user_data["project_name"]="پروژه جدید"
+        context.user_data["members"]=[]
+        await q.edit_message_text("🧮 <b>شروع برآورد جدید</b>\n\nاز روی نقشه، بخش موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu()); return
+    if data=="continue_project":
+        uid=update.effective_user.id
+        saved=db.last_estimate(uid)
+        if not saved:
+            await q.edit_message_text("📂 <b>برآورد ذخیره‌شده‌ای پیدا نشد.</b>\n\nابتدا یک برآورد جدید شروع کن.",parse_mode="HTML",reply_markup=main_menu()); return
+        inputs=saved.get("inputs") or {}
+        members=inputs.get("members",[]) if isinstance(inputs,dict) else []
+        context.user_data.clear()
+        context.user_data["project_id"]=saved["project_id"]
+        context.user_data["project_name"]=saved["project_name"]
+        context.user_data["members"]=members
+        context.user_data["last_result"]=saved.get("result") or None
+        await q.edit_message_text(
+            f"📂 <b>ادامه برآورد</b>\n\n"
+            f"🏗 پروژه: <b>{saved['project_name']}</b>\n"
+            f"👷 تعداد اعضای ذخیره‌شده: <b>{len(members)}</b>\n\n"
+            "می‌توانی عضو جدید اضافه کنی یا اعضای پروژه را از بازبینی اصلاح کنی.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("➕ افزودن عضو",callback_data="choose_section")],
+                [InlineKeyboardButton("🔎 بازبینی پروژه",callback_data="finish_takeoff")],
+                [InlineKeyboardButton("📋 جدول جامع",callback_data="table")],
+                [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+            ])
+        ); return
+    if data=="choose_section":
         if not context.user_data.get("project_name"):
             context.user_data["project_name"]="پروژه جدید"
         context.user_data.setdefault("members",[])
-        await q.edit_message_text("📚 <b>ادامه برآورد</b>\n\nاز روی نقشه، بخش موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu()); return
+        await q.edit_message_text("📚 <b>انتخاب عضو</b>\n\nبخش موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu()); return
     if data=="walls_menu":
         await q.edit_message_text("🧱 <b>دیوارها</b>\n\nنوع دیوار را انتخاب کن:",parse_mode="HTML",reply_markup=walls_menu()); return
     if data.startswith("sec|"):
@@ -1062,7 +1092,20 @@ async def finish_member(q,context):
     if idx is None: context.user_data.setdefault("members",[]).append(m)
     else: context.user_data["members"][idx]=m
     context.user_data["current_edit"]=None
-    await q.message.reply_text("⌨️ ورود اطلاعات این عضو تمام شد.", reply_markup=persistent_menu())
+
+    # Persist the draft immediately so "ادامه برآورد" can restore it even
+    # if the user leaves Telegram before finalizing the whole project.
+    uid=q.from_user.id
+    pid=context.user_data.get("project_id")
+    if not pid:
+        pid=db.add_project(uid,context.user_data.get("project_name","پروژه جدید"))
+        context.user_data["project_id"]=pid
+    try:
+        draft=estimate_members(context.user_data.get("members",[]))
+        db.save_draft(uid,pid,{"members":context.user_data.get("members",[])},draft)
+        context.user_data["last_result"]=draft
+    except Exception as e:
+        log.warning("draft save failed: %s",e)
     context.user_data["current_member_index"]=len(context.user_data.get("members",[]))-1 if idx is None else idx
     await q.edit_message_text(
         f"✅ <b>{m['member']}</b> محاسبه شد.\n\nحالا نتیجه این عضو را نهایی کن یا در صورت نیاز اصلاحش کن.",
