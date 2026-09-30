@@ -36,6 +36,13 @@ def create_excel(result,project_name,path):
                   data.get("procurement_length_m",0),data.get("branches",0),
                   data.get("procurement_weight_kg",0)])
 
+    cl=wb.create_sheet("Cut List")
+    cl.append(["قطر","شاخه 12m","تعداد قطعات","طول مصرفی (m)","پرت برش (m)"])
+    for c in cl[1]: c.font=Font(bold=True)
+    for dia,data in result.get("cut_list",{}).items():
+        cl.append([f"Φ{dia}",data.get("stock_bars",0),data.get("pieces_count",0),
+                   data.get("used_length_m",0),data.get("waste_length_m",0)])
+
     s2=wb.create_sheet("جمع‌بندی واحدها")
     s2.append(["واحد","جمع مقدار"])
     for k,v in result.get("totals_by_unit",{}).items(): s2.append([k,v])
@@ -51,7 +58,9 @@ def create_pdf(result,project_name,path):
                                 ("GRID",(0,0),(-1,-1),0.5,colors.grey),
                                 ("ALIGN",(0,0),(-1,-1),"CENTER")]))
     story += [table,Spacer(1,12),
-              Paragraph(" | ".join(f"{k}: {v:,.3f}" for k,v in result.get("totals_by_unit",{}).items()),styles["BodyText"]),
+              Paragraph(f"Concrete total: {result.get('concrete_total_m3',0):,.3f} m³",styles["BodyText"]),
+              Spacer(1,6),
+              Paragraph(" | ".join(f"Φ{k}: {v.get('stock_bars',0)} bars / {v.get('waste_length_m',0):,.2f} m waste" for k,v in result.get("cut_list",{}).items()),styles["BodyText"]),
               Spacer(1,8),
               Paragraph("مقادیر بر اساس اطلاعات واردشده از نقشه تهیه شده‌اند و نیازمند کنترل مدارک مصوب پروژه هستند.",styles["BodyText"])]
     doc.build(story); return path
