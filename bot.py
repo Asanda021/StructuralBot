@@ -270,7 +270,7 @@ def input_keyboard(values=None, unit="", compound=None):
         if len(row)==4: rows.append(row); row=[]
     if row: rows.append(row)
     rows.append([KeyboardButton("✏️ ورود دستی")])
-    rows.append([KeyboardButton("⬅️ مرحله قبل"), KeyboardButton("📋 ورودی‌ها")])
+    rows.append([KeyboardButton("⬅️ مرحله قبل"), KeyboardButton("📋 ورودی‌های ثبت‌شده")])
     rows.append([KeyboardButton("❌ لغو فرآیند"), KeyboardButton("🏠 منو")])
     rows.append([KeyboardButton("🔄 شروع مجدد")])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True, one_time_keyboard=False, is_persistent=True,
@@ -284,7 +284,7 @@ def field_menu(values=None, unit="", compound=None):
         if len(row)==4: rows.append(row); row=[]
     if row: rows.append(row)
     rows.append([InlineKeyboardButton("✏️ ورود دستی",callback_data="manual")])
-    rows.append([InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back_field"),InlineKeyboardButton("📋 ورودی‌ها",callback_data="show_inputs")])
+    rows.append([InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back_field"),InlineKeyboardButton("📋 ورودی‌های ثبت‌شده",callback_data="show_inputs")])
     rows.append([InlineKeyboardButton("❌ لغو فرآیند",callback_data="cancel_member"),InlineKeyboardButton("🏠 منو",callback_data="home")])
     rows.append([InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
     return InlineKeyboardMarkup(rows)
@@ -553,7 +553,7 @@ async def callback(update,context):
         if not context.user_data.get("project_name"):
             context.user_data["project_name"]="برآورد جدید"
             context.user_data.setdefault("members",[])
-        await q.edit_message_text("📚 <b>موارد برآوردی</b>\n\nعضو سازه‌ای موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu())
+        await q.edit_message_text("📚 <b>انتخاب بخش متره</b>\n\nعضو سازه‌ای موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu())
         return
     if data=="settings":
         s=db.settings(update.effective_user.id)
@@ -588,7 +588,7 @@ async def callback(update,context):
         db.set_settings(update.effective_user.id,unit_system=val)
         await q.edit_message_text(f"✅ سیستم واحد روی <b>{val}</b> ذخیره شد.",parse_mode="HTML",reply_markup=settings_menu()); return
     if data=="standards":
-        await q.edit_message_text("📐 <b>مرجع گزارش</b>\\n\\nاین انتخاب فقط به‌عنوان مشخصات/مرجع گزارش ذخیره می‌شود؛ StructuralBot در این پروژه طراحی سازه انجام نمی‌دهد.",parse_mode="HTML",reply_markup=standards_menu()); return
+        await q.edit_message_text("📐 <b>استاندارد و مرجع</b>\\n\\nاین انتخاب فقط به‌عنوان مشخصات/مرجع گزارش ذخیره می‌شود؛ StructuralBot در این پروژه طراحی سازه انجام نمی‌دهد.",parse_mode="HTML",reply_markup=standards_menu()); return
     if data.startswith("standard|"):
         val=data.split("|",1)[1]
         db.set_settings(update.effective_user.id,standard=val)
@@ -601,7 +601,7 @@ async def callback(update,context):
         db.set_settings(update.effective_user.id,concrete_grade=val)
         await q.edit_message_text(f"✅ رده بتن <b>{val}</b> ذخیره شد.",parse_mode="HTML",reply_markup=settings_menu()); return
     if data=="rebar_settings":
-        await q.edit_message_text("🔩 <b>گرید میلگرد</b>",parse_mode="HTML",reply_markup=rebar_settings_menu()); return
+        await q.edit_message_text("🔩 <b>مشخصات آرماتور</b>",parse_mode="HTML",reply_markup=rebar_settings_menu()); return
     if data.startswith("rebar_grade|"):
         val=data.split("|",1)[1]
         db.set_settings(update.effective_user.id,rebar_grade=val)
@@ -680,7 +680,7 @@ async def callback(update,context):
         return
     if data=="restart":
         context.user_data.clear()
-        await q.edit_message_text("🔄 <b>شروع مجدد</b>\n\nابتدا زبان را انتخاب کن.",parse_mode="HTML",reply_markup=language_menu(initial=True)); return
+        await q.edit_message_text("🔄 <b>بازنشانی فرآیند</b>\n\nابتدا زبان را انتخاب کن.",parse_mode="HTML",reply_markup=language_menu(initial=True)); return
     if data=="new_project":
         context.user_data.clear()
         context.user_data["project_name"]="پروژه جدید"
@@ -690,7 +690,7 @@ async def callback(update,context):
         context.user_data.clear()
         context.user_data["project_name"]="پروژه جدید"
         context.user_data["members"]=[]
-        await q.edit_message_text("🧮 <b>شروع برآورد جدید</b>\n\nاز روی نقشه، بخش موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu()); return
+        await q.edit_message_text("🧮 <b>برآورد جدید</b>\n\nاز روی نقشه، بخش موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu()); return
     if data=="continue_project":
         uid=update.effective_user.id
         saved=db.last_estimate(uid)
@@ -711,7 +711,7 @@ async def callback(update,context):
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("➕ افزودن عضو",callback_data="choose_section")],
-                [InlineKeyboardButton("📋 جدول جامع",callback_data="table")],
+                [InlineKeyboardButton("📋 گزارش جامع متره",callback_data="table")],
                 [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
             ])
         ); return
@@ -719,9 +719,9 @@ async def callback(update,context):
         if not context.user_data.get("project_name"):
             context.user_data["project_name"]="پروژه جدید"
         context.user_data.setdefault("members",[])
-        await q.edit_message_text("📚 <b>انتخاب عضو</b>\n\nبخش موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu()); return
+        await q.edit_message_text("📚 <b>انتخاب عضو برای متره</b>\n\nبخش موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu()); return
     if data=="walls_menu":
-        await q.edit_message_text("🧱 <b>دیوارها</b>\n\nنوع دیوار را انتخاب کن:",parse_mode="HTML",reply_markup=walls_menu()); return
+        await q.edit_message_text("🧱 <b>انتخاب نوع دیوار</b>\n\nنوع دیوار را انتخاب کن:",parse_mode="HTML",reply_markup=walls_menu()); return
     if data.startswith("sec|"):
         await show_member_types(q,data.split("|",1)[1]); return
     if data.startswith("member|"):
@@ -857,8 +857,8 @@ async def callback(update,context):
         await q.edit_message_text("\n".join(lines),parse_mode="HTML",reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📋 کپی نتیجه عضو",callback_data="copy_member_output")],
             [InlineKeyboardButton("✅ تأیید نهایی عضو",callback_data="member_confirm")],
-            [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit")],
-            [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")]
+            [InlineKeyboardButton("✏️ ویرایش عضو",callback_data="member_edit")],
+            [InlineKeyboardButton("➕ افزودن عضو بعدی",callback_data="choose_section")]
         ])); return
     if data=="member_confirm":
         idx=context.user_data.get("current_member_index"); ms=context.user_data.get("members",[])
@@ -867,8 +867,8 @@ async def callback(update,context):
         m=ms[idx]
         await q.edit_message_text(f"✅ <b>{m['member']}</b> با موفقیت تأیید نهایی شد.\n\nاین عضو در متره پروژه ثبت شد و آماده ورود به عضو بعدی یا بازبینی کامل پروژه است.",parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")],
-                [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit")],
+                [InlineKeyboardButton("➕ افزودن عضو بعدی",callback_data="choose_section")],
+                [InlineKeyboardButton("✏️ ویرایش عضو",callback_data="member_edit")],
                 [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
             ])); return
     if data=="member_edit":
@@ -1037,9 +1037,9 @@ async def finish_member(q,context):
         f"✅ <b>{m['member']}</b> محاسبه شد.\n\nحالا نتیجه این عضو را نهایی کن یا در صورت نیاز اصلاحش کن.",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ بازگشت به مرحله قبل",callback_data="member_prev"),InlineKeyboardButton("➡️ رفتن به مرحله بعد",callback_data="choose_section")],
-            [InlineKeyboardButton("🧮 محاسبه نهایی عضو",callback_data="member_calculate")],
-            [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit"),InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+            [InlineKeyboardButton("⬅️ مرحله قبل",callback_data="member_prev"),InlineKeyboardButton("➡️ ادامه ورود",callback_data="choose_section")],
+            [InlineKeyboardButton("🧮 محاسبه و ثبت عضو",callback_data="member_calculate")],
+            [InlineKeyboardButton("✏️ ویرایش عضو",callback_data="member_edit"),InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
         ])
     )
 
@@ -1075,11 +1075,11 @@ async def message(update,context):
                 queue.pop(0)
                 await ask_next_message(update,context)
                 return
-    if text=="🧮 شروع برآورد":
+    if text=="🧮 برآورد جدید":
         if not context.user_data.get("project_name"):
             context.user_data["project_name"]="برآورد جدید"
             context.user_data.setdefault("members",[])
-        await update.message.reply_text("📚 <b>موارد برآوردی</b>\n\nعضو سازه‌ای موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu())
+        await update.message.reply_text("📚 <b>انتخاب بخش متره</b>\n\nعضو سازه‌ای موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu())
         return
     if text=="⬅️ مرحله قبل":
         values=context.user_data.get("current_values",[])
@@ -1090,7 +1090,7 @@ async def message(update,context):
             queue.insert(0,history.pop())
             await ask_next_message(update,context)
         return
-    if text=="📋 ورودی‌ها":
+    if text=="📋 ورودی‌های ثبت‌شده":
         queue=context.user_data.get("current_queue",[])
         values=context.user_data.get("current_values",[])
         history=context.user_data.get("current_history",[])
@@ -1108,7 +1108,7 @@ async def message(update,context):
     if text=="❌ لغو فرآیند":
         for k in ("current_section","current_type","current_values","current_queue","current_history","current_edit","current_preset"):
             context.user_data.pop(k,None)
-        await update.message.reply_text("❌ <b>ورود این عضو لغو شد.</b>",parse_mode="HTML",reply_markup=section_menu())
+        await update.message.reply_text("↩️ <b>ورود عضو لغو شد.</b>",parse_mode="HTML",reply_markup=section_menu())
         return
     if text in ("🏠 خانه","🏠 منو"):
         context.user_data.clear()
@@ -1163,7 +1163,7 @@ async def finish_member_message(update,context):
     await update.message.reply_text(
         f"✅ <b>{m['member']}</b> محاسبه شد.\\n\\nبتن، میلگرد، وزن، شاخه خرید و اجزای وابسته ثبت شد.",
         parse_mode="HTML", reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ بازگشت به مرحله قبل",callback_data="member_prev"),InlineKeyboardButton("➡️ رفتن به مرحله بعد",callback_data="choose_section")],
+            [InlineKeyboardButton("⬅️ مرحله قبل",callback_data="member_prev"),InlineKeyboardButton("➡️ ادامه ورود",callback_data="choose_section")],
             [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
         ])
     )
