@@ -29,6 +29,15 @@ def main():
     assert r["weight_kg"] > 0
     assert r["branches"] > 0
 
+    # Bars longer than the 12m stock length are automatically split with
+    # a code-based tensile lap; the user does not enter lap/bend/hook lengths.
+    long_bar = repeated_bar_rebar(count=1, length_each_m=13.0, diameter_mm=16)
+    assert long_bar["splice_count"] == 1
+    assert len(long_bar["cut_lengths_m"]) == 2
+    assert max(long_bar["cut_lengths_m"]) <= 12.0
+    assert long_bar["lap_m"] >= 0.30
+    assert long_bar["length_m"] > 13.0
+
     # Two-direction thermal mesh: one diameter/spacing, bot calculates both directions.
     grid = grid_rebar(8.0, 6.0, 10, 25)
     assert grid["count_bars"] > 0
