@@ -49,15 +49,15 @@ def _rebar_type_rows(result):
             if dia is None: continue
             base=name.split(" - ")[0]
             g=groups[(base,float(dia))]
-            if name.endswith(" - Pieces"): g["pieces"] += int(c.get("value",0))
-            elif name.endswith(" - Exec. Length"):
+            if name.endswith(" - تعداد قطعه"): g["pieces"] += int(c.get("value",0))
+            elif name.endswith(" - طول اجرا"):
                 g["length"] += float(c.get("value",0))
-            elif name.endswith(" - Exec. Weight"):
+            elif name.endswith(" - وزن اجرا"):
                 g["weight"] += float(c.get("value",0))
-            elif name.endswith(" - Stock Bars"):
+            elif name.endswith(" - شاخه خرید"):
                 g["branches"] += int(c.get("value",0))
                 g["buy_weight"] += float(c.get("procurement_weight_kg",0))
-            elif name.endswith(" - Buy Length"):
+            elif name.endswith(" - طول خرید"):
                 g["buy_length"] += float(c.get("value",0))
     return [(k[0],k[1],v) for k,v in groups.items()]
 
@@ -109,7 +109,7 @@ def create_excel(result,project_name,path):
     rb=wb.create_sheet("Rebar by Type")
     rb.append(["Rebar Type","Dia.","Pieces","Exec. Length (m)","Exec. Weight (kg)","Stock Bars","Buy Length (m)","Buy Weight (kg)"])
     for base,dia,g in _rebar_type_rows(result):
-        rb.append([base,f"Φ{dia:g}",g["pieces"],g["length"],g["weight"],g["branches"],g["buy_length"],g["buy_weight"]])
+        rb.append([_en_label(base),f"Φ{dia:g}",g["pieces"],g["length"],g["weight"],g["branches"],g["buy_length"],g["buy_weight"]])
     _style_sheet(rb)
 
     rd=wb.create_sheet("Rebar Procurement by Diameter")
@@ -132,14 +132,14 @@ def create_excel(result,project_name,path):
     _style_sheet(qa_ws)
 
     cl=wb.create_sheet("Cut List")
-    cl.append(["Dia.","شاخه Standard","Pieces","Used Length (m)","Cut Waste (m)"])
+    cl.append(["Dia.","Stock Length","Pieces","Used Length (m)","Cut Waste (m)"])
     for dia,data in result.get("cut_list",{}).items():
         cl.append([f"Φ{dia}",data.get("stock_bars",0),data.get("pieces_count",0),
                    data.get("used_length_m",0),data.get("waste_length_m",0)])
     _style_sheet(cl)
 
     units=wb.create_sheet("Unit Totals")
-    units.append(["Unit","جمع Quantity"])
+    units.append(["Unit","Total Quantity"])
     for k,v in result.get("totals_by_unit",{}).items(): units.append([k,v])
     _style_sheet(units)
 
@@ -179,7 +179,7 @@ def create_pdf(result,project_name,path):
     total_buy=sum(float(x.get("procurement_weight_kg",0)) for x in result.get("rebar_by_diameter",{}).values())
     total_bars=sum(int(x.get("branches",0)) for x in result.get("rebar_by_diameter",{}).values())
     summary=[
-        ["Member Count","بتن کل (m³)","وزن میلگرد اجرا (kg)","Stock Bars","وزن میلگرد خرید (kg)"],
+        ["Member Count","Total Concrete (m³)","Exec. Rebar Weight (kg)","Stock Bars","Procurement Rebar Weight (kg)"],
         [result.get("member_count",0),f"{result.get('concrete_total_m3',0):,.3f}",f"{total_rebar:,.2f}",total_bars,f"{total_buy:,.2f}"]
     ]
     t=Table(summary,colWidths=[70,95,120,80,120])
@@ -192,7 +192,7 @@ def create_pdf(result,project_name,path):
     story += [table,PageBreak(),Paragraph("REBAR SUMMARY BY TYPE",head)]
     rb=[["Rebar Type","Dia.","Pieces","Exec. Length","Exec. Weight","Stock Bars","Buy Length","Buy Weight"]]
     for base,dia,g in _rebar_type_rows(result):
-        rb.append([base,f"Φ{dia:g}",g["pieces"],f"{g['length']:.2f}",f"{g['weight']:.2f}",g["branches"],f"{g['buy_length']:.2f}",f"{g['buy_weight']:.2f}"])
+        rb.append([_en_label(base),f"Φ{dia:g}",g["pieces"],f"{g['length']:.2f}",f"{g['weight']:.2f}",g["branches"],f"{g['buy_length']:.2f}",f"{g['buy_weight']:.2f}"])
     rb=[[Paragraph(str(x),body) for x in row] for row in rb]
     rt=Table(rb,repeatRows=1,colWidths=[150,45,65,75,75,65,75,75])
     rt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("ALIGN",(1,1),(-1,-1),"CENTER")]))
@@ -202,12 +202,12 @@ def create_pdf(result,project_name,path):
     rd=[[Paragraph(str(x),body) for x in row] for row in rd]
     rdt=Table(rd,repeatRows=1)
     rdt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("ALIGN",(0,0),(-1,-1),"CENTER")]))
-    story += [rdt,Spacer(1,14),Paragraph("QA Review و یادداشت",head)]
+    story += [rdt,Spacer(1,14),Paragraph("QA REVIEW",head)]
     qa=result.get("qa",{})
-    story.append(Paragraph("Status کنترل: "+("OK" if qa.get("ok") else f"{len(qa.get('warnings',[]))} warnings"),body))
-    for w in qa.get("warnings",[])[:12]: story.append(Paragraph("⚠ "+str(w),body))
+    story.append(Paragraph("Status: "+("OK" if qa.get("ok") else f"CHECK REQUIRED ({len(qa.get('warnings',[]))} warnings)"),body))
+    for _w in qa.get("warnings",[])[:12]: story.append(Paragraph("⚠ Review required",body))
     story.append(Spacer(1,8))
     if result.get("ai_explanation"):
         story += [Paragraph("AI Notes",head),Paragraph(str(result["ai_explanation"]),body),Spacer(1,8)]
-    story.append(Paragraph("مقادیر بر اساس اطلاعات واردشده از نقشه تهیه شده‌اند و باید با مدارک مصوب Project کنترل شوند.",body))
+    story.append(Paragraph("Quantities are based on drawing inputs and must be checked against approved project documents.",body))
     doc.build(story); return path
