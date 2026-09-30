@@ -15,37 +15,37 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton(
                 "🏗 پروژه‌های من",
-                callback_data="menu:projects",
+                callback_data="project:list",
             ),
             InlineKeyboardButton(
                 "📐 محاسبات سازه",
-                callback_data="menu:calculations",
+                callback_data="calculations:open",
             ),
         ],
         [
             InlineKeyboardButton(
                 "🧮 برآورد مصالح",
-                callback_data="menu:quantities",
+                callback_data="quantity:menu",
             ),
             InlineKeyboardButton(
                 "🔩 میلگرد و Cut List",
-                callback_data="menu:rebar",
+                callback_data="rebar:menu",
             ),
         ],
         [
             InlineKeyboardButton(
                 "🔄 معادل‌سازی میلگرد",
-                callback_data="menu:equivalency",
+                callback_data="equiv:start",
             ),
             InlineKeyboardButton(
                 "📊 گزارش‌ها",
-                callback_data="menu:reports",
+                callback_data="report:menu",
             ),
         ],
         [
             InlineKeyboardButton(
                 "🤖 دستیار هوشمند",
-                callback_data="menu:ai",
+                callback_data="ai:menu",
             ),
             InlineKeyboardButton(
                 "📚 ابزارهای مهندسی",
@@ -55,17 +55,17 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton(
                 "👤 حساب کاربری",
-                callback_data="menu:account",
+                callback_data="account:menu",
             ),
             InlineKeyboardButton(
                 "💳 اشتراک و اعتبار",
-                callback_data="menu:subscription",
+                callback_data="account:subscription",
             ),
         ],
         [
             InlineKeyboardButton(
                 "⚙️ تنظیمات",
-                callback_data="menu:settings",
+                callback_data="settings:main",
             ),
             InlineKeyboardButton(
                 "❓ راهنما",
@@ -386,6 +386,17 @@ async def main_menu_callback(
     # -----------------------------------------------------
     # RESTART
     # -----------------------------------------------------
+
+    if action == "restart:confirm":
+        language = context.user_data.get("language")
+        unit_system = context.user_data.get("unit_system")
+        context.user_data.clear()
+        if language:
+            context.user_data["language"] = language
+        if unit_system:
+            context.user_data["unit_system"] = unit_system
+        await show_main_menu(update, context)
+        return
 
     if action == "restart":
 
