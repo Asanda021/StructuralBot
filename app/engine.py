@@ -183,6 +183,27 @@ def cut_list_by_diameter(members, stock_length_m=12.0):
         }
     return result
 
+def quality_check_members(members):
+    """Pre-export QA: flags missing or ambiguous takeoff inputs without inventing values."""
+    warnings=[]
+    for i,m in enumerate(members,1):
+        label=f"{i}. {m.get('member',m.get('type','عضو'))}"
+        comps=m.get("components",[])
+        if not comps:
+            warnings.append(f"{label}: هیچ آیتم محاسباتی ثبت نشده.")
+        if not any(c.get("unit")=="m³" and "بتن" in str(c.get("name","")) for c in comps):
+            warnings.append(f"{label}: حجم بتن ثبت نشده یا قابل تشخیص نیست.")
+        if m.get("section") not in ("سایر","آرماتور") and not any(c.get("category")=="میلگرد" for c in comps):
+            warnings.append(f"{label}: دیتیل میلگرد در ورودی ثبت نشده؛ نقشه را کنترل کن.")
+        for c in comps:
+            if c.get("unit") in ("m³","m","kg","عدد","شاخه") and float(c.get("value",0)) < 0:
+                warnings.append(f"{label}: مقدار منفی در {c.get('name','آیتم')}.")
+            if c.get("category")=="میلگرد" and c.get("unit")=="m" and "طول اجرا" in str(c.get("name","")):
+                dia=c.get("diameter_mm")
+                if dia is None or float(dia)<=0:
+                    warnings.append(f"{label}: قطر میلگرد برای {c.get('name','میلگرد')} مشخص نیست.")
+    return {"ok":not warnings,"warnings":warnings,"checked_members":len(members)}
+
 def estimate_members(members):
     rows=[]; totals=defaultdict(float)
     for i,m in enumerate(members,1):
@@ -213,6 +234,7 @@ def estimate_members(members):
             if c.get("unit")=="m³" and "بتن" in str(c.get("name","")):
                 concrete_total += float(c["value"])
     return {"version":"takeoff-5.0","method":"drawing_driven_member_takeoff","cut_list":cut_list_by_diameter(members),
+            "qa":quality_check_members(members),
             "members":members,"items":rows,"totals_by_unit":dict(totals),
             "rebar_by_diameter":{str(k):v for k,v in sorted(rebar_by_diameter.items())},
             "concrete_total_m3":concrete_total,
