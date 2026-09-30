@@ -506,6 +506,8 @@ async def start_cmd(update,context):
         parse_mode="HTML",
         reply_markup=language_menu(initial=True)
     )
+    # Persistent bottom menu: keep it visible independently of inline menus.
+    await update.message.reply_text("منوی ثابت فعال شد.", reply_markup=persistent_menu())
 def reset(context,name):
     context.user_data.clear(); context.user_data.update({"project_name":name,"members":[],"history":[]})
 
