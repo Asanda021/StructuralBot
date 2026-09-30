@@ -368,6 +368,9 @@ async def save_final(update,context):
     ms=context.user_data.get("members",[])
     if not ms: await update.callback_query.edit_message_text("هیچ عضوی ثبت نشده.",reply_markup=section_menu()); return
     result=estimate_members(ms); uid=update.effective_user.id
+    result["project_settings"]=db.settings(uid)
+    if result["project_settings"].get("standard")=="china":
+        result["project_settings"]["china_codes"]=["GB/T 50010-2010(2024)","GB/T 50011-2010(2024)"]
     pid=context.user_data.get("project_id") or db.add_project(uid,context.user_data.get("project_name","پروژه"))
     db.save_estimate(uid,pid,{"members":ms},result,format_estimate(result))
     context.user_data["last_result"]=result
