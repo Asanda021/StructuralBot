@@ -27,6 +27,17 @@ def create_excel(result,project_name,path):
 
     s=wb.create_sheet("خلاصه بتن")
     s.append(["پروژه",project_name]); s.append(["حجم کل بتن (m³)",result.get("concrete_total_m3",0)])
+    s.append(["تعداد اعضا",result.get("member_count",0)])
+    s.append(["تعداد آیتم‌ها",result.get("item_count",0)])
+    s.append(["وضعیت کنترل", "بدون هشدار" if result.get("qa",{}).get("ok") else f"هشدار: {len(result.get('qa',{}).get('warnings',[]))}"])
+
+    q=wb.create_sheet("کنترل کیفیت")
+    q.append(["وضعیت","توضیح"])
+    qa=result.get("qa",{})
+    if qa.get("ok"):
+        q.append(["OK","کنترل اولیه متره بدون هشدار"])
+    else:
+        for warning in qa.get("warnings",[]): q.append(["WARNING",warning])
 
     r=wb.create_sheet("خلاصه میلگرد")
     r.append(["قطر","وزن اجرا (kg)","طول اجرا (m)","طول خرید (m)","شاخه 12m","وزن خرید (kg)"])
@@ -61,6 +72,10 @@ def create_pdf(result,project_name,path):
               Paragraph(f"Concrete total: {result.get('concrete_total_m3',0):,.3f} m³",styles["BodyText"]),
               Spacer(1,6),
               Paragraph(" | ".join(f"Φ{k}: {v.get('stock_bars',0)} bars / {v.get('waste_length_m',0):,.2f} m waste" for k,v in result.get("cut_list",{}).items()),styles["BodyText"]),
+              Spacer(1,8),
+              Paragraph(f"QA: {'OK' if result.get('qa',{}).get('ok') else 'WARNING'}",styles["BodyText"]),
+              Spacer(1,6),
+              Paragraph(" | ".join(result.get("qa",{}).get("warnings",[])[:8]),styles["BodyText"]),
               Spacer(1,8),
               Paragraph("مقادیر بر اساس اطلاعات واردشده از نقشه تهیه شده‌اند و نیازمند کنترل مدارک مصوب پروژه هستند.",styles["BodyText"])]
     doc.build(story); return path
