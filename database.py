@@ -519,6 +519,21 @@ def get_projects_by_user(user_id: int):
         return cursor.fetchall()
 
 
+
+def update_project_code(project_id: int, design_code: str, code_edition: str) -> bool:
+    """Persist the selected country/code pack for a project."""
+    with get_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            UPDATE projects
+            SET design_code = ?, code_edition = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (design_code, code_edition, project_id),
+        )
+        return cursor.rowcount > 0
+
 # =========================================================
 # STARTUP
 # =========================================================

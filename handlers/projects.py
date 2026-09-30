@@ -291,6 +291,12 @@ def get_project_keyboard(
             ],
             [
                 InlineKeyboardButton(
+                    "📚 آیین‌نامه و کشور",
+                    callback_data="codes:list",
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     "📊 گزارش‌ها",
                     callback_data=f"project:reports:{project_id}",
                 )
