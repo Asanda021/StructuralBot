@@ -10,11 +10,16 @@ def rebar_weight(diameter_mm, length_m):
     d=_num(diameter_mm); l=_num(length_m)
     return d*d/162.0*l
 
-def rebar_summary(diameter_mm, total_length_m, stock_length_m=12.0):
+def rebar_summary(diameter_mm, total_length_m, stock_length_m=12.0, waste_percent=0.0):
     d=_num(diameter_mm); total=_num(total_length_m); stock=_num(stock_length_m)
-    branches=math.ceil(total/stock) if total else 0
+    waste_pct=_num(waste_percent)
+    waste_length=total*waste_pct/100.0
+    procurement_length=total+waste_length
+    branches=math.ceil(procurement_length/stock) if procurement_length else 0
     return {"diameter_mm":d,"length_m":total,"weight_kg":rebar_weight(d,total),
             "stock_length_m":stock,"branches":branches,
+            "waste_percent":waste_pct,"waste_length_m":waste_length,
+            "procurement_length_m":procurement_length,
             "procurement_weight_kg":rebar_weight(d,branches*stock)}
 
 def grid_rebar(area_l, area_w, diameter_mm, spacing_cm, stock_length_m=12.0):
@@ -34,9 +39,16 @@ def line_rebar(length_m, spacing_cm, diameter_mm, stock_length_m=12.0):
     count=math.ceil(L/s)+1
     return {"count_bars":count, **rebar_summary(diameter_mm,count*L,stock_length_m)}
 
-def repeated_bar_rebar(count, length_each_m, diameter_mm, stock_length_m=12.0):
+def adjusted_bar_length(straight_m, bend_m=0.0, hook_m=0.0, lap_m=0.0):
+    return _num(straight_m)+_num(bend_m)+_num(hook_m)+_num(lap_m)
+
+def repeated_bar_rebar(count, length_each_m, diameter_mm, stock_length_m=12.0,
+                       bend_m=0.0, hook_m=0.0, lap_m=0.0, waste_percent=0.0):
     n=math.ceil(_num(count)); L=_num(length_each_m)
-    return {"count_bars":n, "length_each_m":L, **rebar_summary(diameter_mm,n*L,stock_length_m)}
+    cut_each=adjusted_bar_length(L,bend_m,hook_m,lap_m)
+    return {"count_bars":n,"length_each_m":L,"cut_length_each_m":cut_each,
+            "bend_m":_num(bend_m),"hook_m":_num(hook_m),"lap_m":_num(lap_m),
+            **rebar_summary(diameter_mm,n*cut_each,stock_length_m,waste_percent)}
 
 SLAB_TYPES={
  "تیرچه تک":{"concrete_coeff":0.18,"joist_factor":1,"block_kind":"یونولیتی"},
@@ -46,6 +58,7 @@ SLAB_TYPES={
  "تیرچه بلوک سفالی تک":{"concrete_coeff":0.18,"joist_factor":1,"block_kind":"سفالی"},
  "تیرچه بلوک سفالی دوبل":{"concrete_coeff":0.23,"joist_factor":2,"block_kind":"سفالی"},
  "وافل":{"concrete_coeff":None,"joist_factor":0,"block_kind":None},
+ "یوبوت":{"concrete_coeff":None,"joist_factor":0,"block_kind":"یوبوت"},
  "دال بتنی":{"concrete_coeff":None,"joist_factor":0,"block_kind":None},
  "دال تخت":{"concrete_coeff":None,"joist_factor":0,"block_kind":None},
 }
@@ -58,7 +71,13 @@ def calculate_slab(data):
     if coeff is None: coeff=_num(data.get("thickness",0))
     if coeff<=0: raise ValueError("ضریب بتن یا ضخامت سقف باید وارد شود")
     concrete=area*float(coeff)
-    result={"area_m2":area,"concrete_m3":concrete,"concrete_coeff":float(coeff)}
+    result={"area_m2":area,"concrete_m3":concrete,"concrete_coeff":float(coeff),"slab_type":typ}
+    openings=data.get("openings") or []
+    if openings:
+        opening_area=sum(_num(op.get("length",0))*_num(op.get("width",0))*_num(op.get("count",1)) for op in openings)
+        opening_area=min(opening_area,area)
+        result["opening_area_m2"]=opening_area
+        result["net_area_m2"]=max(0.0,area-opening_area)
     if meta.get("joist_factor"):
         spacing=_num(data.get("joist_spacing_cm",50))/100
         n=max(1,math.ceil(W/spacing)+1)
@@ -116,7 +135,8 @@ def estimate_members(members):
             "assumptions":["تیپ‌ها و اعداد آماده فقط میانبر ورود هستند و باید با نقشه تطبیق داده شوند.",
                            "مقادیر میلگرد اجرایی، طول، وزن و شاخه خرید جداگانه ثبت می‌شوند.",
                            "شاخه استاندارد پیش‌فرض ۱۲ متر است.",
-                           "قطعات خم‌دار مانند سنجاقی، اتکا و ژوئن فقط با طول/تعداد واقعی دیتیل محاسبه می‌شوند؛ ضریب مخفی اعمال نمی‌شود.",
+                           "قطعات خم‌دار با طول مستقیم، خم، قلاب و وصله به‌صورت جداگانه قابل ثبت هستند؛ ضریب مخفی اعمال نمی‌شود.",
+            "تعداد شاخه خرید بر اساس طول خرید و شاخه استاندارد محاسبه می‌شود؛ برای برش بهینه، Cut List واقعی قطعات لازم است.",
                            "این ابزار متره است و جایگزین طراحی یا کنترل نقشه مصوب نیست."]}
 
 def estimate_items(items):
