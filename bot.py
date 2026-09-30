@@ -409,17 +409,23 @@ def rcomps(title,r,note=""):
       {"name":f"{title} - طول خرید","value":r.get("procurement_length_m",r["length_m"]),"unit":"m","note":f"{dia} | پرت {r.get('waste_percent',0):g}%","category":"میلگرد","diameter_mm":r["diameter_mm"]}
     ]
 
-def grid_direction_rebar(L,W,dia,spacing,direction,count=1):
-    """Return one explicit X/Y reinforcement direction for a grid."""
+def grid_direction_rebar(L,W,dia,spacing,direction,count=1,top_bar=False):
+    """Return one explicit grid direction and automatically split bars over 12m."""
     base=grid_rebar(L,W,dia,spacing)
     i=0 if direction=="X" else 1
-    piece_count=base["bars_each_direction"][i]*int(count)
+    line_count=base["bars_each_direction"][i]*int(count)
     piece_length=base["length_each_direction_m"][i]/max(1,base["bars_each_direction"][i])
-    total_length=base["length_each_direction_m"][i]*int(count)
+    plan=automatic_cut_lengths(piece_length,dia,base["stock_length_m"],top_bar=top_bar)
+    cuts=plan["cut_lengths_m"]*line_count
+    total_length=sum(cuts)
     r=rebar_summary(dia,total_length,base["stock_length_m"])
-    r["count_bars"]=piece_count
+    r["count_bars"]=len(cuts)
+    r["drawing_bar_count"]=line_count
     r["length_each_m"]=piece_length
-    r["cut_lengths_m"]=[piece_length]*piece_count
+    r["cut_lengths_m"]=cuts
+    r["splice_count"]=plan["splice_count"]*line_count
+    r["lap_m"]=plan["lap_m"]
+    r["development"]=plan["development"]
     return r
 
 def repeated_grid_for_foundation(n,L,W,dia,spacing):
@@ -527,15 +533,15 @@ def calc_member(section,typ,v):
                 comps += rcomps("میلگرد شبکه پایین - X",grid_direction_rebar(L,W,bd,bs,"X",n))
                 comps += rcomps("میلگرد شبکه پایین - Y",grid_direction_rebar(L,W,bd,bs,"Y",n))
             if td and ts:
-                comps += rcomps("میلگرد شبکه بالا - X",grid_direction_rebar(L,W,td,ts,"X",n))
-                comps += rcomps("میلگرد شبکه بالا - Y",grid_direction_rebar(L,W,td,ts,"Y",n))
+                comps += rcomps("میلگرد شبکه بالا - X",grid_direction_rebar(L,W,td,ts,"X",n,top_bar=True))
+                comps += rcomps("میلگرد شبکه بالا - Y",grid_direction_rebar(L,W,td,ts,"Y",n,top_bar=True))
         else:
             if bd and bs:
                 comps += rcomps("میلگرد پایین - راستای طول",grid_direction_rebar(L,W,bd,bs,"X",n))
                 comps += rcomps("میلگرد پایین - راستای عرض",grid_direction_rebar(L,W,bd,bs,"Y",n))
             if td and ts:
-                comps += rcomps("میلگرد بالا - راستای طول",grid_direction_rebar(L,W,td,ts,"X",n))
-                comps += rcomps("میلگرد بالا - راستای عرض",grid_direction_rebar(L,W,td,ts,"Y",n))
+                comps += rcomps("میلگرد بالا - راستای طول",grid_direction_rebar(L,W,td,ts,"X",n,top_bar=True))
+                comps += rcomps("میلگرد بالا - راستای عرض",grid_direction_rebar(L,W,td,ts,"Y",n,top_bar=True))
         if rcount and rlen and rd:
             comps += rcomps("میلگرد تقویتی",repeated_bar_rebar(n*rcount,rlen,rd))
         if ecount and elen and ed:
