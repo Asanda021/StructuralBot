@@ -160,7 +160,7 @@ async def callback(update,context):
         await show_member_types(q,data.split("|",1)[1]); return
     if data.startswith("member|"):
         _,section,typ=data.split("|",2)
-        context.user_data.update({"current_section":section,"current_type":typ,"current_values":[],"current_queue":schema(section,typ),"current_edit":None})
+        context.user_data.update({"current_section":section,"current_type":typ,"current_values":[],"current_queue":schema(section,typ),"current_edit":None,"current_preset":None})
         p=presets_for(section,typ)
         if p:
             context.user_data["current_preset"]=p
