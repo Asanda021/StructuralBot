@@ -63,8 +63,8 @@ def main():
     foundation = bot.calc_member("فونداسیون", "پی منفرد",
         [2, 2.0, 1.8, 0.45, 12, 20, 10, 25, 4, 1.0, 16])
     concrete = next(x for x in foundation if x["name"] == "بتن فونداسیون")
-    bottom = next(x for x in foundation if x["name"] == "میلگرد شبکه پایین - دو جهت - تعداد قطعه")
-    top = next(x for x in foundation if x["name"] == "میلگرد شبکه بالا - دو جهت - تعداد قطعه")
+    bottom = next(x for x in foundation if x["name"] == "میلگرد شبکه پایین - X - تعداد قطعه")
+    top = next(x for x in foundation if x["name"] == "میلگرد شبکه بالا - X - تعداد قطعه")
     assert abs(concrete["value"] - 3.24) < 1e-9
     assert bottom["value"] > 0
     assert top["value"] > 0
@@ -165,7 +165,7 @@ def main():
         qa_xlsx = create_excel(qa_result, "QA Test", os.path.join(d, "qa.xlsx"))
         from openpyxl import load_workbook
         book = load_workbook(qa_xlsx, read_only=True)
-        assert "کنترل کیفیت" in book.sheetnames
+        assert "QA Review" in book.sheetnames
         book.close()
 
     with tempfile.TemporaryDirectory() as d:
