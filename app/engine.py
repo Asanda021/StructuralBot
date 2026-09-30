@@ -35,7 +35,7 @@ def _concrete_strength_mpa(value, default=25.0):
         return float(default)
 
 def development_length_tension(diameter_mm, concrete_grade="C25", rebar_grade="A3",
-                               top_bar=False, cb_over_db=1.0, ktr_over_db=0.0):
+                               top_bar=False, cb_over_db=0.5, ktr_over_db=0.0):
     """Automatic tension development length using the Mبحث 9 Chapter 21 framework.
 
     The exact value depends on concrete cover/spacing, transverse reinforcement,
@@ -79,7 +79,7 @@ def lap_splice_length_tension(diameter_mm, concrete_grade="C25", rebar_grade="A3
 
 def automatic_cut_lengths(length_m, diameter_mm, stock_length_m=12.0,
                           concrete_grade="C25", rebar_grade="A3",
-                          top_bar=False, cb_over_db=1.0):
+                          top_bar=False, cb_over_db=0.5):
     """Split a long drawing bar into stock-length pieces with automatic code lap."""
     L=_num(length_m); d=_num(diameter_mm); stock=_num(stock_length_m)
     if L <= stock + 1e-9:
