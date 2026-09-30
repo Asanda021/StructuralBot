@@ -1228,6 +1228,40 @@ def create_application() -> Application:
     return application
 
 
+
+# =========================================================
+# RENDER WEB SERVICE HEALTH SERVER
+# =========================================================
+
+
+def start_health_server() -> None:
+    """Start a tiny HTTP health endpoint for Render Web Service."""
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+
+    port = int(os.getenv("PORT", "10000"))
+
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path in ("/", "/health"):
+                body = b"StructuralBot OK"
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            self.send_response(404)
+            self.end_headers()
+
+        def log_message(self, format, *args):
+            return
+
+    server = ThreadingHTTPServer(("0.0.0.0", port), HealthHandler)
+    Thread(target=server.serve_forever, daemon=True).start()
+    logger.info("Render health server listening on port %s", port)
+
+
 # =========================================================
 # MAIN
 # =========================================================
