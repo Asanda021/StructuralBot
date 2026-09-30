@@ -16,7 +16,6 @@ def main_menu():
 def calc_mode_menu():
     return InlineKeyboardMarkup([
       [InlineKeyboardButton("🧮 شروع برآورد",callback_data="start_estimate")],
-      [InlineKeyboardButton("🌐 زبان / Language",callback_data="language")],
       [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
     ])
 
