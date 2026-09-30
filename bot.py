@@ -201,6 +201,21 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    if data.startswith("edit_saved|"):
+        idx = int(data.split("|", 1)[1])
+        context.user_data["editing_index"] = idx
+        context.user_data["manual"] = True
+        _, label, unit = FIELDS[idx]
+        await q.edit_message_text(
+            f"✏️ <b>{label}</b> ({unit})\n\nمقدار جدید را بفرست.",
+            parse_mode="HTML", reply_markup=cancel_menu()
+        )
+        return
+
+    if data == "review_saved":
+        await show_review(q, context)
+        return
+
     if data.startswith("pv|"):
         if not context.user_data.get("takeoff"):
             await q.edit_message_text("جلسه متره منقضی شده.", reply_markup=main_menu())
@@ -240,12 +255,31 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "edit_project":
-        if "last_estimate" not in context.user_data:
-            await q.edit_message_text("برای ویرایش، یک پروژه جدید را دوباره وارد کن.", reply_markup=main_menu())
+        last = db.last_estimate(update.effective_user.id)
+        if not last:
+            await q.edit_message_text("هنوز پروژه‌ای برای ویرایش ذخیره نشده.", reply_markup=main_menu())
             return
+        context.user_data.clear()
+        context.user_data.update({
+            "takeoff": True,
+            "editing_saved": True,
+            "manual": False,
+            "takeoff_index": 0,
+            "takeoff_values": dict(last["inputs"]),
+            "project_id": last["project_id"],
+            "project_name": last["project_name"],
+        })
+        rows = []
+        for i, (key, label, unit) in enumerate(FIELDS):
+            rows.append([InlineKeyboardButton(
+                f"✏️ {label}: {n(last['inputs'].get(key, 0))} {unit}",
+                callback_data=f"edit_saved|{i}"
+            )])
+        rows.append([InlineKeyboardButton("🔎 بررسی و محاسبه", callback_data="review_saved")])
+        rows.append([InlineKeyboardButton("❌ لغو", callback_data="home")])
         await q.edit_message_text(
-            "✏️ ویرایش کامل پروژه در حال توسعه است. برای ثبت دقیق، از «پروژه جدید» استفاده کن.",
-            reply_markup=main_menu(),
+            f"✏️ <b>ویرایش پروژه: {last['project_name']}</b>\n\nیک آیتم را انتخاب کن.",
+            parse_mode="HTML", reply_markup=InlineKeyboardMarkup(rows)
         )
         return
 
@@ -358,6 +392,20 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         begin_project(context, text)
         await show_step(update.message, context)
+        return
+
+    if context.user_data.get("editing_saved") and context.user_data.get("manual"):
+        try:
+            value = float(text.replace("،", "."))
+            if value <= 0:
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("❌ فقط یک عدد مثبت وارد کن.")
+            return
+        idx = context.user_data["editing_index"]
+        context.user_data["takeoff_values"][FIELDS[idx][0]] = value
+        context.user_data["manual"] = False
+        await show_review(update.message, context)
         return
 
     if context.user_data.get("takeoff"):
