@@ -321,10 +321,20 @@ def calc_member(section,typ,v):
         return comps
 
     if section=="پله":
-        n,area,t,d,s,td,ts=v; side=math.sqrt(area)
-        comps=[{"name":"بتن پله","value":n*area*t,"unit":"m³"},{"name":"مساحت پله","value":n*area,"unit":"m²"}]
-        if d and s: comps += rcomps("میلگرد اصلی",grid_rebar(side,side,d,s))
-        if td and ts: comps += rcomps("میلگرد حرارتی دو جهت",grid_rebar(side,side,td,ts))
+        n,area,t,d,s,td,ts=v
+        # Area is intentionally supplied from the drawing; no square-root geometry is
+        # invented for the reinforcement cut lengths.
+        comps=[{"name":"بتن پله","value":n*area*t,"unit":"m³"},
+               {"name":"مساحت پله","value":n*area,"unit":"m²"}]
+        if d and s:
+            # This is an area-based mesh takeoff. For inclined flights or non-square plans,
+            # exact bar lengths must come from the stair detail rather than inferred geometry.
+            comps.append({"name":"میلگرد اصلی - قطر","value":d,"unit":"mm",
+                           "note":"طول و تعداد قطعات اصلی پله باید از دیتیل اجرایی تعیین شود."})
+            comps.append({"name":"میلگرد اصلی - فاصله","value":s,"unit":"cm"})
+        if td and ts:
+            comps.append({"name":"میلگرد حرارتی - قطر","value":td,"unit":"mm"})
+            comps.append({"name":"میلگرد حرارتی - فاصله","value":ts,"unit":"cm"})
         return comps
     return [{"name":"بتن","value":v[0],"unit":"m³"},{"name":"میلگرد","value":v[1],"unit":"kg"}]
 
