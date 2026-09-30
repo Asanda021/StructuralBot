@@ -949,6 +949,17 @@ def create_application() -> Application:
     )
 
     # =====================================================
+    # UNIT SYSTEM
+    # =====================================================
+
+    application.add_handler(
+        CallbackQueryHandler(
+            unit_system_callback,
+            pattern=r"^unit:(?:SI|IMPERIAL)$",
+        )
+    )
+
+    # =====================================================
     # MAIN MENU / NAVIGATION
     # =====================================================
 
