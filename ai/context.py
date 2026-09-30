@@ -1,633 +1,193 @@
-"""
-StructuralBot - AI Context
-
-Builds structured context for the AI assistant.
-
-The AI layer must receive only the information that is relevant
-to the current request. This module provides a controlled boundary
-between engineering data and the AI provider.
-"""
-
 from __future__ import annotations
 
-from dataclasses import asdict, is_dataclass
-from typing import Any, Dict, Iterable, List, Mapping, Optional
-
-from ai.config import get_ai_config, trim_ai_context
+from dataclasses import dataclass, field
+from typing import Any, Dict, Iterable, Mapping, Optional
 
 
-# ---------------------------------------------------------
-# CONSTANTS
-# ---------------------------------------------------------
-
-CONTEXT_VERSION = "1.0"
-
-SENSITIVE_KEYS = {
-    "password",
-    "token",
-    "api_key",
-    "secret",
-    "authorization",
-    "phone",
-    "email",
-    "national_id",
-    "telegram_token",
-}
-
-
-# ---------------------------------------------------------
-# BASIC SERIALIZATION
-# ---------------------------------------------------------
-
-
-def _serialize(value: Any) -> Any:
+@dataclass
+class AIContext:
     """
-    Convert common Python objects into JSON-like structures.
+    Controlled engineering context supplied to the AI layer.
+
+    The AI layer is an explanatory assistant only. Deterministic
+    calculations and code checks remain the source of truth.
     """
 
-    if value is None:
-        return None
+    user_id: Optional[str] = None
+    project_id: Optional[str] = None
+    project_name: Optional[str] = None
 
-    if is_dataclass(value):
+    structure_type: Optional[str] = None
+    floor_id: Optional[str] = None
+    floor_name: Optional[str] = None
+    member_id: Optional[str] = None
+    member_type: Optional[str] = None
+
+    code_name: Optional[str] = None
+    code_edition: Optional[str] = None
+
+    units: str = "metric"
+    language: str = "fa"
+
+    inputs: Dict[str, Any] = field(default_factory=dict)
+    results: Dict[str, Any] = field(default_factory=dict)
+    checks: Dict[str, Any] = field(default_factory=dict)
+    quantities: Dict[str, Any] = field(default_factory=dict)
+
+    engineering_trace: list[Dict[str, Any]] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def add_input(self, key: str, value: Any) -> None:
+        if key:
+            self.inputs[key] = value
+
+    def add_result(self, key: str, value: Any) -> None:
+        if key:
+            self.results[key] = value
+
+    def add_check(self, key: str, value: Any) -> None:
+        if key:
+            self.checks[key] = value
+
+    def add_quantity(self, key: str, value: Any) -> None:
+        if key:
+            self.quantities[key] = value
+
+    def add_trace(self, item: Mapping[str, Any]) -> None:
+        self.engineering_trace.append(dict(item))
+
+    def to_dict(self) -> Dict[str, Any]:
         return {
-            key: _serialize(item)
-            for key, item in asdict(value).items()
+            "user_id": self.user_id,
+            "project_id": self.project_id,
+            "project_name": self.project_name,
+            "structure_type": self.structure_type,
+            "floor_id": self.floor_id,
+            "floor_name": self.floor_name,
+            "member_id": self.member_id,
+            "member_type": self.member_type,
+            "code_name": self.code_name,
+            "code_edition": self.code_edition,
+            "units": self.units,
+            "language": self.language,
+            "inputs": dict(self.inputs),
+            "results": dict(self.results),
+            "checks": dict(self.checks),
+            "quantities": dict(self.quantities),
+            "engineering_trace": [
+                dict(item) for item in self.engineering_trace
+            ],
+            "metadata": dict(self.metadata),
         }
 
-    if isinstance(value, Mapping):
+    def compact(self) -> Dict[str, Any]:
+        """
+        Return only engineering-relevant information suitable for prompts.
+        """
+
         return {
-            str(key): _serialize(item)
-            for key, item in value.items()
+            "project": {
+                "id": self.project_id,
+                "name": self.project_name,
+            },
+            "structure": {
+                "type": self.structure_type,
+                "floor": self.floor_name or self.floor_id,
+                "member": self.member_type or self.member_id,
+            },
+            "code": {
+                "name": self.code_name,
+                "edition": self.code_edition,
+            },
+            "units": self.units,
+            "language": self.language,
+            "inputs": dict(self.inputs),
+            "results": dict(self.results),
+            "checks": dict(self.checks),
+            "quantities": dict(self.quantities),
+            "trace": [
+                dict(item) for item in self.engineering_trace
+            ],
         }
 
-    if isinstance(value, (list, tuple, set)):
-        return [
-            _serialize(item)
-            for item in value
-        ]
 
-    if hasattr(value, "value"):
-        try:
-            return value.value
-        except Exception:
-            pass
-
-    if hasattr(value, "__dict__"):
-        try:
-            return {
-                str(key): _serialize(item)
-                for key, item in vars(value).items()
-                if not key.startswith("_")
-            }
-        except Exception:
-            pass
-
-    if isinstance(value, (str, int, float, bool)):
-        return value
-
-    return str(value)
-
-
-# ---------------------------------------------------------
-# SENSITIVE DATA REDACTION
-# ---------------------------------------------------------
-
-
-def redact_sensitive_data(
-    data: Any,
-) -> Any:
-    """
-    Remove or mask sensitive values before AI processing.
-    """
-
-    if isinstance(data, Mapping):
-
-        result: Dict[str, Any] = {}
-
-        for key, value in data.items():
-
-            normalized_key = str(key).lower()
-
-            if normalized_key in SENSITIVE_KEYS:
-                result[str(key)] = "[REDACTED]"
-                continue
-
-            result[str(key)] = redact_sensitive_data(
-                value
-            )
-
-        return result
-
-    if isinstance(data, list):
-        return [
-            redact_sensitive_data(item)
-            for item in data
-        ]
-
-    if isinstance(data, tuple):
-        return tuple(
-            redact_sensitive_data(item)
-            for item in data
-        )
-
-    return data
-
-
-# ---------------------------------------------------------
-# PROJECT CONTEXT
-# ---------------------------------------------------------
-
-
-def build_project_context(
-    project: Any,
-) -> Dict[str, Any]:
-    """
-    Convert a project object into AI-safe context.
-    """
-
-    if project is None:
-        return {}
-
-    data = _serialize(project)
-
-    if not isinstance(data, dict):
-        data = {
-            "project": data,
-        }
-
-    result = {
-        "context_version": CONTEXT_VERSION,
-        "type": "project",
-        "project": data,
-    }
-
-    config = get_ai_config()
-
-    if config.redact_sensitive_data:
-        result = redact_sensitive_data(result)
-
-    return result
-
-
-# ---------------------------------------------------------
-# MEMBER CONTEXT
-# ---------------------------------------------------------
-
-
-def build_member_context(
-    member: Any,
-) -> Dict[str, Any]:
-    """
-    Convert a structural member into AI context.
-    """
-
-    if member is None:
-        return {}
-
-    data = _serialize(member)
-
-    result = {
-        "context_version": CONTEXT_VERSION,
-        "type": "structural_member",
-        "member": data,
-    }
-
-    config = get_ai_config()
-
-    if config.redact_sensitive_data:
-        result = redact_sensitive_data(result)
-
-    return result
-
-
-# ---------------------------------------------------------
-# CALCULATION CONTEXT
-# ---------------------------------------------------------
-
-
-def build_calculation_context(
-    calculation: Any,
-) -> Dict[str, Any]:
-    """
-    Convert a calculation request/result into AI context.
-    """
-
-    if calculation is None:
-        return {}
-
-    data = _serialize(calculation)
-
-    result = {
-        "context_version": CONTEXT_VERSION,
-        "type": "calculation",
-        "calculation": data,
-    }
-
-    config = get_ai_config()
-
-    if config.redact_sensitive_data:
-        result = redact_sensitive_data(result)
-
-    return result
-
-
-# ---------------------------------------------------------
-# REPORT CONTEXT
-# ---------------------------------------------------------
-
-
-def build_report_context(
-    report: Any,
-) -> Dict[str, Any]:
-    """
-    Convert report information into AI context.
-    """
-
-    if report is None:
-        return {}
-
-    data = _serialize(report)
-
-    result = {
-        "context_version": CONTEXT_VERSION,
-        "type": "report",
-        "report": data,
-    }
-
-    config = get_ai_config()
-
-    if config.redact_sensitive_data:
-        result = redact_sensitive_data(result)
-
-    return result
-
-
-# ---------------------------------------------------------
-# REINFORCEMENT CONTEXT
-# ---------------------------------------------------------
-
-
-def build_reinforcement_context(
-    reinforcement: Any,
-) -> Dict[str, Any]:
-    """
-    Convert reinforcement/BBS/Cut List data into AI context.
-    """
-
-    if reinforcement is None:
-        return {}
-
-    data = _serialize(reinforcement)
-
-    result = {
-        "context_version": CONTEXT_VERSION,
-        "type": "reinforcement",
-        "reinforcement": data,
-    }
-
-    config = get_ai_config()
-
-    if config.redact_sensitive_data:
-        result = redact_sensitive_data(result)
-
-    return result
-
-
-# ---------------------------------------------------------
-# QUANTITY CONTEXT
-# ---------------------------------------------------------
-
-
-def build_quantity_context(
-    quantities: Any,
-) -> Dict[str, Any]:
-    """
-    Convert quantity takeoff information into AI context.
-    """
-
-    if quantities is None:
-        return {}
-
-    data = _serialize(quantities)
-
-    result = {
-        "context_version": CONTEXT_VERSION,
-        "type": "quantities",
-        "quantities": data,
-    }
-
-    config = get_ai_config()
-
-    if config.redact_sensitive_data:
-        result = redact_sensitive_data(result)
-
-    return result
-
-
-# ---------------------------------------------------------
-# MERGE CONTEXT
-# ---------------------------------------------------------
-
-
-def merge_contexts(
-    *contexts: Optional[Mapping[str, Any]],
-) -> Dict[str, Any]:
-    """
-    Merge multiple context dictionaries.
-
-    Nested dictionaries are merged recursively.
-    """
-
-    result: Dict[str, Any] = {
-        "context_version": CONTEXT_VERSION,
-    }
-
-    def merge_dict(
-        target: Dict[str, Any],
-        source: Mapping[str, Any],
-    ) -> None:
-
-        for key, value in source.items():
-
-            if (
-                key in target
-                and isinstance(target[key], dict)
-                and isinstance(value, Mapping)
-            ):
-                merge_dict(
-                    target[key],
-                    value,
-                )
-            else:
-                target[key] = _serialize(value)
-
-    for context in contexts:
-
-        if not context:
-            continue
-
-        merge_dict(
-            result,
-            context,
-        )
-
-    config = get_ai_config()
-
-    if config.redact_sensitive_data:
-        result = redact_sensitive_data(result)
-
-    return result
-
-
-# ---------------------------------------------------------
-# CONTEXT SUMMARY
-# ---------------------------------------------------------
-
-
-def context_to_text(
-    context: Mapping[str, Any],
-) -> str:
-    """
-    Convert structured context into readable text.
-
-    This is intended for AI prompts and logs.
-    """
-
-    lines: List[str] = []
-
-    def walk(
-        value: Any,
-        prefix: str = "",
-    ) -> None:
-
-        if isinstance(value, Mapping):
-
-            for key, item in value.items():
-
-                next_prefix = (
-                    f"{prefix}.{key}"
-                    if prefix
-                    else str(key)
-                )
-
-                walk(
-                    item,
-                    next_prefix,
-                )
-
-            return
-
-        if isinstance(value, list):
-
-            if not value:
-                lines.append(
-                    f"{prefix}: []"
-                )
-                return
-
-            for index, item in enumerate(value):
-                walk(
-                    item,
-                    f"{prefix}[{index}]",
-                )
-
-            return
-
-        lines.append(
-            f"{prefix}: {value}"
-        )
-
-    walk(context)
-
-    text = "\n".join(lines)
-
-    return trim_ai_context(text)
-
-
-# ---------------------------------------------------------
-# ENGINEERING SNAPSHOT
-# ---------------------------------------------------------
-
-
-def build_engineering_snapshot(
+def build_context(
     *,
-    project: Any = None,
-    member: Any = None,
-    calculation: Any = None,
-    reinforcement: Any = None,
-    quantities: Any = None,
-    report: Any = None,
-) -> Dict[str, Any]:
-    """
-    Build a complete but controlled engineering snapshot.
+    user_id: Optional[str] = None,
+    project_id: Optional[str] = None,
+    project_name: Optional[str] = None,
+    structure_type: Optional[str] = None,
+    floor_id: Optional[str] = None,
+    floor_name: Optional[str] = None,
+    member_id: Optional[str] = None,
+    member_type: Optional[str] = None,
+    code_name: Optional[str] = None,
+    code_edition: Optional[str] = None,
+    units: str = "metric",
+    language: str = "fa",
+    inputs: Optional[Mapping[str, Any]] = None,
+    results: Optional[Mapping[str, Any]] = None,
+    checks: Optional[Mapping[str, Any]] = None,
+    quantities: Optional[Mapping[str, Any]] = None,
+    engineering_trace: Optional[Iterable[Mapping[str, Any]]] = None,
+    metadata: Optional[Mapping[str, Any]] = None,
+) -> AIContext:
+    context = AIContext(
+        user_id=user_id,
+        project_id=project_id,
+        project_name=project_name,
+        structure_type=structure_type,
+        floor_id=floor_id,
+        floor_name=floor_name,
+        member_id=member_id,
+        member_type=member_type,
+        code_name=code_name,
+        code_edition=code_edition,
+        units=units or "metric",
+        language=language or "fa",
+        inputs=dict(inputs or {}),
+        results=dict(results or {}),
+        checks=dict(checks or {}),
+        quantities=dict(quantities or {}),
+        metadata=dict(metadata or {}),
+    )
 
-    Only non-empty components are included.
-    """
+    if engineering_trace:
+        context.engineering_trace = [
+            dict(item) for item in engineering_trace
+        ]
 
-    contexts: List[Mapping[str, Any]] = []
-
-    if project is not None:
-        contexts.append(
-            build_project_context(project)
-        )
-
-    if member is not None:
-        contexts.append(
-            build_member_context(member)
-        )
-
-    if calculation is not None:
-        contexts.append(
-            build_calculation_context(calculation)
-        )
-
-    if reinforcement is not None:
-        contexts.append(
-            build_reinforcement_context(reinforcement)
-        )
-
-    if quantities is not None:
-        contexts.append(
-            build_quantity_context(quantities)
-        )
-
-    if report is not None:
-        contexts.append(
-            build_report_context(report)
-        )
-
-    return merge_contexts(*contexts)
-
-
-# ---------------------------------------------------------
-# CONTEXT FILTERING
-# ---------------------------------------------------------
+    return context
 
 
-def filter_context_for_mode(
-    context: Mapping[str, Any],
-    mode: str,
-) -> Dict[str, Any]:
-    """
-    Restrict context according to AI mode and configuration.
+def context_to_prompt(
+    context: Optional[AIContext],
+) -> str:
+    if context is None:
+        return "No verified engineering context was supplied."
 
-    Modes:
-        assistant
-        explain
-        review
-        project
-        report
-    """
+    data = context.compact()
 
-    config = get_ai_config()
+    sections = [
+        f"Language: {data['language']}",
+        f"Units: {data['units']}",
+        f"Structure type: {data['structure']['type']}",
+        f"Floor: {data['structure']['floor']}",
+        f"Member: {data['structure']['member']}",
+        f"Code: {data['code']['name']}",
+        f"Code edition: {data['code']['edition']}",
+        f"Inputs: {data['inputs']}",
+        f"Verified results: {data['results']}",
+        f"Checks: {data['checks']}",
+        f"Quantities: {data['quantities']}",
+        f"Engineering trace: {data['trace']}",
+    ]
 
-    normalized_mode = (
-        mode or "assistant"
-    ).strip().lower()
-
-    source = _serialize(context)
-
-    if not isinstance(source, dict):
-        return {}
-
-    allowed: Dict[str, Any] = {
-        "context_version": source.get(
-            "context_version",
-            CONTEXT_VERSION,
-        ),
-    }
-
-    if normalized_mode in {
-        "assistant",
-        "review",
-        "explain",
-    }:
-        if config.allow_calculation_context:
-            if "calculation" in source:
-                allowed["calculation"] = source[
-                    "calculation"
-                ]
-
-        if "reinforcement" in source:
-            allowed["reinforcement"] = source[
-                "reinforcement"
-            ]
-
-        if "quantities" in source:
-            allowed["quantities"] = source[
-                "quantities"
-            ]
-
-        if "structural_member" in source:
-            allowed["structural_member"] = source[
-                "structural_member"
-            ]
-
-    if normalized_mode == "project":
-        if config.allow_project_context:
-            if "project" in source:
-                allowed["project"] = source[
-                    "project"
-                ]
-
-        if "structural_member" in source:
-            allowed["structural_member"] = source[
-                "structural_member"
-            ]
-
-        if config.allow_calculation_context:
-            if "calculation" in source:
-                allowed["calculation"] = source[
-                    "calculation"
-                ]
-
-    if normalized_mode == "report":
-        if config.allow_report_context:
-            if "report" in source:
-                allowed["report"] = source[
-                    "report"
-                ]
-
-        if config.allow_calculation_context:
-            if "calculation" in source:
-                allowed["calculation"] = source[
-                    "calculation"
-                ]
-
-        if "quantities" in source:
-            allowed["quantities"] = source[
-                "quantities"
-            ]
-
-        if "reinforcement" in source:
-            allowed["reinforcement"] = source[
-                "reinforcement"
-            ]
-
-    if config.redact_sensitive_data:
-        allowed = redact_sensitive_data(
-            allowed
-        )
-
-    return allowed
-
-
-# ---------------------------------------------------------
-# PUBLIC API
-# ---------------------------------------------------------
+    return "\n".join(sections)
 
 
 __all__ = [
-    "CONTEXT_VERSION",
-    "redact_sensitive_data",
-    "build_project_context",
-    "build_member_context",
-    "build_calculation_context",
-    "build_report_context",
-    "build_reinforcement_context",
-    "build_quantity_context",
-    "merge_contexts",
-    "context_to_text",
-    "build_engineering_snapshot",
-    "filter_context_for_mode",
+    "AIContext",
+    "build_context",
+    "context_to_prompt",
 ]
