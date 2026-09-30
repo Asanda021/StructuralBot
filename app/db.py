@@ -93,7 +93,7 @@ class Database:
                 (project_id, user_id),
             )
             c.execute(
-                "INSERT INTO calculations(user_id,project_id,title,result) VALUES(?,?,?,?,?)",
+                "INSERT INTO calculations(user_id,project_id,title,result) VALUES(?,?,?,?)",
                 (user_id, project_id, "متره ساختمان بتنی", report),
             )
 
