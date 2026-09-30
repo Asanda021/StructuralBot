@@ -7,7 +7,7 @@ from app.db import Database
 from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, multi_face_grid_rebar, repeated_bar_rebar, format_estimate
 from app.exporter import create_excel, create_pdf
 from ai.assistant import explain_takeoff
-from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu, walls_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu, rebar_equiv_source_menu, rebar_equiv_target_menu, language_menu
+from app.keyboards import main_menu, back_home, section_menu, type_menu, report_menu, calc_mode_menu, persistent_menu, walls_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu, rebar_equiv_source_menu, rebar_equiv_target_menu, language_menu
 
 TOKEN=os.getenv("BOT_TOKEN")
 DB_PATH=os.getenv("DATABASE_PATH","/tmp/structuralbot.db")
@@ -511,75 +511,6 @@ async def start_cmd(update,context):
 def reset(context,name):
     context.user_data.clear(); context.user_data.update({"project_name":name,"members":[],"history":[]})
 
-async def review(q,context):
-    ms=context.user_data.get("members",[])
-    qa=quality_check_members(ms)
-    lines=["🔎 <b>بازبینی کامل پروژه</b>","",f"🏗 پروژه: <b>{html.escape(str(context.user_data.get('project_name','پروژه')))}</b>",
-           f"👷 تعداد اعضا: <b>{len(ms)}</b>",
-           f"🧱 حجم بتن: <b>{fmt(estimate_members(ms).get('concrete_total_m3',0))} m³</b>" if ms else "🧱 حجم بتن: <b>0 m³</b>",
-           "",f"🛡 کنترل خودکار: <b>{'بدون هشدار' if qa['ok'] else str(len(qa['warnings']))+' هشدار'}</b>"]
-    for w in qa.get('warnings',[])[:8]:
-        lines.append(f"⚠️ {html.escape(str(w))}")
-    if ms:
-        lines.append("")
-        lines.append("📋 <b>اعضای پروژه</b>")
-        for i,m in enumerate(ms,1):
-            comp_count=len(m.get("components",[]))
-            lines.append(f"{i}. <b>{html.escape(str(m.get('member','عضو')))}</b> — {comp_count} قلم متره")
-    else:
-        lines.append("\nهنوز عضوی ثبت نشده.")
-    lines.append("")
-    lines.append("برای اصلاح، حذف یا کپی هر عضو از «اصلاح/حذف» استفاده کن.")
-    await q.edit_message_text("\n".join(lines),parse_mode="HTML",reply_markup=review_menu())
-
-def _copyable_report(result, project_name):
-    lines=[
-        "STRUCTURALBOT — گزارش متره و برآورد",
-        f"پروژه: {project_name}",
-        "",
-        f"تعداد اعضا: {result.get('member_count',0)}",
-        f"حجم کل بتن: {result.get('concrete_total_m3',0):,.3f} m³",
-        "",
-        "جمع کل میلگرد — تفکیک نوع"
-    ]
-    groups={}
-    for m in result.get("members",[]):
-        for c in m.get("components",[]):
-            if c.get("category")!="میلگرد": continue
-            name=str(c.get("name","")); dia=c.get("diameter_mm")
-            if dia is None: continue
-            base=name.split(" - ")[0]
-            g=groups.setdefault((base,float(dia)),{"pieces":0,"length":0.0,"weight":0.0,"branches":0,"buy_weight":0.0,"buy_length":0.0})
-            if name.endswith(" - تعداد قطعه"): g["pieces"]+=int(c.get("value",0))
-            elif name.endswith(" - طول اجرا"): g["length"]+=float(c.get("value",0))
-            elif name.endswith(" - وزن اجرا"): g["weight"]+=float(c.get("value",0))
-            elif name.endswith(" - شاخه خرید"):
-                g["branches"]+=int(c.get("value",0)); g["buy_weight"]+=float(c.get("procurement_weight_kg",0))
-            elif name.endswith(" - طول خرید"): g["buy_length"]+=float(c.get("value",0))
-    if groups:
-        for (base,dia),g in groups.items():
-            lines += [
-                "",
-                f"نوع میلگرد: {base}",
-                f"قطر: Φ{dia:g}",
-                f"تعداد قطعه: {g['pieces']}",
-                f"طول اجرا: {g['length']:.2f} m",
-                f"وزن اجرا: {g['weight']:.2f} kg",
-                f"شاخه خرید: {g['branches']}",
-                f"طول خرید: {g['buy_length']:.2f} m",
-                f"وزن خرید: {g['buy_weight']:.2f} kg",
-            ]
-    else:
-        lines.append("میلگردی ثبت نشده است.")
-    lines += ["","خلاصه خرید بر اساس قطر"]
-    for dia,d in result.get("rebar_by_diameter",{}).items():
-        lines.append(f"Φ{dia}: {d.get('branches',0)} شاخه | {d.get('procurement_weight_kg',0):.2f} kg خرید | {d.get('weight_kg',0):.2f} kg اجرا")
-    lines += ["","کنترل کیفیت: "+("بدون هشدار" if result.get("qa",{}).get("ok") else f"{len(result.get('qa',{}).get('warnings',[]))} هشدار")]
-    for w in result.get("qa",{}).get("warnings",[])[:12]:
-        lines.append("هشدار: "+str(w))
-    if result.get("ai_explanation"):
-        lines += ["","توضیح هوشمند:",str(result["ai_explanation"])]
-    return "\n".join(lines)
 
 async def save_final(update,context):
     ms=context.user_data.get("members",[])
@@ -780,7 +711,7 @@ async def callback(update,context):
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("➕ افزودن عضو",callback_data="choose_section")],
-                [InlineKeyboardButton("🔎 بازبینی پروژه",callback_data="finish_takeoff")],
+                [InlineKeyboardButton("✅ تأیید پروژه",callback_data="confirm_project")],
                 [InlineKeyboardButton("📋 جدول جامع",callback_data="table")],
                 [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
             ])
@@ -823,7 +754,7 @@ async def callback(update,context):
         rows=[]
         for i,m in enumerate(context.user_data.get("members",[])):
             rows.append([InlineKeyboardButton(f"✏️ {i+1}. {m['member']}",callback_data=f"edit|{i}"),InlineKeyboardButton("📑",callback_data=f"copy|{i}"),InlineKeyboardButton("❌",callback_data=f"delete|{i}")])
-        rows.append([InlineKeyboardButton("⬅️ بازبینی",callback_data="finish_takeoff")])
+        rows.append([InlineKeyboardButton("⬅️ بازگشت",callback_data="confirm_project")])
         await q.edit_message_text("✏️ <b>اصلاح یا حذف عضو</b>",parse_mode="HTML",reply_markup=InlineKeyboardMarkup(rows)); return
     if data=="member_calculate":
         idx=context.user_data.get("current_member_index"); ms=context.user_data.get("members",[])
@@ -928,7 +859,7 @@ async def callback(update,context):
             [InlineKeyboardButton("📋 کپی نتیجه عضو",callback_data="copy_member_output")],
             [InlineKeyboardButton("✅ تأیید نهایی عضو",callback_data="member_confirm")],
             [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit")],
-            [InlineKeyboardButton("🔎 بازبینی پروژه",callback_data="finish_takeoff")],
+            [InlineKeyboardButton("✅ تأیید پروژه",callback_data="confirm_project")],
             [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")]
         ])); return
     if data=="member_confirm":
@@ -939,7 +870,7 @@ async def callback(update,context):
         await q.edit_message_text(f"✅ <b>{m['member']}</b> با موفقیت تأیید نهایی شد.\n\nاین عضو در متره پروژه ثبت شد و آماده ورود به عضو بعدی یا بازبینی کامل پروژه است.",parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")],
-                [InlineKeyboardButton("🔎 بازبینی پروژه",callback_data="finish_takeoff")],
+                [InlineKeyboardButton("✅ تأیید پروژه",callback_data="confirm_project")],
                 [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit")],
                 [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
             ])); return
@@ -953,7 +884,7 @@ async def callback(update,context):
                                   "current_queue":sc[preset_count:],"current_history":[],"current_edit":idx,
                                   "current_preset":presets_for(m["section"],m["type"])})
         await ask_next(q,context); return
-    if data=="finish_takeoff": await review(q,context); return
+    if data=="confirm_project": await review(q,context); return
     if data=="confirm_project":
         ms=context.user_data.get("members",[])
         qa=quality_check_members(ms)
@@ -973,7 +904,7 @@ async def callback(update,context):
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("💾 تأیید و ذخیره نهایی",callback_data="final_save")],
                 [InlineKeyboardButton("✏️ اصلاح",callback_data="edit_members")],
-                [InlineKeyboardButton("⬅️ بازگشت به بازبینی",callback_data="finish_takeoff")]
+                [InlineKeyboardButton("⬅️ بازگشت به بازبینی",callback_data="confirm_project")]
             ])
         )
         return
@@ -1123,7 +1054,7 @@ async def finish_member(q,context):
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🧮 محاسبه نهایی عضو",callback_data="member_calculate")],
             [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit")],
-            [InlineKeyboardButton("🔎 بازبینی پروژه",callback_data="finish_takeoff")],
+            [InlineKeyboardButton("✅ تأیید پروژه",callback_data="confirm_project")],
             [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")],
             [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
         ])
@@ -1250,7 +1181,7 @@ async def finish_member_message(update,context):
         f"✅ <b>{m['member']}</b> محاسبه شد.\\n\\nبتن، میلگرد، وزن، شاخه خرید و اجزای وابسته ثبت شد.",
         parse_mode="HTML", reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")],
-            [InlineKeyboardButton("🔎 بازبینی",callback_data="finish_takeoff")],
+            [InlineKeyboardButton("✅ تأیید پروژه",callback_data="confirm_project")],
             [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
         ])
     )
