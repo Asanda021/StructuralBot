@@ -30,3 +30,5 @@ services:
         value: "false"
       - key: BOT_TOKEN
         sync: false
+      - key: WEBHOOK_SECRET
+        generateValue: true
