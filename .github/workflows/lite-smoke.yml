@@ -15,6 +15,5 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install -r requirements.txt
       - run: python -m compileall -q .
-      - run: python -c "from app.engine import estimate_items, calculate_rebar_weight; items=[{'section':'سقف','name':'بتن سقف','quantity':48,'unit':'m³','note':'320×0.15'},{'section':'سقف','name':'یونولیت','quantity':1200,'unit':'عدد'},{'section':'سقف','name':'میلگرد منفی','quantity':850,'unit':'kg'}]; r=estimate_items(items); assert r['item_count']==3; assert r['totals_by_unit']['m³']==48; assert calculate_rebar_weight(16,12,20)>0; print('ITEM_ENGINE_OK')"
-      - run: python -c "from app.engine import estimate_building; d={'floors':3,'area':120,'foundation_count':8,'footing_w':1.5,'footing_l':1.5,'footing_t':0.5,'columns_per_floor':12,'column_w':0.35,'column_d':0.35,'floor_h':3,'beam_length_per_floor':80,'beam_w':0.3,'beam_h':0.5,'slab_t':0.15,'stair_area_per_floor':10,'stair_t':0.15}; r=estimate_building(d); assert r['totals']['concrete_net']>0; print('LEGACY_ENGINE_OK')"
-      - run: python -c "import bot; from app.exporter import create_excel, create_pdf; print('BOT_EXPORT_IMPORT_OK')"
+      - run: python tests/smoke_test.py
+      - run: python -c "import bot; from app.engine import estimate_members; from app.exporter import create_excel, create_pdf; print('BOT_EXPORT_IMPORT_OK')"
