@@ -128,6 +128,27 @@ READY_OPTIONS = {
  "طول هر کمرکش":[1.0,1.5,2.0,2.5,3.0],
 }
 
+# Explicit foundation presets: every standard foundation input has selectable shortcuts.
+FOUNDATION_READY = {
+ "تعداد":[1,2,3,4,6,8,10,12,16,20],
+ "طول":[1.0,1.2,1.5,1.8,2.0,2.5,3.0,4.0,5.0,6.0],
+ "عرض":[1.0,1.2,1.5,1.8,2.0,2.5,3.0,4.0,5.0,6.0],
+ "ضخامت":[0.30,0.35,0.40,0.45,0.50,0.55,0.60,0.70,0.80],
+ "ضخامت مگر":[0.08,0.10,0.12,0.15],
+ "قطر میلگرد شبکه پایین":[10,12,14,16,18,20,22],
+ "فاصله میلگرد شبکه پایین":[10,12.5,15,17.5,20,25,30],
+ "قطر میلگرد شبکه بالا":[10,12,14,16,18,20,22],
+ "فاصله میلگرد شبکه بالا":[10,12.5,15,17.5,20,25,30],
+ "تعداد میلگرد انتظار":[0,2,4,6,8,10,12,16,20],
+ "طول هر انتظار":[0.50,0.80,1.00,1.20,1.50,2.00],
+ "قطر میلگرد انتظار":[10,12,14,16,18,20],
+ "تعداد میلگرد طولی هر شناژ":[4,6,8,10,12],
+ "قطر میلگرد طولی":[12,14,16,18,20,22,25,28,32],
+ "قطر خاموت":[8,10,12],
+ "فاصله خاموت":[10,12.5,15,20,25,30],
+ "طول هر خاموت":[0.80,1.00,1.20,1.40,1.60,1.80,2.00],
+}
+
 # Exact common isolated-footing presets requested for fast drawing entry.
 FOOTING_PRESETS = {
  "پی منفرد":[(1.5,1.5,0.50),(1.8,1.8,0.50),(2.0,2.0,0.50)]
@@ -151,10 +172,14 @@ def apply_compound_preset(context, values):
         context.user_data.setdefault("current_values",[]).append(value)
     return len(values)
 def ready_options(section,typ,label):
-    if section=="فونداسیون" and typ in FOOTING_PRESETS and label in ("طول","عرض","ضخامت"):
-        vals=FOOTING_PRESETS[typ]
-        idx={"طول":0,"عرض":1,"ضخامت":2}[label]
-        return list(dict.fromkeys(x[idx] for x in vals))
+    # Foundation fields always expose engineering shortcut buttons; manual entry remains available.
+    if section=="فونداسیون":
+        if typ=="پی منفرد" and label in ("طول","عرض","ضخامت"):
+            vals=FOOTING_PRESETS[typ]
+            idx={"طول":0,"عرض":1,"ضخامت":2}[label]
+            return list(dict.fromkeys(x[idx] for x in vals))
+        if label in FOUNDATION_READY:
+            return FOUNDATION_READY[label]
     if label=="ضریب بتن":
         if "دوبل" in typ: return [0.23]
         if "تک" in typ: return [0.18]
