@@ -50,7 +50,7 @@ def section_menu():
       [InlineKeyboardButton("🧱 دیوار",callback_data="sec|دیوار"),InlineKeyboardButton("🪜 پله",callback_data="sec|پله")],
       [InlineKeyboardButton("🔩 آرماتور/مدفون",callback_data="sec|آرماتور")],
       [InlineKeyboardButton("➕ آیتم سفارشی",callback_data="sec|سایر")],
-      [InlineKeyboardButton("🏁 پایان متره",callback_data="confirm_project")],[InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
+      [InlineKeyboardButton("⬅️ بازگشت به مرحله قبل",callback_data="back_field"),InlineKeyboardButton("➡️ رفتن به مرحله بعد",callback_data="choose_section")],[InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
     ])
 
 def type_menu(section):
