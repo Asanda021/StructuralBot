@@ -175,7 +175,13 @@ def create_excel(result,project_name,path,lang=None):
 
     wb.save(path); return path
 
-def _pdf_font():
+def _pdf_font(lang="fa"):
+    if lang_code(lang)=="zh":
+        try:
+            from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+            pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
+            return "STSong-Light"
+        except Exception: pass
     candidates=[
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf",
@@ -191,7 +197,7 @@ def _pdf_font():
 def create_pdf(result,project_name,path,lang=None):
     lang=lang_code(lang or result.get('project_settings',{}).get('language','fa'))
     doc=SimpleDocTemplate(path,pagesize=landscape(A4),rightMargin=24,leftMargin=24,topMargin=24,bottomMargin=24)
-    font=_pdf_font()
+    font=_pdf_font(lang)
     styles=getSampleStyleSheet()
     title=ParagraphStyle("SBTitle",parent=styles["Title"],fontName=font,alignment=TA_CENTER,fontSize=18,leading=22)
     body=ParagraphStyle("SBBody",parent=styles["BodyText"],fontName=font,fontSize=8.5,leading=11)
