@@ -6,7 +6,7 @@ from telegram.error import BadRequest
 from app.db import Database
 from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, multi_face_grid_rebar, repeated_bar_rebar, format_estimate
 from app.exporter import create_excel, create_pdf
-from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu
+from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu, walls_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu
 
 TOKEN=os.getenv("BOT_TOKEN")
 DB_PATH=os.getenv("DATABASE_PATH","/tmp/structuralbot.db")
@@ -555,6 +555,8 @@ async def callback(update,context):
         if not context.user_data.get("project_name"):
             await q.edit_message_text("ابتدا «پروژه جدید» را بزن.",reply_markup=main_menu()); return
         await q.edit_message_text("📚 <b>بخش سازه</b>\n\nاز روی نقشه، بخش موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu()); return
+    if data=="walls_menu":
+        await q.edit_message_text("🧱 <b>دیوارها</b>\n\nنوع دیوار را انتخاب کن:",parse_mode="HTML",reply_markup=walls_menu()); return
     if data.startswith("sec|"):
         await show_member_types(q,data.split("|",1)[1]); return
     if data.startswith("member|"):
