@@ -151,4 +151,46 @@ def rebar_equivalency_menu():
       [InlineKeyboardButton("Φ20 ↔ Φ22",callback_data="eq|20|22"),InlineKeyboardButton("Φ22 ↔ Φ25",callback_data="eq|22|25")],
       [InlineKeyboardButton("Φ25 ↔ Φ28",callback_data="eq|25|28"),InlineKeyboardButton("Φ28 ↔ Φ32",callback_data="eq|28|32")],
       [InlineKeyboardButton("⬅️ بازگشت",callback_data="home")]
+    ])def input_keyboard(values=None, unit=""):
+    """Preset picker plus manual entry. Presets are shortcuts, never design decisions."""
+    rows=[]
+    if values:
+        row=[]
+        for v in values:
+            row.append(KeyboardButton(f"⚡ {v} {unit}"))
+            if len(row)==2:
+                rows.append(row); row=[]
+        if row: rows.append(row)
+    rows.append([KeyboardButton("✏️ ورود دستی")])
+    rows.append([KeyboardButton("⬅️ مرحله قبل"), KeyboardButton("📋 ورودی‌ها")])
+    rows.append([KeyboardButton("❌ لغو عضو"), KeyboardButton("🏠 منو")])
+    rows.append([KeyboardButton("🔄 شروع مجدد")])
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True, one_time_keyboard=False, is_persistent=True,
+                               input_field_placeholder="مقدار آماده را انتخاب کن یا ورود دستی بزن")
+
+def field_menu(values=None, unit=""):
+    rows=[]
+    if values:
+        row=[]
+        for v in values:
+            row.append(InlineKeyboardButton(f"⚡ {v} {unit}",callback_data=f"ready|{v}"))
+            if len(row)==2:
+                rows.append(row); row=[]
+        if row: rows.append(row)
+    rows.append([InlineKeyboardButton("✏️ ورود دستی",callback_data="manual")])
+    rows.append([
+        InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back_field"),
+        InlineKeyboardButton("📋 ورودی‌ها",callback_data="show_inputs")
     ])
+    rows.append([
+        InlineKeyboardButton("❌ لغو عضو",callback_data="cancel_member"),
+        InlineKeyboardButton("🏠 منو",callback_data="home")
+    ])
+    rows.append([InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
+    return InlineKeyboardMarkup(rows)
+
+def ask_text(name,fields,section,typ):
+    label,unit=fields[0]
+    return f"✏️ <b>{name}</b>\n\n<b>{label}</b> ({unit})\n\nاز گزینه‌های آماده انتخاب کن یا «✏️ ورود دستی» را بزن.\n\n⚠️ مقادیر آماده فقط میانبر ورود هستند؛ مقدار نهایی را با نقشه کنترل کن."
+
+
