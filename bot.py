@@ -6,7 +6,7 @@ from telegram.error import BadRequest
 from app.db import Database
 from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, multi_face_grid_rebar, repeated_bar_rebar, format_estimate
 from app.exporter import create_excel, create_pdf
-from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu, walls_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu
+from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu, walls_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu, language_menu
 
 TOKEN=os.getenv("BOT_TOKEN")
 DB_PATH=os.getenv("DATABASE_PATH","/tmp/structuralbot.db")
@@ -479,13 +479,32 @@ def calc_member(section,typ,v):
 def show_member_types(q,section):
     return q.edit_message_text(f"🏗 <b>{section}</b>\n\nنوع عضو را از تیپ‌های آماده انتخاب کن یا سفارشی را بزن.",parse_mode="HTML",reply_markup=type_menu(section))
 
+LANGUAGE_STANDARD = {
+    "fa": "iran",
+    "en": "aci",
+    "ar": "aci",
+    "zh": "china",
+}
+LANGUAGE_NAMES = {"fa":"فارسی","ar":"العربية","en":"English","zh":"中文"}
+STANDARD_NAMES = {
+    "iran":"مقررات ملی ایران",
+    "aci":"ACI 318",
+    "ec2":"Eurocode 2",
+    "china":"China — GB/T 50010-2010(2024) + GB/T 50011-2010(2024)",
+}
+
 async def start_cmd(update,context):
     uid=update.effective_user.id
     db.ensure_user(uid,update.effective_user.first_name or "")
-    db.set_settings(uid)
+    settings=db.settings(uid)
     context.user_data.clear()
-    await update.message.reply_text("🏗 <b>StructuralBot</b>\n\n<b>متره جامع از روی نقشه</b>\n\nبرای شروع، روی دکمه زیر بزن.",parse_mode="HTML",reply_markup=calc_mode_menu())
-    await update.message.reply_text("منوی ثابت:",reply_markup=persistent_menu())
+    context.user_data["language"]=settings.get("language","fa")
+    await update.message.reply_text(
+        "🌐 <b>زبان / Language / اللغة / 语言</b>\n\n"
+        "زبان رابط کاربری را انتخاب کن. آیین‌نامه مرجع به‌صورت خودکار بر اساس زبان فعال می‌شود و بعداً از تنظیمات قابل تغییر است.",
+        parse_mode="HTML",
+        reply_markup=language_menu(initial=True)
+    )
 def reset(context,name):
     context.user_data.clear(); context.user_data.update({"project_name":name,"members":[],"history":[]})
 
@@ -531,9 +550,6 @@ async def callback(update,context):
             context.user_data.setdefault("members",[])
         await q.edit_message_text("📚 <b>موارد برآوردی</b>\n\nعضو سازه‌ای موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu())
         return
-        context.user_data["calc_mode"]=mode
-        db.set_settings(update.effective_user.id,calc_mode=mode)
-        await q.edit_message_text(f"✅ <b>{labels.get(mode,mode)}</b> فعال شد.\n\nورودی‌های اصلی از نقشه گرفته می‌شوند و در پایان، بتن/میلگرد/شاخه خرید و Cut List طبق اطلاعات موجود گزارش می‌شوند.",parse_mode="HTML",reply_markup=main_menu()); return
     if data=="settings":
         s=db.settings(update.effective_user.id)
         msg=(f"⚙️ <b>تنظیمات متره</b>\\n\\n"
@@ -600,13 +616,22 @@ async def callback(update,context):
         ratio=(d1*d1)/(d2*d2)
         await q.edit_message_text(f"🔁 <b>Φ{d1:g} ↔ Φ{d2:g}</b>\\n\\nبرای حفظ سطح مقطع: هر ۱ شاخه Φ{d1:g} معادل حدود <b>{ratio:.3f}</b> شاخه Φ{d2:g} است.\\n\\nاین فقط تبدیل مقدار متره است و جایگزین دیتیل طراحی نیست.",parse_mode="HTML",reply_markup=rebar_equivalency_menu()); return
     if data=="language":
-        await q.edit_message_text("🌐 <b>انتخاب زبان رابط کاربری</b>",parse_mode="HTML",reply_markup=__import__("app.keyboards",fromlist=["language_menu"]).language_menu()); return
+        await q.edit_message_text("🌐 <b>انتخاب زبان رابط کاربری</b>",parse_mode="HTML",reply_markup=language_menu()); return
     if data.startswith("lang|"):
         lang=data.split("|",1)[1]
-        db.set_settings(update.effective_user.id,language=lang)
+        standard=LANGUAGE_STANDARD.get(lang,"iran")
+        db.set_settings(update.effective_user.id,language=lang,standard=standard)
         context.user_data["language"]=lang
-        names={"fa":"فارسی","ar":"العربية","en":"English","zh":"中文"}
-        await q.edit_message_text(f"🌐 زبان رابط روی <b>{names.get(lang,lang)}</b> ذخیره شد.\n\nمحاسبات و واحدها مستقل از زبان باقی می‌مانند.",parse_mode="HTML",reply_markup=main_menu()); return
+        context.user_data["standard"]=standard
+        await q.edit_message_text(
+            f"✅ <b>{LANGUAGE_NAMES.get(lang,lang)}</b> فعال شد.\n\n"
+            f"📐 مرجع پیش‌فرض: <b>{STANDARD_NAMES.get(standard,standard)}</b>\n"
+            "این مرجع در پس‌زمینه برای گزارش و کنترل پروژه ثبت شد و از ⚙️ تنظیمات قابل تغییر است.",
+            parse_mode="HTML",
+            reply_markup=main_menu()
+        )
+        await q.message.reply_text("منوی ثابت:",reply_markup=persistent_menu())
+        return
     if data=="restart":
         context.user_data.clear()
         await q.edit_message_text("🔄 <b>شروع مجدد</b>\n\nتمام اطلاعات موقت این مرحله پاک شد. برای شروع دوباره، حالت محاسبه را فعال کن.",parse_mode="HTML",reply_markup=calc_mode_menu()); return
@@ -897,6 +922,12 @@ async def message(update,context):
                 queue.pop(0)
                 await ask_next_message(update,context)
                 return
+    if text=="🧮 شروع برآورد":
+        if not context.user_data.get("project_name"):
+            context.user_data["project_name"]="برآورد جدید"
+            context.user_data.setdefault("members",[])
+        await update.message.reply_text("📚 <b>موارد برآوردی</b>\n\nعضو سازه‌ای موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu())
+        return
     if text=="⬅️ مرحله قبل":
         values=context.user_data.get("current_values",[])
         history=context.user_data.get("current_history",[])
@@ -998,9 +1029,3 @@ def main():
     app.run_polling(drop_pending_updates=True)
 
 if __name__=="__main__": main()
-    if text=="🧮 شروع برآورد":
-        if not context.user_data.get("project_name"):
-            context.user_data["project_name"]="برآورد جدید"
-            context.user_data.setdefault("members",[])
-        await update.message.reply_text("📚 <b>موارد برآوردی</b>\n\nعضو سازه‌ای موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu())
-        return
