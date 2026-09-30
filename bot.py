@@ -206,6 +206,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         idx = int(data.split("|", 1)[1])
         context.user_data["editing_index"] = idx
         context.user_data["manual"] = True
+        context.user_data["editing_saved"] = True
         _, label, unit = FIELDS[idx]
         await q.edit_message_text(
             f"✏️ <b>{label}</b> ({unit})\n\nمقدار جدید را بفرست.",
