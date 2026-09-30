@@ -700,12 +700,15 @@ async def callback(update,context):
         context.user_data.clear()
         await q.edit_message_text("🔄 <b>شروع مجدد</b>\n\nابتدا زبان را انتخاب کن.",parse_mode="HTML",reply_markup=language_menu(initial=True)); return
     if data=="new_project":
-        context.user_data.clear(); context.user_data["awaiting_project_name"]=True
-        await q.edit_message_text("🏗 نام پروژه را بفرست.",reply_markup=back_home()); return
-    if data in ("continue_project","choose_section"):
+        context.user_data.clear()
+        context.user_data["project_name"]="پروژه جدید"
+        context.user_data["members"]=[]
+        await q.edit_message_text("🏗 <b>پروژه جدید</b>\n\nحالا اعضای سازه را از روی نقشه اضافه کن.",parse_mode="HTML",reply_markup=section_menu()); return
+    if data in ("start_estimate","continue_project","choose_section"):
         if not context.user_data.get("project_name"):
-            await q.edit_message_text("ابتدا «پروژه جدید» را بزن.",reply_markup=main_menu()); return
-        await q.edit_message_text("📚 <b>بخش سازه</b>\n\nاز روی نقشه، بخش موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu()); return
+            context.user_data["project_name"]="پروژه جدید"
+        context.user_data.setdefault("members",[])
+        await q.edit_message_text("📚 <b>ادامه برآورد</b>\n\nاز روی نقشه، بخش موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu()); return
     if data=="walls_menu":
         await q.edit_message_text("🧱 <b>دیوارها</b>\n\nنوع دیوار را انتخاب کن:",parse_mode="HTML",reply_markup=walls_menu()); return
     if data.startswith("sec|"):
@@ -898,13 +901,25 @@ async def callback(update,context):
     if data=="back":
         await q.edit_message_text("📚 <b>بخش سازه</b>",parse_mode="HTML",reply_markup=section_menu()); return
     if data=="table":
-        r=context.user_data.get("last_result") or (db.last_estimate(update.effective_user.id) or {}).get("result")
+        r=context.user_data.get("last_result")
+        if not r and context.user_data.get("members"):
+            r=estimate_members(context.user_data["members"])
+            context.user_data["last_result"]=r
+        if not r:
+            last=db.last_estimate(update.effective_user.id)
+            r=last["result"] if last else None
         extra=(f"\n\n🧠 <b>توضیح هوشمند</b>\n{r.get('ai_explanation')}" if r and r.get("ai_explanation") else "")
-        await q.edit_message_text((format_estimate(r)+extra) if r else "هنوز گزارشی ثبت نشده.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
+        await q.edit_message_text((format_estimate(r)+extra) if r else "هنوز عضوی برای جدول جامع ثبت نشده است.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
     if data=="reports":
-        last=db.last_estimate(update.effective_user.id)
-        extra=(f"\n\n🧠 <b>توضیح هوشمند</b>\n{last['result'].get('ai_explanation')}" if last and last["result"].get("ai_explanation") else "")
-        await q.edit_message_text((format_estimate(last["result"])+extra) if last else "هنوز گزارشی ثبت نشده.",parse_mode="HTML",reply_markup=report_menu() if last else main_menu()); return
+        r=context.user_data.get("last_result")
+        if not r and context.user_data.get("members"):
+            r=estimate_members(context.user_data["members"])
+            context.user_data["last_result"]=r
+        if not r:
+            last=db.last_estimate(update.effective_user.id)
+            r=last["result"] if last else None
+        extra=(f"\n\n🧠 <b>توضیح هوشمند</b>\n{r.get("ai_explanation")}" if r and r.get("ai_explanation") else "")
+        await q.edit_message_text((format_estimate(r)+extra) if r else "هنوز گزارشی ثبت نشده است.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
     if data=="projects":
         ps=db.projects(update.effective_user.id); rows=[[InlineKeyboardButton(p[1],callback_data=f"open|{p[0]}")] for p in ps]
         rows.append([InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")])
