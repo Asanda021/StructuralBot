@@ -973,7 +973,6 @@ def create_application() -> Application:
                 r"|navigation:.*"
                 r"|navigation_.*"
                 r"|menu:.*"
-                r"|calc:.*"
                 r"|restart:.*"
                 r")$"
             ),
