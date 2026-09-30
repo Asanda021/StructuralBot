@@ -298,6 +298,70 @@ def ask_text(name,fields,section,typ,values=None,compound=None,context=None):
     filled="\n📋 <b>ثبت‌شده:</b> "+" | ".join(summary) if summary else ""
     return f"🏗 <b>{name}</b>\n\n<b>مرحله {current} از {total}</b>  {bar}\n\n🎯 <b>{label}</b> ({unit}){ready}{filled}\n\nیکی از گزینه‌های آماده را بزن یا «✏️ ورود دستی» را انتخاب کن.\n⚠️ گزینه‌های آماده فقط میانبر ورود هستند؛ مقدار نهایی باید با نقشه کنترل شود."
 
+def english_report(result):
+    """Compact English engineering takeoff report for Telegram output."""
+    members=result.get("members",[])
+    concrete=float(result.get("concrete_total_m3",0) or 0)
+    by_type={}
+    by_dia={}
+    for m in members:
+        for comp in m.get("components",[]):
+            if comp.get("category") != "میلگرد":
+                continue
+            name=str(comp.get("name", ""))
+            dia=comp.get("diameter_mm")
+            if dia is None:
+                continue
+            base=name.split(" - ")[0]
+            key=(base,float(dia))
+            g=by_type.setdefault(key,{"pieces":0,"length":0.0,"weight":0.0,"bars":0,"buy_length":0.0,"buy_weight":0.0})
+            if name.endswith(" - تعداد قطعه"): g["pieces"] += int(comp.get("value",0) or 0)
+            elif name.endswith(" - طول اجرا"): g["length"] += float(comp.get("value",0) or 0)
+            elif name.endswith(" - وزن اجرا"): g["weight"] += float(comp.get("value",0) or 0)
+            elif name.endswith(" - شاخه خرید"):
+                g["bars"] += int(comp.get("value",0) or 0)
+                g["buy_weight"] += float(comp.get("procurement_weight_kg",0) or 0)
+            elif name.endswith(" - طول خرید"): g["buy_length"] += float(comp.get("value",0) or 0)
+    for dia,data in result.get("rebar_by_diameter",{}).items():
+        by_dia[float(dia)]=data
+    names={
+        "میلگرد شبکه پایین - دو جهت":"Bottom Reinforcement",
+        "میلگرد شبکه بالا - دو جهت":"Top Reinforcement",
+        "شبکه حرارتی دو جهت":"Thermal Reinforcement",
+        "میلگرد طولی":"Longitudinal Reinforcement",
+        "میلگرد طولی ستون":"Column Longitudinal Reinforcement",
+        "میلگرد پایینی تیر":"Beam Bottom Reinforcement",
+        "میلگرد بالایی تیر":"Beam Top Reinforcement",
+        "خاموت":"Stirrups",
+        "خاموت شناژ":"Tie Beam Stirrups",
+        "سنجاقی ستون":"Column Crossties",
+        "سنجاقی تیر":"Beam Crossties",
+        "کمرکش تیر":"Beam Side Bars",
+        "میلگرد تقویتی":"Additional Reinforcement",
+        "میلگرد انتظار":"Starter Bars",
+        "میلگرد انتظار شناژ":"Tie Beam Starters",
+        "کلاف/ژوئن":"Tie / Joint Reinforcement",
+        "سنجاقی ژوئن":"Tie / Joint Crossties",
+        "میلگرد منفی":"Negative Reinforcement",
+        "اتکا/ادکا":"Support Bars",
+        "میلگرد قائم دو وجه":"Vertical Wall Reinforcement",
+        "میلگرد افقی دو وجه":"Horizontal Wall Reinforcement",
+    }
+    def en(name):
+        return names.get(name,name)
+    total_w=sum(float(x.get("weight_kg",0) or 0) for x in by_dia.values())
+    total_bw=sum(float(x.get("procurement_weight_kg",0) or 0) for x in by_dia.values())
+    total_bars=sum(int(x.get("branches",0) or 0) for x in by_dia.values())
+    lines=["PROJECT TAKEOFF","",f"Members: {len(members)}",f"Concrete: {concrete:,.2f} m³",f"Rebar: {total_w:,.2f} kg",f"Stock Bars: {total_bars:,} pcs",f"Procurement Weight: {total_bw:,.2f} kg","","REBAR SUMMARY","","Type | Dia | Pieces | Exec. Length | Exec. Weight | Stock Bars | Buy Length | Buy Weight"]
+    for (base,dia),g in sorted(by_type.items(), key=lambda x:(x[0][0],x[0][1])):
+        lines.append(f"{en(base)} | Ø{dia:g} | {g['pieces']:,} | {g['length']:,.2f} m | {g['weight']:,.2f} kg | {g['bars']:,} | {g['buy_length']:,.2f} m | {g['buy_weight']:,.2f} kg")
+    lines += ["","PROCUREMENT BY DIAMETER","","Dia | Exec. Length | Exec. Weight | Stock Bars | Buy Length | Buy Weight"]
+    for dia,d in sorted(by_dia.items()):
+        lines.append(f"Ø{dia:g} | {float(d.get('length_m',0)):,.2f} m | {float(d.get('weight_kg',0)):,.2f} kg | {int(d.get('branches',0)):,} | {float(d.get('procurement_length_m',0)):,.2f} m | {float(d.get('procurement_weight_kg',0)):,.2f} kg")
+    qa=result.get("qa",{})
+    lines += ["","QA",f"Status: {'OK' if qa.get('ok') else 'CHECK REQUIRED'}"]
+    return "\n".join(lines)
+
 def rcomps(title,r,note=""):
     n=int(r.get("count_bars",0)); branches=r.get("branches",0)
     dia=f"Φ{r['diameter_mm']:g}"
@@ -895,7 +959,7 @@ async def callback(update,context):
             last=db.last_estimate(update.effective_user.id)
             r=last["result"] if last else None
         extra=(f"\n\n🧠 <b>توضیح هوشمند</b>\n{r.get('ai_explanation')}" if r and r.get("ai_explanation") else "")
-        await q.edit_message_text((format_estimate(r)+extra) if r else "هنوز عضوی برای جدول جامع ثبت نشده است.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
+        await q.edit_message_text(english_report(r) if r else "No takeoff data is available yet.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
     if data=="reports":
         r=context.user_data.get("last_result")
         if not r and context.user_data.get("members"):
@@ -905,7 +969,7 @@ async def callback(update,context):
             last=db.last_estimate(update.effective_user.id)
             r=last["result"] if last else None
         extra=(f"\n\n🧠 <b>توضیح هوشمند</b>\n{r.get('ai_explanation')}" if r and r.get("ai_explanation") else "")
-        await q.edit_message_text((format_estimate(r)+extra) if r else "هنوز گزارشی ثبت نشده است.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
+        await q.edit_message_text(english_report(r) if r else "No takeoff report is available yet.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
     if data=="projects":
         ps=db.projects(update.effective_user.id); rows=[[InlineKeyboardButton(p[1],callback_data=f"open|{p[0]}")] for p in ps]
         rows.append([InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")])
@@ -1113,7 +1177,7 @@ async def message(update,context):
     if text in ("🏠 خانه","🏠 منو"):
         context.user_data.clear()
         await update.message.reply_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu())
-        await update.message.reply_text("منوی ثابت:",reply_markup=persistent_menu())
+        await update.message.reply_text("Keyboard menu is active.",reply_markup=persistent_menu())
         return
     if text=="📂 پروژه‌ها":
         ps=db.projects(update.effective_user.id)
