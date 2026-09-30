@@ -129,8 +129,24 @@ def estimate_members(members):
             row={**base,"name":c["name"],"value":round(float(c["value"]),4),"unit":c["unit"],
                  "note":c.get("note","")}
             rows.append(row); totals[c["unit"]]+=float(c["value"])
-    return {"version":"takeoff-4.0","method":"drawing_driven_member_takeoff",
+    rebar_by_diameter=defaultdict(lambda: {"weight_kg":0.0,"length_m":0.0,"procurement_weight_kg":0.0,"procurement_length_m":0.0,"branches":0})
+    concrete_total=0.0
+    for m in members:
+        for c in m.get("components",[]):
+            if c.get("category")=="میلگرد" and c.get("unit")=="kg":
+                dia=None
+                note=str(c.get("note",""))
+                if "Φ" in note:
+                    try: dia=float(note.split("Φ",1)[1].split()[0])
+                    except Exception: dia=None
+                if dia is not None:
+                    rebar_by_diameter[dia]["weight_kg"] += float(c["value"])
+            if c.get("unit")=="m³" and "بتن" in str(c.get("name","")):
+                concrete_total += float(c["value"])
+    return {"version":"takeoff-5.0","method":"drawing_driven_member_takeoff",
             "members":members,"items":rows,"totals_by_unit":dict(totals),
+            "rebar_by_diameter":{str(k):v for k,v in sorted(rebar_by_diameter.items())},
+            "concrete_total_m3":concrete_total,
             "item_count":len(rows),"member_count":len(members),
             "assumptions":["تیپ‌ها و اعداد آماده فقط میانبر ورود هستند و باید با نقشه تطبیق داده شوند.",
                            "مقادیر میلگرد اجرایی، طول، وزن و شاخه خرید جداگانه ثبت می‌شوند.",
