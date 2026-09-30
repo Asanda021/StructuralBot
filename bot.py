@@ -178,7 +178,7 @@ from handlers.columns import (
 # ---------------------------------------------------------
 
 from handlers.beams import (
-    beams_callback,
+    beam_callback,
     receive_beam_manual_input,
 )
 
@@ -524,7 +524,7 @@ async def beam_router(
         data.startswith("beam")
         or data.startswith("beams")
     ):
-        await beams_callback(
+        await beam_callback(
             update,
             context,
         )
