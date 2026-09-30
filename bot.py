@@ -138,13 +138,14 @@ async def home(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🏠 منوی اصلی", reply_markup=main_menu())
 
 
-def begin_project(context):
+def begin_project(context, project_name):
     context.user_data.clear()
     context.user_data.update({
         "takeoff": True,
         "takeoff_index": 0,
         "takeoff_values": {},
         "manual": False,
+        "project_name": project_name[:120],
     })
 
 
@@ -349,6 +350,16 @@ async def show_review(target, context):
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = (update.message.text or "").strip()
+
+    if context.user_data.get("awaiting_project_name"):
+        if not text or len(text) > 120:
+            await update.message.reply_text("❌ نام پروژه باید بین ۱ تا ۱۲۰ کاراکتر باشد.")
+            return
+        begin_project(context, text)
+        await show_step(update.message, context)
+        return
+
     if context.user_data.get("takeoff"):
         if not context.user_data.get("manual"):
             await update.message.reply_text(
