@@ -197,7 +197,11 @@ def format_estimate(result):
         for c in m.get("components",[]):
             extra=f" — {c.get('note','')}" if c.get("note") else ""
             lines.append(f"• {c['name']}: <b>{c['value']:,.2f}</b> {c['unit']}{extra}")
-    lines += ["","<b>جمع‌بندی</b>"]
+    lines += ["","<b>جمع‌بندی بتن</b>",f"• حجم کل بتن: <b>{result.get('concrete_total_m3',0):,.3f}</b> m³",
+                "","<b>جمع‌بندی میلگرد بر اساس قطر</b>"]
+    for dia,data in result.get("rebar_by_diameter",{}).items():
+        lines.append(f"• Φ{float(dia):g}: <b>{data.get('weight_kg',0):,.2f}</b> kg | {data.get('branches',0)} شاخه 12m | وزن خرید {data.get('procurement_weight_kg',0):,.2f} kg")
+    lines += ["","<b>جمع‌بندی واحدها</b>"]
     for u,v in result.get("totals_by_unit",{}).items(): lines.append(f"• {u}: <b>{v:,.2f}</b>")
     lines += ["","⚠️ کنترل نهایی با نقشه‌های مصوب و دیتیل‌های اجرایی ضروری است."]
     return "\n".join(lines)
