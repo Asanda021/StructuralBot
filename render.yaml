@@ -1,0 +1,37 @@
+services:
+  - type: worker
+    name: structuralbot
+    runtime: python
+    plan: 0.5c-512mb
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    numInstances: 1
+    maxShutdownDelaySeconds: 30
+    disk:
+      name: structuralbot-data
+      mountPath: /var/data
+      sizeGB: 10
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_NAME
+        value: StructuralBot
+      - key: DATABASE_PATH
+        value: /var/data/structuralbot.db
+      - key: SECRET_KEY
+        generateValue: true
+      - key: REDACT_SENSITIVE_DATA
+        value: "true"
+      - key: DEBUG
+        value: "false"
+      - key: AI_ENABLED
+        value: "false"
+      - key: AI_PROVIDER
+        value: placeholder
+      - key: PAYMENT_PROVIDER
+        value: placeholder
+      - key: PAYMENT_GATEWAY_ENABLED
+        value: "false"
+      - key: BOT_TOKEN
+        sync: false
