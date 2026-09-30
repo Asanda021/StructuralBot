@@ -30,7 +30,7 @@ def grid_rebar(area_l, area_w, diameter_mm, spacing_cm, stock_length_m=12.0):
 SLAB_TYPES={
  "تیرچه تک":{"concrete_coeff":0.18,"joist_factor":1},
  "تیرچه دوبل":{"concrete_coeff":0.23,"joist_factor":2},
- "وافل":{"concrete_coeff":0.0,"joist_factor":0},
+ "وافل":{"concrete_coeff":None,"joist_factor":0},
  "دال بتنی":{"concrete_coeff":None,"joist_factor":0},
  "دال تخت":{"concrete_coeff":None,"joist_factor":0},
 }
@@ -48,9 +48,9 @@ def calculate_slab(data):
         joist_count=n
         result["joist_count"]=joist_count
         result["joist_total_length_m"]=joist_count*joist_len
-        block_len=_num(data.get("block_length_m",0.33))
+        block_len=_num(data.get("block_length_m",1.0))
         blocks_per_line=math.ceil(joist_len/block_len) if block_len else 0
-        result["foam_blocks"]=joist_count*blocks_per_line
+        result["foam_blocks"]=max(0,joist_count-1)*blocks_per_line
     if data.get("thermal_dia") and data.get("thermal_spacing_cm"):
         result["thermal"]=grid_rebar(data["length"],data["width"],data["thermal_dia"],data["thermal_spacing_cm"])
     if data.get("negative_dia") and data.get("negative_spacing_cm"):
