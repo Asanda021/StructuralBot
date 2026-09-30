@@ -192,8 +192,13 @@ def field_menu(values=None, unit=""):
     rows.append([InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
     return InlineKeyboardMarkup(rows)
 
-def ask_text(name,fields,section,typ):
+def ask_text(name,fields,section,typ,values=None):
     label,unit=fields[0]
-    return f"✏️ <b>{name}</b>\n\n<b>{label}</b> ({unit})\n\nاز گزینه‌های آماده انتخاب کن یا «✏️ ورود دستی» را بزن.\n\n⚠️ مقادیر آماده فقط میانبر ورود هستند؛ مقدار نهایی را با نقشه کنترل کن."
+    if values:
+        shown="  |  ".join(str(v) for v in values)
+        ready=f"\n\n⚡ <b>مقادیر آماده:</b> {shown} {unit}"
+    else:
+        ready=""
+    return f"✏️ <b>{name}</b>\n\n<b>{label}</b> ({unit}){ready}\n\nیکی از مقادیر آماده را انتخاب کن یا «✏️ ورود دستی» را بزن.\n\n⚠️ مقادیر آماده فقط میانبر ورود هستند؛ مقدار نهایی را با نقشه کنترل کن."
 
 
