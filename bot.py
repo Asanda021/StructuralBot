@@ -1141,6 +1141,32 @@ def create_application() -> Application:
     )
 
     # =====================================================
+    # STATEFUL TEXT INPUTS
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, ai_message),
+        group=0,
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, column_message),
+        group=0,
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, beam_message),
+        group=0,
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, slab_message),
+        group=0,
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, equivalency_message),
+        group=0,
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, quantities_message),
+        group=0,
+    )
+
     # TEXT FALLBACK
     # =====================================================
 
