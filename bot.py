@@ -6,6 +6,7 @@ from telegram.error import BadRequest
 from app.db import Database
 from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, multi_face_grid_rebar, repeated_bar_rebar, automatic_cut_lengths, format_estimate
 from app.exporter import create_excel, create_pdf
+from app.i18n import L, item_label, lang_code
 from ai.assistant import explain_takeoff
 from app.keyboards import main_menu, back_home, section_menu, type_menu, report_menu, calc_mode_menu, persistent_menu, walls_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu, rebar_equiv_source_menu, rebar_equiv_target_menu, language_menu
 
@@ -323,79 +324,39 @@ def ask_text(name,fields,section,typ,values=None,compound=None,context=None):
     filled="\n📋 <b>ثبت‌شده:</b> "+" | ".join(summary) if summary else ""
     return f"🏗 <b>{name}</b>\n\n<b>مرحله {current} از {total}</b>  {bar}\n\n🎯 <b>{label}</b> ({unit}){ready}{filled}\n\nیکی از گزینه‌های آماده را بزن یا «✏️ ورود دستی» را انتخاب کن.\n⚠️ گزینه‌های آماده فقط میانبر ورود هستند؛ مقدار نهایی باید با نقشه کنترل شود."
 
-def english_report(result):
-    """Compact English engineering takeoff report for Telegram output."""
+def english_report(result, lang=None):
+    """Localized compact engineering takeoff report for Telegram output."""
+    lang=lang_code(lang or result.get("project_settings",{}).get("language","fa"))
     members=result.get("members",[])
     concrete=float(result.get("concrete_total_m3",0) or 0)
-    by_type={}
-    by_dia={}
+    by_type={}; by_dia={}
     for m in members:
         for comp in m.get("components",[]):
-            if comp.get("category") != "میلگرد":
-                continue
-            name=str(comp.get("name", ""))
-            dia=comp.get("diameter_mm")
-            if dia is None:
-                continue
+            if comp.get("category")!="میلگرد": continue
+            name=str(comp.get("name","")); dia=comp.get("diameter_mm")
+            if dia is None: continue
             base=name.split(" - ")[0]
-            key=(base,float(dia))
-            g=by_type.setdefault(key,{"pieces":0,"length":0.0,"weight":0.0,"bars":0,"buy_length":0.0,"buy_weight":0.0})
-            if name.endswith(" - تعداد قطعه"): g["pieces"] += int(comp.get("value",0) or 0)
-            elif name.endswith(" - طول اجرا"): g["length"] += float(comp.get("value",0) or 0)
-            elif name.endswith(" - وزن اجرا"): g["weight"] += float(comp.get("value",0) or 0)
+            g=by_type.setdefault((base,float(dia)),{"pieces":0,"length":0.0,"weight":0.0,"bars":0,"buy_length":0.0,"buy_weight":0.0})
+            if name.endswith(" - تعداد قطعه"): g["pieces"]+=int(comp.get("value",0) or 0)
+            elif name.endswith(" - طول اجرا"): g["length"]+=float(comp.get("value",0) or 0)
+            elif name.endswith(" - وزن اجرا"): g["weight"]+=float(comp.get("value",0) or 0)
             elif name.endswith(" - شاخه خرید"):
-                g["bars"] += int(comp.get("value",0) or 0)
-                g["buy_weight"] += float(comp.get("procurement_weight_kg",0) or 0)
-            elif name.endswith(" - طول خرید"): g["buy_length"] += float(comp.get("value",0) or 0)
-    for dia,data in result.get("rebar_by_diameter",{}).items():
-        by_dia[float(dia)]=data
-    names={
-        "میلگرد شبکه پایین - X":"Bottom Reinforcement - X Direction",
-        "میلگرد شبکه پایین - Y":"Bottom Reinforcement - Y Direction",
-        "میلگرد شبکه بالا - X":"Top Reinforcement - X Direction",
-        "میلگرد شبکه بالا - Y":"Top Reinforcement - Y Direction",
-        "شبکه حرارتی - X":"Thermal Reinforcement - X Direction",
-        "شبکه حرارتی - Y":"Thermal Reinforcement - Y Direction",
-        "میلگرد پایین - راستای طول":"Bottom Reinforcement - Longitudinal",
-        "میلگرد پایین - راستای عرض":"Bottom Reinforcement - Transverse",
-        "میلگرد بالا - راستای طول":"Top Reinforcement - Longitudinal",
-        "میلگرد بالا - راستای عرض":"Top Reinforcement - Transverse",
-        "میلگرد طولی":"Longitudinal Reinforcement",
-        "میلگرد عرضی":"Transverse Reinforcement",
-        "میلگرد انتظار ستون":"Column Starter Bars",
-        "انتظار راه‌پله":"Stair Starter Bars",
-        "چاله آسانسور":"Elevator Pit",
-        "میلگرد طولی ستون":"Column Longitudinal Reinforcement",
-        "میلگرد پایینی تیر":"Beam Bottom Reinforcement",
-        "میلگرد بالایی تیر":"Beam Top Reinforcement",
-        "خاموت":"Stirrups",
-        "خاموت شناژ":"Tie Beam Stirrups",
-        "سنجاقی ستون":"Column Crossties",
-        "سنجاقی تیر":"Beam Crossties",
-        "کمرکش تیر":"Beam Side Bars",
-        "میلگرد تقویتی":"Additional Reinforcement",
-        "میلگرد انتظار":"Starter Bars",
-        "میلگرد انتظار شناژ":"Tie Beam Starters",
-        "کلاف/ژوئن":"Tie / Joint Reinforcement",
-        "سنجاقی ژوئن":"Tie / Joint Crossties",
-        "میلگرد منفی":"Negative Reinforcement",
-        "اتکا/ادکا":"Support Bars",
-        "میلگرد قائم دو وجه":"Vertical Wall Reinforcement",
-        "میلگرد افقی دو وجه":"Horizontal Wall Reinforcement",
-    }
-    def en(name):
-        return names.get(name,name)
+                g["bars"]+=int(comp.get("value",0) or 0); g["buy_weight"]+=float(comp.get("procurement_weight_kg",0) or 0)
+            elif name.endswith(" - طول خرید"): g["buy_length"]+=float(comp.get("value",0) or 0)
+    for dia,data in result.get("rebar_by_diameter",{}).items(): by_dia[float(dia)]=data
     total_w=sum(float(x.get("weight_kg",0) or 0) for x in by_dia.values())
     total_bw=sum(float(x.get("procurement_weight_kg",0) or 0) for x in by_dia.values())
     total_bars=sum(int(x.get("branches",0) or 0) for x in by_dia.values())
-    lines=["PROJECT TAKEOFF","",f"Members: {len(members)}",f"Concrete: {concrete:,.2f} m³",f"Rebar: {total_w:,.2f} kg",f"Stock Bars: {total_bars:,} pcs",f"Procurement Weight: {total_bw:,.2f} kg","","REBAR SUMMARY","","Type | Dia | Pieces | Exec. Length | Exec. Weight | Stock Bars | Buy Length | Buy Weight"]
-    for (base,dia),g in sorted(by_type.items(), key=lambda x:(x[0][0],x[0][1])):
-        lines.append(f"{en(base)} | Ø{dia:g} | {g['pieces']:,} | {g['length']:,.2f} m | {g['weight']:,.2f} kg | {g['bars']:,} | {g['buy_length']:,.2f} m | {g['buy_weight']:,.2f} kg")
-    lines += ["","PROCUREMENT BY DIAMETER","","Dia | Exec. Length | Exec. Weight | Stock Bars | Buy Length | Buy Weight"]
+    lines=[L("report",lang),"",f"{L('members',lang)}: {len(members)}",f"{L('concrete',lang)}: {concrete:,.2f}",
+           f"{L('rebar_exec',lang)}: {total_w:,.2f}",f"{L('stock',lang)}: {total_bars:,}",f"{L('rebar_buy',lang)}: {total_bw:,.2f}","",
+           L("rebar_type",lang),"",f"{L('rebar_type',lang)} | {L('dia',lang)} | {L('pieces',lang)} | {L('exec_len',lang)} | {L('exec_weight',lang)} | {L('stock_bars',lang)} | {L('buy_len',lang)} | {L('buy_weight',lang)}"]
+    for (base,dia),g in sorted(by_type.items(),key=lambda x:(x[0][0],x[0][1])):
+        lines.append(f"{item_label(base,lang)} | Φ{dia:g} | {g['pieces']:,} | {g['length']:,.2f} | {g['weight']:,.2f} | {g['bars']:,} | {g['buy_length']:,.2f} | {g['buy_weight']:,.2f}")
+    lines += ["",L("procurement",lang),"",f"{L('dia',lang)} | {L('exec_len',lang)} | {L('exec_weight',lang)} | {L('stock_bars',lang)} | {L('buy_len',lang)} | {L('buy_weight',lang)}"]
     for dia,d in sorted(by_dia.items()):
-        lines.append(f"Ø{dia:g} | {float(d.get('length_m',0)):,.2f} m | {float(d.get('weight_kg',0)):,.2f} kg | {int(d.get('branches',0)):,} | {float(d.get('procurement_length_m',0)):,.2f} m | {float(d.get('procurement_weight_kg',0)):,.2f} kg")
+        lines.append(f"Φ{dia:g} | {float(d.get('length_m',0)):,.2f} | {float(d.get('weight_kg',0)):,.2f} | {int(d.get('branches',0)):,} | {float(d.get('procurement_length_m',0)):,.2f} | {float(d.get('procurement_weight_kg',0)):,.2f}")
     qa=result.get("qa",{})
-    lines += ["","QA",f"Status: {'OK' if qa.get('ok') else 'CHECK REQUIRED'}"]
+    lines += ["",L("qa",lang),f"{L('status',lang)}: {L('ok',lang) if qa.get('ok') else L('check',lang)}"]
     return "\n".join(lines)
 
 def rcomps(title,r,note=""):
