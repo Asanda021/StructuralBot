@@ -50,7 +50,7 @@ def section_menu():
       [InlineKeyboardButton("🧱 دیوار",callback_data="sec|دیوار"),InlineKeyboardButton("🪜 پله",callback_data="sec|پله")],
       [InlineKeyboardButton("🔩 آرماتور/مدفون",callback_data="sec|آرماتور")],
       [InlineKeyboardButton("➕ آیتم سفارشی",callback_data="sec|سایر")],
-      [InlineKeyboardButton("🏁 پایان متره",callback_data="finish_takeoff")],[InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
+      [InlineKeyboardButton("🏁 پایان متره",callback_data="confirm_project")],[InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
     ])
 
 def type_menu(section):
@@ -71,12 +71,6 @@ def type_menu(section):
     rows.append([InlineKeyboardButton("⬅️ مرحله قبل",callback_data="choose_section")])
     return InlineKeyboardMarkup(rows)
 
-def review_menu():
-    return InlineKeyboardMarkup([
-      [InlineKeyboardButton("✏️ اصلاح/حذف",callback_data="edit_members"),InlineKeyboardButton("➕ افزودن",callback_data="choose_section")],
-      [InlineKeyboardButton("✅ تأیید نهایی",callback_data="confirm_project")],
-      [InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back"),InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
-    ])
 
 def report_menu():
     return InlineKeyboardMarkup([
