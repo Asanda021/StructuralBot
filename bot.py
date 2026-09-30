@@ -106,6 +106,21 @@ def schema(section,typ):
                 ("قطر حرارتی","mm"),("فاصله حرارتی","cm")]
     return [("مقدار/حجم بتن","m³"),("وزن میلگرد","kg")]
 
+def field_menu(rv=None, unit=""):
+    rows=[]
+    if rv is not None:
+        rows.append([InlineKeyboardButton(f"⚡ مقدار آماده: {rv} {unit}",callback_data=f"ready|{rv}")])
+    rows.append([
+        InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back_field"),
+        InlineKeyboardButton("📋 ورودی‌ها",callback_data="show_inputs")
+    ])
+    rows.append([
+        InlineKeyboardButton("❌ لغو عضو",callback_data="cancel_member"),
+        InlineKeyboardButton("🏠 منو",callback_data="home")
+    ])
+    rows.append([InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
+    return InlineKeyboardMarkup(rows)
+
 def ask_text(name,fields,section,typ):
     label,unit=fields[0]
     rv=ready_value(section,typ,label)
@@ -311,6 +326,24 @@ async def callback(update,context):
             await update.effective_message.reply_document(open(x,"rb"),caption="📊 Excel - متره جامع")
             await update.effective_message.reply_document(open(p,"rb"),caption="📄 PDF - متره جامع")
         return
+    if data=="show_inputs":
+        queue=context.user_data.get("current_queue",[])
+        values=context.user_data.get("current_values",[])
+        history=context.user_data.get("current_history",[])
+        lines=["📋 <b>وضعیت ورود اطلاعات</b>","",f"عضو: <b>{context.user_data.get('current_type','')}</b>"]
+        if history:
+            for i,(label,unit) in enumerate(history):
+                lines.append(f"✅ {label}: <b>{fmt(values[i])}</b> {unit}")
+        if queue:
+            label,unit=queue[0]
+            lines += ["",f"⏳ مرحله فعلی: <b>{label}</b> ({unit})"]
+        await q.edit_message_text("\n".join(lines),parse_mode="HTML",reply_markup=field_menu(ready_value(context.user_data.get("current_section",""),context.user_data.get("current_type",""),queue[0][0]) if queue else None,queue[0][1] if queue else ""))
+        return
+    if data=="cancel_member":
+        for k in ("current_section","current_type","current_values","current_queue","current_history","current_edit","current_preset"):
+            context.user_data.pop(k,None)
+        await q.edit_message_text("❌ <b>ورود این عضو لغو شد.</b>\n\nمی‌توانی عضو دیگری را انتخاب کنی.",parse_mode="HTML",reply_markup=section_menu())
+        return
     if data=="back_field":
         values=context.user_data.get("current_values",[])
         history=context.user_data.get("current_history",[])
@@ -387,7 +420,7 @@ async def ask_next_message(update,context):
             buttons.append([InlineKeyboardButton(f"⚡ استفاده از مقدار آماده: {rv} {unit}",callback_data=f"ready|{rv}")])
         buttons.append([InlineKeyboardButton("⬅️ اصلاح مرحله قبل",callback_data="back_field")])
         buttons.append([InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
-        await update.message.reply_text(f"⏳ ثبت شد.\n\nمرحله بعد: <b>{label}</b> ({unit}){ready}",parse_mode="HTML",reply_markup=InlineKeyboardMarkup(buttons))
+        await update.message.reply_text(f"⏳ ثبت شد.\n\nمرحله بعد: <b>{label}</b> ({unit}){ready}",parse_mode="HTML",reply_markup=field_menu(rv,unit))
     else:
         class Q:
             async def edit_message_text(self,*a,**kw): await update.message.reply_text(*a,**kw)
