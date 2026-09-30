@@ -168,7 +168,7 @@ from handlers.foundation import (
 
 from handlers.columns import (
     columns_callback,
-    column_message,
+    get_column_message_handler,
 )
 
 
@@ -178,7 +178,7 @@ from handlers.columns import (
 
 from handlers.beams import (
     beams_callback,
-    beam_message,
+    get_beam_message_handler,
 )
 
 
@@ -188,7 +188,7 @@ from handlers.beams import (
 
 from handlers.slabs import (
     slabs_callback,
-    slab_message,
+    get_slab_message_handler,
 )
 
 
@@ -207,7 +207,7 @@ from handlers.rebar import (
 
 from handlers.equivalency import (
     equivalency_callback,
-    equivalency_message,
+    get_equivalency_message_handler,
 )
 
 
@@ -217,7 +217,7 @@ from handlers.equivalency import (
 
 from handlers.quantities import (
     quantities_callback,
-    quantities_message,
+    get_quantities_message_handler,
 )
 
 
@@ -255,6 +255,15 @@ from handlers.account import (
 
 from handlers.settings import (
     settings_callback,
+)
+
+
+# ---------------------------------------------------------
+# DESIGN CODES
+# ---------------------------------------------------------
+
+from handlers.codes import (
+    code_callback,
 )
 
 
@@ -966,6 +975,17 @@ def create_application() -> Application:
     )
 
     # =====================================================
+    # DESIGN CODES
+    # =====================================================
+
+    application.add_handler(
+        CallbackQueryHandler(
+            code_callback,
+            pattern=r"^(?:codes:list|codecountry:.*|codeset:.*)$",
+        ),
+    )
+
+    # =====================================================
     # GENERAL CALCULATIONS
     # =====================================================
 
@@ -1170,6 +1190,44 @@ def create_application() -> Application:
     )
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, quantities_message),
+        group=0,
+    )
+
+    # =====================================================
+    # STATEFUL TEXT INPUTS
+    # =====================================================
+
+    application.add_handler(
+        get_column_message_handler(),
+        group=0,
+    )
+    application.add_handler(
+        get_beam_message_handler(),
+        group=0,
+    )
+    application.add_handler(
+        get_slab_message_handler(),
+        group=0,
+    )
+    application.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            get_equivalency_message_handler(),
+        ),
+        group=0,
+    )
+    application.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            get_quantities_message_handler(),
+        ),
+        group=0,
+    )
+    application.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            ai_message,
+        ),
         group=0,
     )
 
