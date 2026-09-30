@@ -13,7 +13,7 @@ class Database:
             CREATE TABLE IF NOT EXISTS users(user_id INTEGER PRIMARY KEY,name TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
             CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active',created_at TEXT DEFAULT CURRENT_TIMESTAMP,updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
             CREATE TABLE IF NOT EXISTS project_estimates(id INTEGER PRIMARY KEY AUTOINCREMENT,project_id INTEGER NOT NULL,inputs_json TEXT NOT NULL,result_json TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE);
-            CREATE TABLE IF NOT EXISTS calculations(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER,title TEXT NOT NULL,result TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL);\n            CREATE TABLE IF NOT EXISTS user_settings(user_id INTEGER PRIMARY KEY,language TEXT NOT NULL DEFAULT "fa",calc_mode TEXT NOT NULL DEFAULT "detailed");
+            CREATE TABLE IF NOT EXISTS calculations(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER,title TEXT NOT NULL,result TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL);\n            CREATE TABLE IF NOT EXISTS user_settings(user_id INTEGER PRIMARY KEY,language TEXT NOT NULL DEFAULT "fa",calc_mode TEXT NOT NULL DEFAULT "detailed",unit_system TEXT NOT NULL DEFAULT "metric",concrete_grade TEXT NOT NULL DEFAULT "C25",rebar_grade TEXT NOT NULL DEFAULT "A3",standard TEXT NOT NULL DEFAULT "iran",stock_length_m REAL NOT NULL DEFAULT 12.0);
             """)
     def ensure_user(self,user_id,name):
         with self.connect() as c: c.execute("INSERT INTO users(user_id,name) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET name=excluded.name",(user_id,name))
@@ -37,17 +37,24 @@ class Database:
             row=c.execute("SELECT pe.project_id,p.name,pe.inputs_json,pe.result_json FROM project_estimates pe JOIN projects p ON p.id=pe.project_id WHERE p.user_id=? ORDER BY pe.id DESC LIMIT 1",(user_id,)).fetchone()
         if not row:return None
         return {"project_id":row[0],"project_name":row[1],"inputs":json.loads(row[2]),"result":json.loads(row[3])}
-    def set_settings(self,user_id,language=None,calc_mode=None):
+    def set_settings(self,user_id,language=None,calc_mode=None,unit_system=None,concrete_grade=None,rebar_grade=None,standard=None,stock_length_m=None):
         with self.connect() as c:
-            row=c.execute("SELECT language,calc_mode FROM user_settings WHERE user_id=?",(user_id,)).fetchone()
-            lang=language or (row[0] if row else "fa")
-            mode=calc_mode or (row[1] if row else "detailed")
-            c.execute("INSERT INTO user_settings(user_id,language,calc_mode) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET language=excluded.language,calc_mode=excluded.calc_mode",(user_id,lang,mode))
+            row=c.execute("SELECT language,calc_mode,unit_system,concrete_grade,rebar_grade,standard,stock_length_m FROM user_settings WHERE user_id=?",(user_id,)).fetchone()
+            vals=list(row) if row else ["fa","detailed","metric","C25","A3","iran",12.0]
+            vals[0]=language or vals[0]; vals[1]=calc_mode or vals[1]; vals[2]=unit_system or vals[2]
+            vals[3]=concrete_grade or vals[3]; vals[4]=rebar_grade or vals[4]; vals[5]=standard or vals[5]
+            vals[6]=float(stock_length_m) if stock_length_m is not None else vals[6]
+            c.execute("""INSERT INTO user_settings(user_id,language,calc_mode,unit_system,concrete_grade,rebar_grade,standard,stock_length_m)
+                         VALUES(?,?,?,?,?,?,?,?)
+                         ON CONFLICT(user_id) DO UPDATE SET language=excluded.language,calc_mode=excluded.calc_mode,
+                         unit_system=excluded.unit_system,concrete_grade=excluded.concrete_grade,rebar_grade=excluded.rebar_grade,
+                         standard=excluded.standard,stock_length_m=excluded.stock_length_m""",(user_id,*vals))
+
 
     def settings(self,user_id):
         with self.connect() as c:
             row=c.execute("SELECT language,calc_mode FROM user_settings WHERE user_id=?",(user_id,)).fetchone()
-        return {"language":row[0],"calc_mode":row[1]} if row else {"language":"fa","calc_mode":"detailed"}
+        return {"language":row[0],"calc_mode":row[1],"unit_system":row[2],"concrete_grade":row[3],"rebar_grade":row[4],"standard":row[5],"stock_length_m":row[6]} if row else {"language":"fa","calc_mode":"detailed","unit_system":"metric","concrete_grade":"C25","rebar_grade":"A3","standard":"iran","stock_length_m":12.0}
 
     def last_calc(self,user_id):
         with self.connect() as c:return c.execute("SELECT title,result FROM calculations WHERE user_id=? ORDER BY id DESC LIMIT 1",(user_id,)).fetchone()
