@@ -87,7 +87,7 @@ def main():
     cl = result["cut_list"]["16.0"]
     assert cl["pieces_count"] == 3
     assert cl["stock_bars"] == 2
-    assert cl["used_length_m"] == 17.55
+    assert abs(cl["used_length_m"] - 17.55) < 1e-9
     assert result["concrete_total_m3"] == 0
 
     # QA must flag missing concrete/rebar rather than silently inventing values.
