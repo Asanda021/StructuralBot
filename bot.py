@@ -271,7 +271,7 @@ def input_keyboard(values=None, unit="", compound=None):
     if row: rows.append(row)
     rows.append([KeyboardButton("✏️ ورود دستی")])
     rows.append([KeyboardButton("⬅️ مرحله قبل"), KeyboardButton("📋 ورودی‌ها")])
-    rows.append([KeyboardButton("❌ لغو عضو"), KeyboardButton("🏠 منو")])
+    rows.append([KeyboardButton("❌ لغو ورود عضو"), KeyboardButton("🏠 منو")])
     rows.append([KeyboardButton("🔄 شروع مجدد")])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True, one_time_keyboard=False, is_persistent=True,
                                input_field_placeholder="مقدار آماده را انتخاب کن یا ورود دستی بزن")
@@ -285,7 +285,7 @@ def field_menu(values=None, unit="", compound=None):
     if row: rows.append(row)
     rows.append([InlineKeyboardButton("✏️ ورود دستی",callback_data="manual")])
     rows.append([InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back_field"),InlineKeyboardButton("📋 ورودی‌ها",callback_data="show_inputs")])
-    rows.append([InlineKeyboardButton("❌ لغو عضو",callback_data="cancel_member"),InlineKeyboardButton("🏠 منو",callback_data="home")])
+    rows.append([InlineKeyboardButton("❌ لغو ورود عضو",callback_data="cancel_member"),InlineKeyboardButton("🏠 منو",callback_data="home")])
     rows.append([InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
     return InlineKeyboardMarkup(rows)
 
@@ -941,7 +941,7 @@ async def callback(update,context):
     if data=="cancel_member":
         for k in ("current_section","current_type","current_values","current_queue","current_history","current_edit","current_preset"):
             context.user_data.pop(k,None)
-        await q.edit_message_text("❌ <b>ورود این عضو لغو شد.</b>\n\nمی‌توانی عضو دیگری را انتخاب کنی.",parse_mode="HTML",reply_markup=section_menu())
+        await q.edit_message_text("❌ <b>فرآیند ورود این عضو لغو شد.</b>\n\nمی‌توانی عضو دیگری را انتخاب کنی.",parse_mode="HTML",reply_markup=section_menu())
         return
     if data=="member_prev":
         values=context.user_data.get("current_values",[])
@@ -1105,7 +1105,7 @@ async def message(update,context):
                 ready_options(context.user_data.get("current_section",""),context.user_data.get("current_type",""),queue[0][0]) if queue else [],
                 queue[0][1] if queue else ""))
         return
-    if text=="❌ لغو عضو":
+    if text=="❌ لغو ورود عضو":
         for k in ("current_section","current_type","current_values","current_queue","current_history","current_edit","current_preset"):
             context.user_data.pop(k,None)
         await update.message.reply_text("❌ <b>ورود این عضو لغو شد.</b>",parse_mode="HTML",reply_markup=section_menu())
