@@ -266,11 +266,12 @@ async def callback(update,context):
         await show_member_types(q,data.split("|",1)[1]); return
     if data.startswith("member|"):
         _,section,typ=data.split("|",2)
-        context.user_data.update({"current_section":section,"current_type":typ,"current_values":[],"current_queue":schema(section,typ),"current_edit":None,"current_preset":presets_for(section,typ)})
+        context.user_data.update({"current_section":section,"current_type":typ,"current_values":[],"current_queue":schema(section,typ),"current_history":[],"current_edit":None,"current_preset":presets_for(section,typ)})
         await ask_next(q,context); return
     if data.startswith("edit|"):
         idx=int(data.split("|")[1]); m=context.user_data["members"][idx]
         context.user_data.update({"current_section":m["section"],"current_type":m["type"],"current_values":m.get("raw",[]),
+                                  "current_history":[],
                                   "current_queue":schema(m["section"],m["type"]),"current_edit":idx,"current_preset":presets_for(m["section"],m["type"])})
         await ask_next(q,context); return
     if data.startswith("delete|"):
@@ -310,9 +311,23 @@ async def callback(update,context):
             await update.effective_message.reply_document(open(x,"rb"),caption="📊 Excel - متره جامع")
             await update.effective_message.reply_document(open(p,"rb"),caption="📄 PDF - متره جامع")
         return
+    if data=="back_field":
+        values=context.user_data.get("current_values",[])
+        history=context.user_data.get("current_history",[])
+        queue=context.user_data.get("current_queue",[])
+        if values and history:
+            values.pop()
+            queue.insert(0, history.pop())
+            await ask_next(q,context)
+        else:
+            await q.edit_message_text("📚 <b>بخش سازه</b>",parse_mode="HTML",reply_markup=section_menu())
+        return
     if data.startswith("ready|"):
         value=float(data.split("|",1)[1])
-        context.user_data["current_values"].append(value); context.user_data["current_queue"].pop(0)
+        queue=context.user_data.get("current_queue",[])
+        if queue:
+            context.user_data.setdefault("current_history",[]).append(queue[0])
+            context.user_data["current_values"].append(value); queue.pop(0)
         await ask_next(q,context); return
     if data in ("pricing","settings","help"):
         msg={"pricing":"💰 قیمت‌گذاری در مرحله بعد روی همین اقلام و واحدها سوار می‌شود.",
@@ -357,6 +372,7 @@ async def message(update,context):
         try: value=float(text)
         except ValueError: await update.message.reply_text("❌ فقط عدد وارد کن."); return
         if value<0: await update.message.reply_text("❌ عدد منفی مجاز نیست."); return
+        context.user_data.setdefault("current_history",[]).append(queue[0])
         context.user_data["current_values"].append(value); context.user_data["current_queue"].pop(0)
         await ask_next_message(update,context); return
     await update.message.reply_text("از منوی زیر انتخاب کن.",reply_markup=persistent_menu())
@@ -366,7 +382,12 @@ async def ask_next_message(update,context):
         label,unit=context.user_data["current_queue"][0]
         rv=ready_value(context.user_data["current_section"],context.user_data["current_type"],label)
         ready=f"\n⚡ مقدار آماده: {rv} {unit}" if rv is not None else ""
-        await update.message.reply_text(f"⏳ ثبت شد.\n\nمرحله بعد: <b>{label}</b> ({unit}){ready}",parse_mode="HTML",reply_markup=back_home())
+        buttons=[]
+        if rv is not None:
+            buttons.append([InlineKeyboardButton(f"⚡ استفاده از مقدار آماده: {rv} {unit}",callback_data=f"ready|{rv}")])
+        buttons.append([InlineKeyboardButton("⬅️ اصلاح مرحله قبل",callback_data="back_field")])
+        buttons.append([InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
+        await update.message.reply_text(f"⏳ ثبت شد.\n\nمرحله بعد: <b>{label}</b> ({unit}){ready}",parse_mode="HTML",reply_markup=InlineKeyboardMarkup(buttons))
     else:
         class Q:
             async def edit_message_text(self,*a,**kw): await update.message.reply_text(*a,**kw)
