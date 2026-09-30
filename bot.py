@@ -15,7 +15,7 @@ from app.engine import (
     foundation_calc, column_calc, beam_calc, slab_calc,
     concrete_for_dimensions, rebar_equivalent,
 )
-from app.keyboards import main_menu, calc_menu, back_menu
+from app.keyboards import main_menu, calc_menu, rebar_menu, back_menu
 
 TOKEN = os.getenv("BOT_TOKEN")
 DB_PATH = os.getenv("DATABASE_PATH", "/tmp/structuralbot.db")
@@ -123,7 +123,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if data == "quantity":
+    if data == "rebar":\n        context.user_data.clear()\n        await q.edit_message_text("🔩 ابزارهای میلگرد:", reply_markup=rebar_menu())\n        return\n\n    if data == "rebar_eq":\n        context.user_data["step"] = "rebar_eq"\n        await q.edit_message_text(\n            "🔄 <b>معادل‌سازی میلگرد</b>\\n\\nدو قطر را با کاما بفرست.\\nمثال: <code>16, 20</code>",\n            parse_mode="HTML", reply_markup=back_menu(),\n        )\n        return\n\n    if data == "bbs":\n        context.user_data["step"] = "bbs"\n        await q.edit_message_text(\n            "📋 <b>BBS / Cut List</b>\\n\\nقطر، تعداد و طول هر قطعه را با کاما بفرست.\\nمثال: <code>16, 20, 8.5</code>",\n            parse_mode="HTML", reply_markup=back_menu(),\n        )\n        return\n\n    if data == "codes":\n        await q.edit_message_text(\n            "📚 <b>کدهای طراحی</b>\\n\\nنسخه سبک فعلی ورودی کد را جدا نگه می‌دارد.\\nدر فاز بعد کدهای ایران و سایر کشورها به‌صورت Adapter اضافه می‌شوند.",\n            parse_mode="HTML", reply_markup=back_menu(),\n        )\n        return\n\n    if data == "quantity":
         context.user_data["step"] = "quantity"
         await q.edit_message_text(
             "🧮 <b>برآورد بتن</b>\n\n"
@@ -204,12 +204,12 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ پروژه «{text}» ذخیره شد.", reply_markup=main_menu())
         return
 
-    if step not in {"foundation", "column", "beam", "slab", "quantity", "rebar"}:
+    if step not in {"foundation", "column", "beam", "slab", "quantity", "rebar_eq", "bbs"}:
         await update.message.reply_text("از منوی زیر یک گزینه انتخاب کن.", reply_markup=main_menu())
         return
 
     try:
-        count = 2 if step == "rebar" else 3
+        count = 2 if step == "rebar_eq" else 3
         values = parse_numbers(text, count)
         if step == "foundation":
             title, result = "پی", foundation_calc(*values)
@@ -224,7 +224,7 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             title, result = "معادل‌سازی میلگرد", rebar_equivalent(*values)
     except (ValueError, TypeError):
-        example = "16, 20" if step == "rebar" else "0.30, 5, 4"
+        example = "16, 20" if step == "rebar_eq" else ("16, 20, 8.5" if step == "bbs" else "0.30, 5, 4")
         await update.message.reply_text(f"❌ ورودی نامعتبر است. مثال: {example}")
         return
 
