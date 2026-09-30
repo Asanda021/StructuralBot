@@ -1,20 +1,24 @@
 services:
-  - type: web
+  - type: worker
     name: structuralbot
     runtime: python
-    plan: free
+    plan: 0.5c-512mb
     region: frankfurt
     buildCommand: pip install -r requirements.txt
     startCommand: python bot.py
     numInstances: 1
-    healthCheckPath: /health
+    maxShutdownDelaySeconds: 30
+    disk:
+      name: structuralbot-data
+      mountPath: /var/data
+      sizeGB: 10
     envVars:
       - key: APP_ENV
         value: production
       - key: APP_NAME
         value: StructuralBot
       - key: DATABASE_PATH
-        value: /tmp/structuralbot.db
+        value: /var/data/structuralbot.db
       - key: SECRET_KEY
         generateValue: true
       - key: REDACT_SENSITIVE_DATA
