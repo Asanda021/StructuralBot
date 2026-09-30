@@ -594,6 +594,8 @@ async def callback(update,context):
         _,section,typ=data.split("|",2)
         sc=schema(section,typ)
         preset_values=list(COMPOUND_PRESETS.get(section,{}).get(typ,[]))
+        if section=="فونداسیون" and typ=="پی منفرد":
+            preset_values=[]
         context.user_data.update({"current_section":section,"current_type":typ,"current_values":preset_values,
                                   "current_queue":sc[len(preset_values):],"current_history":[],"current_edit":None,"current_preset":presets_for(section,typ)})
         await ask_next(q,context); return
@@ -620,7 +622,31 @@ async def callback(update,context):
         rows.append([InlineKeyboardButton("⬅️ بازبینی",callback_data="finish_takeoff")])
         await q.edit_message_text("✏️ <b>اصلاح یا حذف عضو</b>",parse_mode="HTML",reply_markup=InlineKeyboardMarkup(rows)); return
     if data=="finish_takeoff": await review(q,context); return
-    if data=="confirm_project": await save_final(update,context); return
+    if data=="confirm_project":
+        ms=context.user_data.get("members",[])
+        qa=quality_check_members(ms)
+        result=estimate_members(ms) if ms else {"concrete_total_m3":0,"rebar_by_diameter":{}}
+        concrete=result.get("concrete_total_m3",0)
+        rebar=sum(float(x.get("weight_kg",0)) for x in result.get("rebar_by_diameter",{}).values())
+        warnings=len(qa.get("warnings",[]))
+        await q.edit_message_text(
+            "🔐 <b>تأیید نهایی پروژه</b>\\n\\n"
+            f"پروژه: <b>{context.user_data.get('project_name','-')}</b>\\n"
+            f"تعداد اعضا: <b>{len(ms)}</b>\\n"
+            f"بتن: <b>{fmt(concrete)} m³</b>\\n"
+            f"وزن میلگرد اجرا: <b>{fmt(rebar)} kg</b>\\n"
+            f"هشدار کنترل: <b>{warnings}</b>\\n\\n"
+            "بعد از ذخیره نهایی، گزارش پروژه به‌عنوان آخرین متره ثبت می‌شود.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("💾 تأیید و ذخیره نهایی",callback_data="final_save")],
+                [InlineKeyboardButton("✏️ اصلاح",callback_data="edit_members")],
+                [InlineKeyboardButton("⬅️ بازگشت به بازبینی",callback_data="finish_takeoff")]
+            ])
+        )
+        return
+    if data=="final_save":
+        await save_final(update,context); return
     if data=="back":
         await q.edit_message_text("📚 <b>بخش سازه</b>",parse_mode="HTML",reply_markup=section_menu()); return
     if data=="table":
@@ -827,9 +853,30 @@ async def ask_next_message(update,context):
             reply_markup=input_keyboard(options,unit,compound_options(context.user_data["current_section"],context.user_data["current_type"],label))
         )
     else:
-        class Q:
-            async def edit_message_text(self,*a,**kw): await update.message.reply_text(*a,**kw)
-        await finish_member(Q(),context)
+        await finish_member_message(update,context)
+
+async def finish_member_message(update,context):
+    section=context.user_data["current_section"]; typ=context.user_data["current_type"]; vals=context.user_data["current_values"]
+    try:
+        comps=calc_member(section,typ,vals)
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطا در محاسبه: {e}")
+        return
+    idx=context.user_data.get("current_edit")
+    m={"section":section,"member":f"{section} {typ}","type":typ,"quantity":1,"components":comps,"raw":vals}
+    if idx is None:
+        context.user_data.setdefault("members",[]).append(m)
+    else:
+        context.user_data["members"][idx]=m
+    context.user_data["current_edit"]=None
+    await update.message.reply_text(
+        f"✅ <b>{m['member']}</b> محاسبه شد.\\n\\nبتن، میلگرد، وزن، شاخه خرید و اجزای وابسته ثبت شد.",
+        parse_mode="HTML", reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")],
+            [InlineKeyboardButton("🔎 بازبینی",callback_data="finish_takeoff")],
+            [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+        ])
+    )
 
 async def error_handler(update,context):
     if isinstance(context.error,BadRequest) and "Message is not modified" in str(context.error): return
