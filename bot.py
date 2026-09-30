@@ -202,7 +202,7 @@ def calc_member(section,typ,v):
             modules=nx*ny
             void_volume=modules*ml*mw*mh
             opening_area=oc*ol*ow if oc and ol and ow else 0
-            concrete=max(0,area*T-void_volume-opening_area*top)
+            concrete=max(0,area*T-void_volume-opening_area*T)
             comps=[{"name":"بتن سقف","value":concrete,"unit":"m³","note":f"حجم خالص {typ} پس از کسر فضای خالی ماژول و بازشو"},
                    {"name":"مساحت سقف","value":area,"unit":"m²"},{"name":"تعداد ماژول خالی","value":modules,"unit":"عدد"},
                    {"name":"حجم فضای خالی","value":void_volume,"unit":"m³"},{"name":"مساحت بازشو","value":opening_area,"unit":"m²"}]
@@ -319,7 +319,11 @@ def reset(context,name):
 
 async def review(q,context):
     ms=context.user_data.get("members",[])
+    qa=quality_check_members(ms)
     lines=["🔎 <b>بازبینی کامل متره</b>","",f"پروژه: <b>{context.user_data.get('project_name')}</b>"]
+    lines += ["",f"کنترل خودکار: <b>{'بدون هشدار' if qa['ok'] else str(len(qa['warnings']))+' هشدار'}</b>"]
+    for w in qa.get('warnings',[])[:12]:
+        lines.append(f"⚠️ {w}")
     for i,m in enumerate(ms,1):
         lines.append(f"\n<b>{i}. {m['member']}</b> | {m['section']} | {m['type']}")
         for c in m["components"]: lines.append(f"• {c['name']}: {fmt(c['value'])} {c['unit']}")
