@@ -35,3 +35,17 @@ def rebar_equivalent(d1, d2):
         f"سطح مقطع Φ{d2:g} (mm²)": a2,
         f"تعداد Φ{d2:g} معادل 1×Φ{d1:g}": a1/a2,
     }
+
+def bbs_cutlist(diameter, count, length):
+    _positive(diameter, count, length)
+    pieces = math.ceil(length / 12)
+    total_length = count * length
+    kg_per_m = diameter**2 / 162
+    total_weight = total_length * kg_per_m
+    return {
+        "تعداد میلگرد": count,
+        "طول هر میلگرد (m)": length,
+        "تعداد قطعه 12 متری موردنیاز": pieces * count,
+        "طول کل (m)": total_length,
+        "وزن تقریبی (kg)": total_weight,
+    }
