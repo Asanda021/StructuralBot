@@ -10,17 +10,110 @@ def rebar_weight(diameter_mm, length_m):
     d=_num(diameter_mm); l=_num(length_m)
     return d*d/162.0*l
 
+REBAR_GRADE_FY_MPA = {
+    "A1": 240.0, "A2": 300.0, "A3": 400.0, "A4": 500.0,
+    "S240": 240.0, "S300": 300.0, "S400": 400.0, "S500": 500.0,
+}
+
+def _grade_number(value, default):
+    text=str(value or "").upper().replace(" ", "")
+    for key, fy in REBAR_GRADE_FY_MPA.items():
+        if key in text:
+            return fy
+    return float(default)
+
+def _concrete_strength_mpa(value, default=25.0):
+    text=str(value or "").upper().replace(" ", "")
+    if text.startswith("C"):
+        try:
+            return float(text[1:])
+        except ValueError:
+            pass
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+def development_length_tension(diameter_mm, concrete_grade="C25", rebar_grade="A3",
+                               top_bar=False, cb_over_db=1.0, ktr_over_db=0.0):
+    """Automatic tension development length using the Mبحث 9 Chapter 21 framework.
+
+    The exact value depends on concrete cover/spacing, transverse reinforcement,
+    bar position and steel grade. When those drawing details are not available,
+    the engine uses a conservative internal cb/db fallback and Ktr=0.
+    """
+    d=_num(diameter_mm)
+    fc=_concrete_strength_mpa(concrete_grade)
+    fy=_grade_number(rebar_grade, 400.0)
+    if fc <= 0 or fy <= 0:
+        raise ValueError("مقاومت بتن/میلگرد برای محاسبه طول مهاری نامعتبر است")
+    psi_t=1.3 if top_bar else 1.0
+    psi_e=1.0
+    psi_s=0.8 if d <= 20.0 else 1.0
+    psi_g=1.0
+    ratio=max(0.1, min(float(cb_over_db)+float(ktr_over_db), 2.5))
+    ld_mm=(fy*psi_t*psi_e*psi_s*psi_g)/(1.1*math.sqrt(fc)*ratio)*d
+    ld_mm=max(ld_mm, 300.0, 12.0*d)
+    return {
+        "ld_m":ld_mm/1000.0, "ld_mm":ld_mm, "diameter_mm":d,
+        "concrete_grade":str(concrete_grade or "C25"),
+        "rebar_grade":str(rebar_grade or "A3"),
+        "psi_t":psi_t, "psi_s":psi_s, "psi_e":psi_e, "psi_g":psi_g,
+        "cb_over_db_used":ratio, "ktr_over_db_used":float(ktr_over_db),
+        "basis":"مبحث ۹، فصل ۹-۲۱؛ طول مهاری کششی",
+    }
+
+def lap_splice_length_tension(diameter_mm, concrete_grade="C25", rebar_grade="A3",
+                              top_bar=False, splice_class="B", cb_over_db=1.0):
+    """Automatic tensile lap length; Type B is the default when the drawing
+    only says that a long bar must be spliced."""
+    ld=development_length_tension(
+        diameter_mm, concrete_grade, rebar_grade, top_bar,
+        cb_over_db=cb_over_db, ktr_over_db=0.0
+    )
+    factor=1.0 if str(splice_class).upper()=="A" else 1.3
+    lap_mm=max(300.0, factor*ld["ld_mm"])
+    return {**ld, "lap_m":lap_mm/1000.0, "lap_mm":lap_mm,
+            "splice_class":"A" if factor==1.0 else "B",
+            "basis":"مبحث ۹، بند ۹-۲۱-۴؛ وصله پوششی کششی"}
+
+def automatic_cut_lengths(length_m, diameter_mm, stock_length_m=12.0,
+                          concrete_grade="C25", rebar_grade="A3",
+                          top_bar=False, cb_over_db=1.0):
+    """Split a long drawing bar into stock-length pieces with automatic code lap."""
+    L=_num(length_m); d=_num(diameter_mm); stock=_num(stock_length_m)
+    if L <= stock + 1e-9:
+        return {"cut_lengths_m":[L],"splice_count":0,"lap_m":0.0,"development":None}
+    lap=lap_splice_length_tension(
+        d, concrete_grade, rebar_grade, top_bar, splice_class="B",
+        cb_over_db=cb_over_db
+    )
+    lap_m=lap["lap_m"]
+    if lap_m >= stock:
+        raise ValueError("طول وصله محاسبه‌شده برای شاخه استاندارد مناسب نیست")
+    pieces=max(2, math.ceil((L-lap_m)/(stock-lap_m)))
+    advance=stock-lap_m
+    last=L-(pieces-1)*advance
+    while last > stock + 1e-9:
+        pieces += 1
+        last=L-(pieces-1)*advance
+    if last <= 0:
+        raise ValueError("تقسیم خودکار طول میلگرد نامعتبر است")
+    cuts=[stock]*(pieces-1)+[last]
+    return {"cut_lengths_m":cuts,"splice_count":pieces-1,"lap_m":lap_m,"development":lap}
+
 def rebar_summary(diameter_mm, total_length_m, stock_length_m=12.0, waste_percent=0.0):
     d=_num(diameter_mm); total=_num(total_length_m); stock=_num(stock_length_m)
     waste_pct=_num(waste_percent)
     waste_length=total*waste_pct/100.0
-    procurement_length=total+waste_length
-    branches=math.ceil(procurement_length/stock) if procurement_length else 0
+    required_length=total+waste_length
+    branches=math.ceil(required_length/stock) if required_length else 0
+    procurement_length=branches*stock
     return {"diameter_mm":d,"length_m":total,"weight_kg":rebar_weight(d,total),
             "stock_length_m":stock,"branches":branches,
             "waste_percent":waste_pct,"waste_length_m":waste_length,
             "procurement_length_m":procurement_length,
-            "procurement_weight_kg":rebar_weight(d,branches*stock)}
+            "procurement_weight_kg":rebar_weight(d,procurement_length)}
 
 def grid_rebar(area_l, area_w, diameter_mm, spacing_cm, stock_length_m=12.0):
     L=_num(area_l); W=_num(area_w); s=_num(spacing_cm)/100
@@ -60,13 +153,23 @@ def adjusted_bar_length(straight_m, bend_m=0.0, hook_m=0.0, lap_m=0.0):
     return _num(straight_m)+_num(bend_m)+_num(hook_m)+_num(lap_m)
 
 def repeated_bar_rebar(count, length_each_m, diameter_mm, stock_length_m=12.0,
-                       bend_m=0.0, hook_m=0.0, lap_m=0.0, waste_percent=0.0):
+                       bend_m=0.0, hook_m=0.0, lap_m=0.0, waste_percent=0.0,
+                       concrete_grade="C25", rebar_grade="A3", top_bar=False):
     n=math.ceil(_num(count)); L=_num(length_each_m)
+    # Legacy parameters remain for compatibility with old saved projects.
+    # Normal bot input no longer asks the user to enter bend/hook/lap lengths.
     cut_each=adjusted_bar_length(L,bend_m,hook_m,lap_m)
+    plan=automatic_cut_lengths(
+        cut_each, diameter_mm, stock_length_m,
+        concrete_grade=concrete_grade, rebar_grade=rebar_grade, top_bar=top_bar
+    )
     return {"count_bars":n,"length_each_m":L,"cut_length_each_m":cut_each,
-            "cut_lengths_m":[cut_each]*n,
-            "bend_m":_num(bend_m),"hook_m":_num(hook_m),"lap_m":_num(lap_m),
-            **rebar_summary(diameter_mm,n*cut_each,stock_length_m,waste_percent)}
+            "cut_lengths_m":plan["cut_lengths_m"]*n,
+            "bend_m":_num(bend_m),"hook_m":_num(hook_m),
+            "lap_m":plan["lap_m"] if plan["splice_count"] else _num(lap_m),
+            "splice_count":plan["splice_count"]*n,
+            "development":plan["development"],
+            **rebar_summary(diameter_mm,sum(plan["cut_lengths_m"])*n,stock_length_m,waste_percent)}
 
 SLAB_TYPES={
  "تیرچه تک":{"concrete_coeff":0.18,"joist_factor":1,"block_kind":"یونولیتی"},
@@ -264,9 +367,9 @@ def estimate_members(members):
                            "مقادیر میلگرد اجرایی، طول، وزن و شاخه خرید جداگانه ثبت می‌شوند.",
                            "شاخه استاندارد پیش‌فرض ۱۲ متر است.",
                            "برای بازشوهای سقف، حجم بتن از مساحت خالص کسر می‌شود؛ آرماتور اطراف بازشو باید از دیتیل نقشه وارد شود.",
-                           "قطعات خم‌دار با طول مستقیم، خم، قلاب و وصله به‌صورت جداگانه قابل ثبت هستند؛ ضریب مخفی اعمال نمی‌شود.",
-            "تعداد شاخه خرید بر اساس طول خرید و شاخه استاندارد محاسبه می‌شود؛ برای برش بهینه، Cut List واقعی قطعات لازم است.",
-                           "هر قطعه بزرگ‌تر از ۱۲ متر باید در نقشه/دیتیل دارای وصله یا تقسیم طول باشد؛ موتور خودسرانه وصله ایجاد نمی‌کند.",
+                           "طول مهاری و وصله پوششی میلگردهای بلند به‌صورت خودکار بر اساس قواعد فصل ۹-۲۱ و قطر میلگرد محاسبه می‌شود؛ ورود دستی خم/قلاب/وصله از کاربر حذف شده است.",
+                           "برای قطعات بلندتر از شاخه استاندارد، موتور قطعه‌بندی و وصله پوششی پیش‌فرض نوع B را در Cut List اعمال می‌کند؛ دیتیل خاص نقشه باید بر آن مقدم باشد.",
+                           "در نبود جزئیات پوشش/فاصله، موتور از پارامتر داخلی محافظه‌کارانه برای طول مهاری استفاده می‌کند و آن را در متادیتای محاسبه ثبت می‌کند.",
                            "تعداد تیرچه، یونولیت/بلوک و شبکه حرارتی از ابعاد و فواصل ورودی محاسبه می‌شود؛ مقدار نهایی باید با پلان و دیتیل اجرایی تطبیق داده شود.",
                            "این ابزار متره است و جایگزین طراحی یا کنترل نقشه مصوب نیست."]}
 
