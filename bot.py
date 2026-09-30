@@ -168,6 +168,7 @@ from handlers.foundation import (
 
 from handlers.columns import (
     columns_callback,
+    column_message,
 )
 
 
@@ -177,6 +178,7 @@ from handlers.columns import (
 
 from handlers.beams import (
     beams_callback,
+    beam_message,
 )
 
 
@@ -186,6 +188,7 @@ from handlers.beams import (
 
 from handlers.slabs import (
     slabs_callback,
+    slab_message,
 )
 
 
@@ -204,6 +207,7 @@ from handlers.rebar import (
 
 from handlers.equivalency import (
     equivalency_callback,
+    equivalency_message,
 )
 
 
@@ -213,6 +217,7 @@ from handlers.equivalency import (
 
 from handlers.quantities import (
     quantities_callback,
+    quantities_message,
 )
 
 
@@ -231,6 +236,7 @@ from handlers.reports import (
 
 from handlers.ai import (
     ai_callback,
+    ai_message,
 )
 
 
