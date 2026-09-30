@@ -624,7 +624,7 @@ async def start_cmd(update,context):
         reply_markup=language_menu(initial=True)
     )
     # Persistent bottom menu: keep it visible independently of inline menus.
-    await update.message.reply_text("منوی ثابت فعال شد.", reply_markup=persistent_menu())
+    await update.message.reply_text("\u2063", reply_markup=persistent_menu())
 def reset(context,name):
     context.user_data.clear(); context.user_data.update({"project_name":name,"members":[],"history":[]})
 
@@ -661,7 +661,7 @@ async def callback(update,context):
     if data=="home":
         context.user_data.clear()
         await q.edit_message_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu())
-        await q.message.reply_text("منوی ثابت",reply_markup=persistent_menu())
+        await q.message.reply_text("\u2063",reply_markup=persistent_menu())
         return
     if data=="calc_mode":
         await q.edit_message_text("🧮 <b>شروع برآورد</b>\n\nبرای ورود به موارد برآوردی، دکمه زیر را بزن.",parse_mode="HTML",reply_markup=calc_mode_menu())
@@ -793,7 +793,7 @@ async def callback(update,context):
             parse_mode="HTML",
             reply_markup=main_menu()
         )
-        await q.message.reply_text("",reply_markup=ReplyKeyboardRemove())
+        await q.message.reply_text("\u2063",reply_markup=persistent_menu())
         return
     if data=="restart":
         context.user_data.clear()
