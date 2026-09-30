@@ -126,7 +126,7 @@ def create_excel(result,project_name,path,lang=None):
 
     detail=wb.create_sheet(L("detail",lang)[:31])
     detail.append(["No.",L("section",lang),L("member",lang),L("item",lang),L("quantity",lang),L("unit",lang),L("notes",lang)])
-    for row in rows(result): detail.append(row)
+    for row in rows(result,lang): detail.append(row)
     _style_sheet(detail)
 
     rb=wb.create_sheet(L("rebar_type",lang)[:31])
@@ -215,14 +215,14 @@ def create_pdf(result,project_name,path,lang=None):
     t=Table(summary,colWidths=[70,95,120,80,120])
     t.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.5,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("ALIGN",(0,0),(-1,-1),"CENTER")]))
     story += [t,Spacer(1,14),Paragraph(L("detail",lang),head)]
-    data=[["No.","Section","Member","Item","Quantity","Unit","Notes"]]+rows(result)
+    data=[["No.",L("section",lang),L("member",lang),L("item",lang),L("quantity",lang),L("unit",lang),L("notes",lang)]]+rows(result,lang)
     data=[[Paragraph(_rtl_pdf_text(x),body) for x in row] for row in data]
     table=Table(data,repeatRows=1,colWidths=[30,60,75,180,65,45,180])
     table.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("VALIGN",(0,0),(-1,-1),"TOP")]))
     story += [table,PageBreak(),Paragraph(L("rebar_type",lang),head)]
     rb=[[L("rebar_type",lang),L("dia",lang),L("pieces",lang),L("exec_len",lang),L("exec_weight",lang),L("stock_bars",lang),L("buy_len",lang),L("buy_weight",lang)]]
     for base,dia,g in _rebar_type_rows(result):
-        rb.append([_en_label(base),f"Φ{dia:g}",g["pieces"],f"{g['length']:.2f}",f"{g['weight']:.2f}",g["branches"],f"{g['buy_length']:.2f}",f"{g['buy_weight']:.2f}"])
+        rb.append([item_label(base,lang),f"Φ{dia:g}",g["pieces"],f"{g['length']:.2f}",f"{g['weight']:.2f}",g["branches"],f"{g['buy_length']:.2f}",f"{g['buy_weight']:.2f}"])
     rb=[[Paragraph(_rtl_pdf_text(x),body) for x in row] for row in rb]
     rt=Table(rb,repeatRows=1,colWidths=[150,45,65,75,75,65,75,75])
     rt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("ALIGN",(1,1),(-1,-1),"CENTER")]))
@@ -234,8 +234,8 @@ def create_pdf(result,project_name,path,lang=None):
     rdt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("ALIGN",(0,0),(-1,-1),"CENTER")]))
     story += [rdt,Spacer(1,14),Paragraph(L("qa",lang),head)]
     qa=result.get("qa",{})
-    story.append(Paragraph("Status: "+("OK" if qa.get("ok") else f"CHECK REQUIRED ({len(qa.get('warnings',[]))} warnings)"),body))
-    for _w in qa.get("warnings",[])[:12]: story.append(Paragraph(_rtl_pdf_text("⚠ Review required"),body))
+    story.append(Paragraph(f"{L('status',lang)}: "+(L('ok',lang) if qa.get("ok") else f"{L('check',lang)} ({len(qa.get('warnings',[]))})"),body))
+    for _w in qa.get("warnings",[])[:12]: story.append(Paragraph(_rtl_pdf_text(f"⚠ {L('check',lang)}"),body))
     story.append(Spacer(1,8))
     if result.get("ai_explanation"):
         story += [Paragraph(L("ai",lang),head),Paragraph(_rtl_pdf_text(result["ai_explanation"]),body),Spacer(1,8)]
