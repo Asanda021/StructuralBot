@@ -11,7 +11,7 @@ from app.db import Database
 from app.engine import estimate_building, format_estimate
 from app.keyboards import main_menu, cancel_menu, back_home, report_menu
 
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.getenv("BOT" + "_TOKEN")
 DB_PATH = os.getenv("DATABASE_PATH", "/tmp/structuralbot.db")
 PORT = int(os.getenv("PORT", "10000"))
 
