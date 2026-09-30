@@ -150,41 +150,40 @@ def rebar_settings_menu():
     ])
 
 def rebar_equivalency_menu():
-    diameters=[8,10,12,14,16,18,20,22,25,28,32]
+    counts=[2,3,4,5,6,8,10,12,14,16,20,24,30,32]
     rows=[]
     row=[]
-    for d in diameters:
-        row.append(InlineKeyboardButton(f"Φ{d}",callback_data=f"eqsrc|{d}"))
-        if len(row)==3:
+    for n in counts:
+        row.append(InlineKeyboardButton(str(n),callback_data=f"eqcountstart|{n}"))
+        if len(row)==4:
             rows.append(row); row=[]
     if row: rows.append(row)
     rows.append([InlineKeyboardButton("⬅️ بازگشت",callback_data="home")])
     return InlineKeyboardMarkup(rows)
 
-def rebar_equiv_target_menu(source):
+def rebar_equiv_source_menu(count):
+    diameters=[8,10,12,14,16,18,20,22,25,28,32]
+    rows=[]
+    row=[]
+    for d in diameters:
+        row.append(InlineKeyboardButton(f"Φ{d}",callback_data=f"eqsrc|{count}|{d}"))
+        if len(row)==3:
+            rows.append(row); row=[]
+    if row: rows.append(row)
+    rows.append([InlineKeyboardButton("⬅️ تعداد فعلی",callback_data="rebar_equiv")])
+    return InlineKeyboardMarkup(rows)
+
+def rebar_equiv_target_menu(count,source):
     diameters=[8,10,12,14,16,18,20,22,25,28,32]
     rows=[]
     row=[]
     for d in diameters:
         if d==source: continue
-        row.append(InlineKeyboardButton(f"Φ{d}",callback_data=f"eqdst|{source}|{d}"))
+        row.append(InlineKeyboardButton(f"Φ{d}",callback_data=f"eqdst|{count}|{source}|{d}"))
         if len(row)==3:
             rows.append(row); row=[]
     if row: rows.append(row)
-    rows.append([InlineKeyboardButton("⬅️ قطر مبدأ",callback_data="rebar_equiv")])
-    return InlineKeyboardMarkup(rows)
-
-def rebar_equiv_count_menu(source,target):
-    counts=[2,3,4,5,6,8,10,12,14,16,20,24,30,32]
-    rows=[]
-    row=[]
-    for n in counts:
-        row.append(InlineKeyboardButton(str(n),callback_data=f"eqcount|{source}|{target}|{n}"))
-        if len(row)==4:
-            rows.append(row); row=[]
-    if row: rows.append(row)
-    rows.append([InlineKeyboardButton("⬅️ قطر جایگزین",callback_data=f"eqsrc|{source}")])
-    rows.append([InlineKeyboardButton("🏠 منو",callback_data="home")])
+    rows.append([InlineKeyboardButton("⬅️ قطر فعلی",callback_data=f"eqcountstart|{count}")])
     return InlineKeyboardMarkup(rows)
 
 
