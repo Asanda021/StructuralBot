@@ -53,6 +53,7 @@ class StructuralBotSmokeTests(unittest.TestCase):
         query = SimpleNamespace(
             data="unit:SI",
             answer=AsyncMock(),
+            edit_message_text=AsyncMock(),
             message=SimpleNamespace(edit_text=AsyncMock()),
         )
         update = SimpleNamespace(
