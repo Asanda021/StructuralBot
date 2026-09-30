@@ -1,6 +1,6 @@
 import logging, os, threading, tempfile, math, html
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
 from telegram.error import BadRequest
 from app.db import Database
@@ -512,14 +512,22 @@ def reset(context,name):
 async def review(q,context):
     ms=context.user_data.get("members",[])
     qa=quality_check_members(ms)
-    lines=["🔎 <b>بازبینی کامل متره</b>","",f"پروژه: <b>{context.user_data.get('project_name')}</b>"]
-    lines += ["",f"کنترل خودکار: <b>{'بدون هشدار' if qa['ok'] else str(len(qa['warnings']))+' هشدار'}</b>"]
-    for w in qa.get('warnings',[])[:12]:
-        lines.append(f"⚠️ {w}")
-    for i,m in enumerate(ms,1):
-        lines.append(f"\n<b>{i}. {m['member']}</b> | {m['section']} | {m['type']}")
-        for c in m["components"]: lines.append(f"• {c['name']}: {fmt(c['value'])} {c['unit']}")
-    if not ms: lines.append("\nهنوز عضوی ثبت نشده.")
+    lines=["🔎 <b>بازبینی کامل پروژه</b>","",f"🏗 پروژه: <b>{html.escape(str(context.user_data.get('project_name','پروژه')))}</b>",
+           f"👷 تعداد اعضا: <b>{len(ms)}</b>",
+           f"🧱 حجم بتن: <b>{fmt(estimate_members(ms).get('concrete_total_m3',0))} m³</b>" if ms else "🧱 حجم بتن: <b>0 m³</b>",
+           "",f"🛡 کنترل خودکار: <b>{'بدون هشدار' if qa['ok'] else str(len(qa['warnings']))+' هشدار'}</b>"]
+    for w in qa.get('warnings',[])[:8]:
+        lines.append(f"⚠️ {html.escape(str(w))}")
+    if ms:
+        lines.append("")
+        lines.append("📋 <b>اعضای پروژه</b>")
+        for i,m in enumerate(ms,1):
+            comp_count=len(m.get("components",[]))
+            lines.append(f"{i}. <b>{html.escape(str(m.get('member','عضو')))}</b> — {comp_count} قلم متره")
+    else:
+        lines.append("\nهنوز عضوی ثبت نشده.")
+    lines.append("")
+    lines.append("برای اصلاح، حذف یا کپی هر عضو از «اصلاح/حذف» استفاده کن.")
     await q.edit_message_text("\n".join(lines),parse_mode="HTML",reply_markup=review_menu())
 
 def _copyable_report(result, project_name):
@@ -603,7 +611,7 @@ async def callback(update,context):
     if data=="home":
         context.user_data.clear()
         await q.edit_message_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu())
-        await q.message.reply_text("منوی ثابت:",reply_markup=ReplyKeyboardRemove())
+        await q.message.reply_text("",reply_markup=ReplyKeyboardRemove())
         return
     if data=="calc_mode":
         await q.edit_message_text("🧮 <b>شروع برآورد</b>\n\nبرای ورود به موارد برآوردی، دکمه زیر را بزن.",parse_mode="HTML",reply_markup=calc_mode_menu())
@@ -735,7 +743,7 @@ async def callback(update,context):
             parse_mode="HTML",
             reply_markup=main_menu()
         )
-        await q.message.reply_text("منوی ثابت:",reply_markup=ReplyKeyboardRemove()())
+        await q.message.reply_text("",reply_markup=ReplyKeyboardRemove())
         return
     if data=="restart":
         context.user_data.clear()
@@ -1189,7 +1197,7 @@ async def message(update,context):
     if text in ("🏠 خانه","🏠 منو"):
         context.user_data.clear()
         await update.message.reply_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu())
-        await update.message.reply_text("منوی ثابت:",reply_markup=persistent_menu())
+        await update.message.reply_text("",reply_markup=ReplyKeyboardRemove())
         return
     if text=="📂 پروژه‌ها":
         ps=db.projects(update.effective_user.id)
@@ -1207,7 +1215,7 @@ async def message(update,context):
         context.user_data.setdefault("current_history",[]).append(queue[0])
         context.user_data["current_values"].append(value); context.user_data["current_queue"].pop(0)
         await ask_next_message(update,context); return
-    await update.message.reply_text("از منوی زیر انتخاب کن.",reply_markup=persistent_menu())
+    await update.message.reply_text("از دکمه‌های همین پیام برای ادامه استفاده کن.")
 
 async def ask_next_message(update,context):
     if context.user_data.get("current_queue"):
