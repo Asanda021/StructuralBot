@@ -820,10 +820,18 @@ async def finish_member(q,context):
     else: context.user_data["members"][idx]=m
     context.user_data["current_edit"]=None
     await q.message.reply_text("⌨️ ورود اطلاعات این عضو تمام شد.", reply_markup=ReplyKeyboardRemove())
-    await q.edit_message_text(f"✅ <b>{m['member']}</b> محاسبه شد.\n\nبتن، میلگرد، طول، وزن، شاخه و اجزای وابسته در همین مرحله ثبت شدند.",parse_mode="HTML",
-                               reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")],
-                                                                   [InlineKeyboardButton("🔎 بازبینی",callback_data="finish_takeoff")],
-                                                                   [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]]))
+    context.user_data["current_member_index"]=len(context.user_data.get("members",[]))-1 if idx is None else idx
+    await q.edit_message_text(
+        f"✅ <b>{m['member']}</b> محاسبه شد.\n\nحالا نتیجه این عضو را نهایی کن یا در صورت نیاز اصلاحش کن.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🧮 محاسبه نهایی عضو",callback_data="member_calculate")],
+            [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit")],
+            [InlineKeyboardButton("🔎 بازبینی پروژه",callback_data="finish_takeoff")],
+            [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")],
+            [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+        ])
+    )
 
 async def message(update,context):
     text=(update.message.text or "").strip().replace("،",".")
