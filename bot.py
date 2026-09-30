@@ -25,7 +25,10 @@ class HealthHandler(MiniAppHandler):
             return
         return super().do_GET()
     def log_message(self,*_): pass
-def health_server(): ThreadingHTTPServer(("0.0.0.0",PORT),HealthHandler).serve_forever()\n\ndef miniapp_server(): ThreadingHTTPServer(("0.0.0.0",PORT+1),MiniAppHandler).serve_forever()\n\nMINIAPP_URL=os.getenv("MINIAPP_URL","https://structuralbot.onrender.com/miniapp")
+def health_server():
+    ThreadingHTTPServer(("0.0.0.0", PORT), HealthHandler).serve_forever()
+
+MINIAPP_URL = os.getenv("MINIAPP_URL", "https://structuralbot.onrender.com/miniapp")
 
 def fmt(v):
     return f"{float(v):,.3f}".rstrip("0").rstrip(".")
