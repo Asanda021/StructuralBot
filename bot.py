@@ -7,7 +7,7 @@ from app.db import Database
 from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, multi_face_grid_rebar, repeated_bar_rebar, format_estimate
 from app.exporter import create_excel, create_pdf
 from ai.assistant import explain_takeoff
-from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu, walls_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu, language_menu
+from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu, walls_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu, rebar_equiv_source_menu, rebar_equiv_target_menu, language_menu
 
 TOKEN=os.getenv("BOT_TOKEN")
 DB_PATH=os.getenv("DATABASE_PATH","/tmp/structuralbot.db")
@@ -675,32 +675,32 @@ async def callback(update,context):
     if data=="rebar_equiv":
         await q.edit_message_text(
             "🔁 <b>معادل‌سازی میلگرد</b>\n\n"
-            "قطر و تعداد میلگرد فعلی را انتخاب کن؛ سپس قطر جایگزین را انتخاب کن.\n"
-            "تعداد میلگرد جایگزین را ربات بر اساس سطح مقطع محاسبه می‌کند.",
+            "روند طبق ساختار تعریف‌شده:\n"
+            "۱️⃣ تعداد میلگرد فعلی\n"
+            "۲️⃣ قطر میلگرد فعلی\n"
+            "۳️⃣ فقط قطر میلگرد جایگزین\n"
+            "۴️⃣ محاسبه تعداد میلگرد جایگزین",
             parse_mode="HTML", reply_markup=rebar_equivalency_menu()
         ); return
+    if data.startswith("eqcountstart|"):
+        count=int(data.split("|",1)[1])
+        context.user_data["rebar_equiv_count"]=count
+        await q.edit_message_text(
+            f"🔁 <b>تعداد فعلی: {count} عدد</b>\n\nحالا قطر میلگرد فعلی را انتخاب کن.",
+            parse_mode="HTML", reply_markup=rebar_equiv_source_menu(count)
+        ); return
     if data.startswith("eqsrc|"):
-        source=int(data.split("|",1)[1])
+        _,a,b=data.split("|")
+        count=int(a); source=int(b)
+        context.user_data["rebar_equiv_count"]=count
         context.user_data["rebar_equiv_source"]=source
         await q.edit_message_text(
-            f"🔁 <b>میلگرد فعلی: Φ{source}</b>\n\n"
-            "حالا <b>قطر میلگرد جایگزین</b> را انتخاب کن.",
-            parse_mode="HTML", reply_markup=rebar_equiv_target_menu(source)
+            f"🔁 <b>میلگرد فعلی: {count}Φ{source}</b>\n\nحالا فقط <b>قطر میلگرد جایگزین</b> را انتخاب کن.",
+            parse_mode="HTML", reply_markup=rebar_equiv_target_menu(count,source)
         ); return
     if data.startswith("eqdst|"):
-        _,a,b=data.split("|")
-        source=int(a); target=int(b)
-        context.user_data["rebar_equiv_source"]=source
-        context.user_data["rebar_equiv_target"]=target
-        await q.edit_message_text(
-            f"🔁 <b>Φ{source} → Φ{target}</b>\n\n"
-            "حالا <b>تعداد میلگرد فعلی</b> را انتخاب کن.",
-            parse_mode="HTML",
-            reply_markup=rebar_equiv_count_menu(source,target)
-        ); return
-    if data.startswith("eqcount|"):
         _,a,b,c=data.split("|")
-        source=int(a); target=int(b); count=int(c)
+        count=int(a); source=int(b); target=int(c)
         area_old=count*math.pi*source*source/4.0
         area_new_one=math.pi*target*target/4.0
         new_count=math.ceil(area_old/area_new_one)
@@ -710,12 +710,10 @@ async def callback(update,context):
             "🔁 <b>نتیجه معادل‌سازی میلگرد</b>\n\n"
             f"میلگرد فعلی: <b>{count}Φ{source}</b>\n"
             f"سطح مقطع فعلی: <b>{area_old:.2f} mm²</b>\n\n"
-            f"قطر جایگزین: <b>Φ{target}</b>\n"
-            f"تعداد جایگزین: <b>{new_count}Φ{target}</b>\n"
+            f"میلگرد جایگزین: <b>{new_count}Φ{target}</b>\n"
             f"سطح مقطع جایگزین: <b>{area_new:.2f} mm²</b>\n"
             f"افزایش سطح مقطع: <b>{increase:.2f}%</b>\n\n"
-            "📌 تعداد جایگزین رو به بالا گرد شده تا سطح مقطع فولاد کمتر از حالت فعلی نشود.\n"
-            "⚠️ این ابزار فقط معادل‌سازی تعداد/قطر بر اساس سطح مقطع است؛ کنترل فاصله و ضوابط اجرایی عضو باید انجام شود.",
+            "تعداد جایگزین رو به بالا گرد شده تا سطح مقطع فولاد کمتر از مقدار فعلی نشود.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔄 معادل‌سازی جدید",callback_data="rebar_equiv")],
