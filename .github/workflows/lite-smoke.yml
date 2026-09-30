@@ -1,7 +1,7 @@
 name: lite-smoke
 on:
   push:
-    branches: ["lite-rebuild-20260930"]
+    branches: ["main", "lite-rebuild-20260930"]
   pull_request:
     branches: ["main"]
 
@@ -15,5 +15,5 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install -r requirements.txt
       - run: python -m compileall -q .
-      - run: python -c "from app.engine import foundation_calc, column_calc, beam_calc, slab_calc; print(foundation_calc(1,2,.3)); print(column_calc(.4,.4,3)); print(beam_calc(.3,.5,5)); print(slab_calc(.15,5,4))"
+      - run: python -c "from app.engine import foundation_calc, column_calc, beam_calc, slab_calc, bbs_cutlist; print(foundation_calc(1,2,.3)); print(column_calc(.4,.4,3)); print(beam_calc(.3,.5,5)); print(slab_calc(.15,5,4)); print(bbs_cutlist(16,20,8.5))"
       - run: python -c "import bot; print('BOT_IMPORT_OK')"
