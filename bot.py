@@ -5,6 +5,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 from telegram.error import BadRequest
 from app.db import Database
 from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, multi_face_grid_rebar, repeated_bar_rebar, automatic_cut_lengths, format_estimate
+from app.foundation_takeoff import calculate_foundation_takeoff, foundation_components
 from app.exporter import create_excel, create_pdf
 from app.i18n import L, item_label, lang_code
 from ai.assistant import explain_takeoff
@@ -130,6 +131,10 @@ READY_OPTIONS = {
  "مساحت":[2.0,3.0,4.0,5.0,6.0,8.0,10.0,12.0],
  "ضخامت مگر":[0.08,0.10,0.12,0.15],
  "طول هر خاموت":[0.80,1.00,1.20,1.40,1.60,1.80,2.00],
+ "عرض فضای کار اطراف پی":[0,0.10,0.15,0.20,0.25,0.30],
+ "عمق خاکبرداری":[0.50,0.60,0.80,1.00,1.20,1.50,2.00],
+ "حجم خاک جانشین":[0], "قالب‌بندی":[0,1], "تعداد خرک":[0,4,8,12,16,20,24,32,40],
+ "تعداد اسپیسر":[0,10,20,30,40,60,80,100,120], "تعداد انکربولت":[0,4,6,8,12,16],
  "طول هر سنجاقی":[0.50,0.60,0.80,1.00,1.20],
  "طول هر سنجاقی ژوئن":[0.30,0.40,0.50,0.60,0.80],
  "طول هر کلاف/ژوئن":[2.0,3.0,4.0,5.0,6.0],
@@ -246,14 +251,21 @@ def schema(section,typ):
                 ("تعداد میلگرد انتظار ستون","عدد"),("طول هر انتظار ستون","m"),("قطر انتظار ستون","mm"),
                 ("تعداد انتظار راه‌پله","عدد"),("طول هر انتظار راه‌پله","m"),("قطر انتظار راه‌پله","mm"),
                 ("تعداد چاله آسانسور","عدد"),("طول چاله آسانسور","m"),("عرض چاله آسانسور","m"),("عمق چاله آسانسور","m"),
+            ]+[
+                ("ضخامت مگر","m"),("عرض فضای کار اطراف پی","m"),("عمق خاکبرداری","m"),
+                ("حجم خاک جانشین","m³"),("قالب‌بندی","0/1"),("تعداد خرک","عدد"),
+                ("تعداد اسپیسر","عدد"),("تعداد انکربولت","عدد")
             ]
-        return common+[
             ("قطر میلگرد شبکه پایین","mm"),("فاصله میلگرد شبکه پایین","cm"),
             ("قطر میلگرد شبکه بالا","mm"),("فاصله میلگرد شبکه بالا","cm"),
             ("تعداد میلگرد تقویتی","عدد"),("طول هر میلگرد تقویتی","m"),("قطر میلگرد تقویتی","mm"),
             ("تعداد میلگرد انتظار ستون","عدد"),("طول هر انتظار ستون","m"),("قطر انتظار ستون","mm"),
             ("تعداد چاله آسانسور","عدد"),("طول چاله آسانسور","m"),("عرض چاله آسانسور","m"),("عمق چاله آسانسور","m"),
-        ]
+        ]+[
+                ("ضخامت مگر","m"),("عرض فضای کار اطراف پی","m"),("عمق خاکبرداری","m"),
+                ("حجم خاک جانشین","m³"),("قالب‌بندی","0/1"),("تعداد خرک","عدد"),
+                ("تعداد اسپیسر","عدد"),("تعداد انکربولت","عدد")
+            ]
     if section=="ستون":
         return [("تعداد ستون","عدد"),("عرض ستون","m"),("عمق ستون","m"),("ارتفاع","m"),
                 ("تعداد میلگرد طولی هر ستون","عدد"),("قطر میلگرد طولی","mm"),
@@ -388,6 +400,30 @@ def grid_direction_rebar(L,W,dia,spacing,direction,count=1,top_bar=False):
     r["lap_m"]=plan["lap_m"]
     r["development"]=plan["development"]
     return r
+
+def foundation_extra_components(typ,n,L,W,T,extras):
+    """Add full foundation takeoff layers without duplicating the existing BBS logic."""
+    # extras: blinding thickness, working space, excavation depth, replacement soil,
+    # formwork flag, chairs, spacers, anchor bolts.
+    x=list(extras or [])+[0]*8
+    blinding,working,exc_depth,replacement,formwork_flag,chairs,spacers,anchors=x[:8]
+    try:
+        result=calculate_foundation_takeoff({
+            "foundation_type":typ,"count":n,"length":L,"width":W,"thickness":T,
+            "blinding_thickness":blinding or 0,
+            "working_space_m":working or 0,
+            "excavation_depth_m":exc_depth or T,
+            "replacement_soil_m3":replacement or 0,
+            "formwork_mode":"all" if formwork_flag else "free",
+            "chair_count":chairs or 0,"spacer_count":spacers or 0,
+            "anchor_bolt_count":anchors or 0,
+        })
+        comps=foundation_components(result)
+        skip={"بتن فونداسیون","مساحت فونداسیون"}
+        return [c for c in comps if c.get("name") not in skip]
+    except (TypeError,ValueError,KeyError) as exc:
+        return [{"name":"هشدار متره فونداسیون","value":0,"unit":"عدد",
+                 "note":f"ورودی تکمیلی نامعتبر: {exc}"}]
 
 def repeated_grid_for_foundation(n,L,W,dia,spacing):
     """Repeat a drawing-defined two-way foundation mesh for each footing/unit."""
