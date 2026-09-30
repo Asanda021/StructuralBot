@@ -85,6 +85,14 @@ async def home(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🏠 منوی اصلی", reply_markup=main_menu())
 
 
+def result_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✏️ ویرایش ورودی‌ها", callback_data="edit_last")],
+        [InlineKeyboardButton("🔁 محاسبه مجدد", callback_data="recalc_last"),
+         InlineKeyboardButton("🏠 منوی اصلی", callback_data="home")],
+    ])
+
+
 def wizard_keyboard(options, custom_label="✏️ ورود دستی"):
     rows = []
     row = []
@@ -235,11 +243,13 @@ async def finish_wizard(update, context):
     db.ensure_user(uid, update.effective_user.first_name or "")
     db.save_calc(uid, title, lines)
     context.user_data.clear()
+    context.user_data["last_calc_kind"] = kind
+    context.user_data["last_calc_values"] = values
     await update.effective_message.reply_text(
         f"✅ <b>{title}</b>\\n\\n{lines}\\n\\n"
         "⚠️ این خروجی برای برآورد اولیه است و جایگزین طراحی نهایی مهندس محاسب نیست.",
         parse_mode="HTML",
-        reply_markup=main_menu(),
+        reply_markup=result_keyboard(),
     )
 
 
@@ -251,6 +261,51 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "home":
         await home(update, context)
+        return
+
+    if data == "edit_last":
+        kind = context.user_data.get("last_calc_kind")
+        values = context.user_data.get("last_calc_values")
+        if not kind or not values:
+            await q.edit_message_text("⚠️ محاسبه قبلی در این نشست موجود نیست.", reply_markup=main_menu())
+            return
+        context.user_data.update({"wizard": kind, "wizard_values": list(values), "wizard_index": 0, "editing": True})
+        rows = []
+        for i, label in enumerate(wizard_labels(kind)):
+            rows.append([InlineKeyboardButton(f"✏️ {label}: {clean_number(values[i])}", callback_data=f"edit_field|{i}")])
+        rows.append([InlineKeyboardButton("✅ تأیید و محاسبه", callback_data="confirm_edit")])
+        rows.append([InlineKeyboardButton("❌ لغو ویرایش", callback_data="cancel_edit")])
+        await q.edit_message_text("✏️ <b>ویرایش ورودی‌ها</b>\\n\\nموردی را که می‌خواهی تغییر کند انتخاب کن:", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(rows))
+        return
+
+    if data.startswith("edit_field|"):
+        idx = int(data.split("|", 1)[1])
+        kind = context.user_data.get("wizard")
+        if not kind:
+            await q.edit_message_text("جلسه ویرایش منقضی شده.", reply_markup=main_menu())
+            return
+        context.user_data["wizard_index"] = idx
+        context.user_data["manual"] = True
+        label = wizard_labels(kind)[idx]
+        await q.edit_message_text(
+            f"✏️ <b>{label}</b>\\n\\nمقدار جدید را تایپ کن.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ لغو ویرایش", callback_data="cancel_edit")]])
+        )
+        return
+
+    if data == "confirm_edit":
+        await finish_wizard(update, context)
+        return
+
+    if data == "cancel_edit":
+        kind = context.user_data.get("last_calc_kind")
+        values = context.user_data.get("last_calc_values")
+        context.user_data.clear()
+        if kind and values:
+            context.user_data["last_calc_kind"] = kind
+            context.user_data["last_calc_values"] = values
+        await q.edit_message_text("ویرایش لغو شد.", reply_markup=result_keyboard())
         return
 
     if data.startswith("wizval|"):
@@ -400,6 +455,18 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 raise ValueError
         except ValueError:
             await update.message.reply_text("❌ فقط یک عدد مثبت وارد کن. مثال: <code>0.35</code>", parse_mode="HTML")
+            return
+        if context.user_data.get("editing"):
+            idx = context.user_data["wizard_index"]
+            context.user_data["wizard_values"][idx] = value
+            context.user_data["manual"] = False
+            context.user_data["editing"] = False
+            rows = []
+            for i, label in enumerate(wizard_labels(kind)):
+                rows.append([InlineKeyboardButton(f"✏️ {label}: {clean_number(context.user_data['wizard_values'][i])}", callback_data=f"edit_field|{i}")])
+            rows.append([InlineKeyboardButton("✅ تأیید و محاسبه", callback_data="confirm_edit")])
+            rows.append([InlineKeyboardButton("❌ لغو ویرایش", callback_data="cancel_edit")])
+            await update.message.reply_text("✏️ مقدار اصلاح شد. مورد دیگری را هم می‌توانی ویرایش کنی:", reply_markup=InlineKeyboardMarkup(rows))
             return
         context.user_data["wizard_values"].append(value)
         context.user_data["manual"] = False
