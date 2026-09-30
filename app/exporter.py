@@ -10,6 +10,19 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 import os
+import re
+import arabic_reshaper
+from bidi.algorithm import get_display
+
+def _rtl_pdf_text(text):
+    """Shape Arabic/Persian text and apply bidi ordering for ReportLab."""
+    s=str(text or "")
+    if not re.search(r"[\u0600-\u06FF\u0750-\u077F]", s):
+        return s
+    try:
+        return get_display(arabic_reshaper.reshape(s))
+    except Exception:
+        return s
 
 def _en_label(text):
     s=str(text or "")
@@ -173,7 +186,7 @@ def create_pdf(result,project_name,path):
     body=ParagraphStyle("SBBody",parent=styles["BodyText"],fontName=font,fontSize=8.5,leading=11)
     head=ParagraphStyle("SBHead",parent=styles["Heading2"],fontName=font,fontSize=13,leading=16,alignment=TA_RIGHT)
     story=[Paragraph("STRUCTURAL TAKEOFF REPORT",title),
-           Paragraph(f"Project: {project_name}",body),Spacer(1,10)]
+           Paragraph(_rtl_pdf_text(f"Project: {project_name}"),body),Spacer(1,10)]
 
     total_rebar=sum(float(x.get("weight_kg",0)) for x in result.get("rebar_by_diameter",{}).values())
     total_buy=sum(float(x.get("procurement_weight_kg",0)) for x in result.get("rebar_by_diameter",{}).values())
@@ -186,28 +199,28 @@ def create_pdf(result,project_name,path):
     t.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.5,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("ALIGN",(0,0),(-1,-1),"CENTER")]))
     story += [t,Spacer(1,14),Paragraph("Detailed Takeoff",head)]
     data=[["No.","Section","Member","Item","Quantity","Unit","Notes"]]+rows(result)
-    data=[[Paragraph(str(x),body) for x in row] for row in data]
+    data=[[Paragraph(_rtl_pdf_text(x),body) for x in row] for row in data]
     table=Table(data,repeatRows=1,colWidths=[30,60,75,180,65,45,180])
     table.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("VALIGN",(0,0),(-1,-1),"TOP")]))
     story += [table,PageBreak(),Paragraph("REBAR SUMMARY BY TYPE",head)]
     rb=[["Rebar Type","Dia.","Pieces","Exec. Length","Exec. Weight","Stock Bars","Buy Length","Buy Weight"]]
     for base,dia,g in _rebar_type_rows(result):
         rb.append([_en_label(base),f"Φ{dia:g}",g["pieces"],f"{g['length']:.2f}",f"{g['weight']:.2f}",g["branches"],f"{g['buy_length']:.2f}",f"{g['buy_weight']:.2f}"])
-    rb=[[Paragraph(str(x),body) for x in row] for row in rb]
+    rb=[[Paragraph(_rtl_pdf_text(x),body) for x in row] for row in rb]
     rt=Table(rb,repeatRows=1,colWidths=[150,45,65,75,75,65,75,75])
     rt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("ALIGN",(1,1),(-1,-1),"CENTER")]))
     story += [rt,Spacer(1,14),Paragraph("Rebar Procurement by Diameter",head)]
     rd=[["Dia.","Exec. Length","Exec. Weight","Stock Bars","Buy Length","Buy Weight"]]
     for row in _rebar_diameter_rows(result): rd.append([str(x) for x in row])
-    rd=[[Paragraph(str(x),body) for x in row] for row in rd]
+    rd=[[Paragraph(_rtl_pdf_text(x),body) for x in row] for row in rd]
     rdt=Table(rd,repeatRows=1)
     rdt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("ALIGN",(0,0),(-1,-1),"CENTER")]))
     story += [rdt,Spacer(1,14),Paragraph("QA REVIEW",head)]
     qa=result.get("qa",{})
     story.append(Paragraph("Status: "+("OK" if qa.get("ok") else f"CHECK REQUIRED ({len(qa.get('warnings',[]))} warnings)"),body))
-    for _w in qa.get("warnings",[])[:12]: story.append(Paragraph("⚠ Review required",body))
+    for _w in qa.get("warnings",[])[:12]: story.append(Paragraph(_rtl_pdf_text("⚠ Review required"),body))
     story.append(Spacer(1,8))
     if result.get("ai_explanation"):
-        story += [Paragraph("AI Notes",head),Paragraph(str(result["ai_explanation"]),body),Spacer(1,8)]
+        story += [Paragraph("AI Notes",head),Paragraph(_rtl_pdf_text(result["ai_explanation"]),body),Spacer(1,8)]
     story.append(Paragraph("Quantities are based on drawing inputs and must be checked against approved project documents.",body))
     doc.build(story); return path
