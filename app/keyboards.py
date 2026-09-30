@@ -71,3 +71,20 @@ def report_menu():
       [InlineKeyboardButton("➕ افزودن/اصلاح",callback_data="continue_project"),InlineKeyboardButton("📋 جدول جامع",callback_data="table")],
       [InlineKeyboardButton("📊 Excel + PDF",callback_data="exports")],[InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
     ])
+
+
+def legacy_engineering_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📁 پروژه جدید", callback_data="new_project"), InlineKeyboardButton("📂 پروژه‌های من", callback_data="projects")],
+        [InlineKeyboardButton("🧱 فونداسیون", callback_data="section|فونداسیون"), InlineKeyboardButton("🏛 ستون‌ها", callback_data="section|ستون")],
+        [InlineKeyboardButton("➖ تیرها", callback_data="section|تیر"), InlineKeyboardButton("🏗 سقف‌ها", callback_data="section|سقف")],
+        [InlineKeyboardButton("🧱 دیوارها", callback_data="walls_menu"), InlineKeyboardButton("🪜 راه‌پله", callback_data="section|پله")],
+        [InlineKeyboardButton("📊 خلاصه پروژه", callback_data="summary"), InlineKeyboardButton("📋 بازبینی", callback_data="review")],
+        [InlineKeyboardButton("⚙️ تنظیمات", callback_data="settings"), InlineKeyboardButton("❓ راهنما", callback_data="help")],
+    ])
+
+def walls_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🧱 دیوار برشی", callback_data="type|دیوار برشی"), InlineKeyboardButton("🧱 دیوار حائل", callback_data="type|دیوار حائل")],
+        [InlineKeyboardButton("⬅️ بازگشت", callback_data="home")]
+    ])
