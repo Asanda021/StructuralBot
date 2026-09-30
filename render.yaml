@@ -3,34 +3,13 @@ services:
     name: structuralbot
     runtime: python
     plan: free
-    region: frankfurt
     buildCommand: pip install -r requirements.txt
     startCommand: python -u bot.py
     healthCheckPath: /health
     envVars:
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      - key: APP_ENV
-        value: production
-      - key: APP_NAME
-        value: StructuralBot
-      - key: DATABASE_PATH
-        value: /tmp/structuralbot.db
-      - key: SECRET_KEY
-        generateValue: true
-      - key: REDACT_SENSITIVE_DATA
-        value: "true"
-      - key: DEBUG
-        value: "false"
-      - key: AI_ENABLED
-        value: "false"
-      - key: AI_PROVIDER
-        value: placeholder
-      - key: PAYMENT_PROVIDER
-        value: placeholder
-      - key: PAYMENT_GATEWAY_ENABLED
-        value: "false"
       - key: BOT_TOKEN
         sync: false
-      - key: WEBHOOK_SECRET
-        generateValue: true
+      - key: DATABASE_PATH
+        value: /tmp/structuralbot.db
+      - key: PYTHONUNBUFFERED
+        value: "1"
