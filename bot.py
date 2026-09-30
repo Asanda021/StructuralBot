@@ -7,7 +7,7 @@ from app.db import Database
 from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, multi_face_grid_rebar, repeated_bar_rebar, format_estimate
 from app.exporter import create_excel, create_pdf
 from ai.assistant import explain_takeoff
-from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu, walls_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu, rebar_equiv_source_menu, rebar_equiv_target_menu, language_menu
+from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, walls_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu, rebar_equiv_source_menu, rebar_equiv_target_menu, language_menu
 
 TOKEN=os.getenv("BOT_TOKEN")
 DB_PATH=os.getenv("DATABASE_PATH","/tmp/structuralbot.db")
@@ -603,7 +603,7 @@ async def callback(update,context):
     if data=="home":
         context.user_data.clear()
         await q.edit_message_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu())
-        await q.message.reply_text("منوی ثابت:",reply_markup=persistent_menu())
+        await q.message.reply_text("منوی ثابت:",reply_markup=ReplyKeyboardRemove())
         return
     if data=="calc_mode":
         await q.edit_message_text("🧮 <b>شروع برآورد</b>\n\nبرای ورود به موارد برآوردی، دکمه زیر را بزن.",parse_mode="HTML",reply_markup=calc_mode_menu())
@@ -735,7 +735,7 @@ async def callback(update,context):
             parse_mode="HTML",
             reply_markup=main_menu()
         )
-        await q.message.reply_text("منوی ثابت:",reply_markup=persistent_menu())
+        await q.message.reply_text("منوی ثابت:",reply_markup=ReplyKeyboardRemove()())
         return
     if data=="restart":
         context.user_data.clear()
