@@ -111,6 +111,27 @@ def main():
     assert not qa["ok"]
     assert qa["warnings"]
 
+    # QA must flag a rebar piece longer than the default 12m stock bar.
+    oversize = quality_check_members([{
+        "section": "تیر",
+        "member": "B2",
+        "components": [{
+            "name": "میلگرد پایینی - طول اجرا",
+            "value": 13.0,
+            "unit": "m",
+            "category": "میلگرد",
+            "diameter_mm": 16,
+            "cut_lengths_m": [13.0],
+        }, {
+            "name": "بتن تیر",
+            "value": 1.0,
+            "unit": "m³",
+            "category": "بتن",
+        }],
+    }])
+    assert not oversize["ok"]
+    assert any("۱۲m" in w for w in oversize["warnings"])
+
     # Exporters must generate valid files from the current result schema.
     full_result = estimate_members([{
         "section": "سقف",
