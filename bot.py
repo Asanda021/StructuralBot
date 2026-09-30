@@ -638,7 +638,7 @@ async def save_final(update,context):
     if result["project_settings"].get("standard")=="china":
         result["project_settings"]["china_codes"]=["GB/T 50010-2010(2024)","GB/T 50011-2010(2024)"]
     pid=context.user_data.get("project_id") or db.add_project(uid,context.user_data.get("project_name","پروژه"))
-    db.save_estimate(uid,pid,{"members":ms},result,format_estimate(result))
+    db.save_estimate(uid,pid,{"members":ms,"language":result["project_settings"].get("language","fa")},result,english_report(result,result["project_settings"].get("language","fa")))
     context.user_data["last_result"]=result
 
     async def _background_ai():
@@ -651,8 +651,8 @@ async def save_final(update,context):
     # AI runs behind the takeoff flow; it never changes quantities or design data.
     context.application.create_task(_background_ai(), update=update)
     await update.effective_message.reply_text(
-        "✅ <b>متره نهایی ثبت شد</b>\n\n"+format_estimate(result)+
-        "\n\n🧠 توضیحات هوشمند در پس‌زمینه در حال آماده‌سازی است.",
+        "✅ <b>"+L("report",result["project_settings"].get("language","fa"))+"</b>\n\n"+english_report(result,result["project_settings"].get("language","fa"))+
+        "\n\n🧠 AI explanation is being prepared in the selected language.",
         parse_mode="HTML",reply_markup=report_menu()
     )
 
