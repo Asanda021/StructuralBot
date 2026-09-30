@@ -4,11 +4,23 @@ def main_menu():
     return InlineKeyboardMarkup([
       [InlineKeyboardButton("🏗 پروژه جدید",callback_data="new_project"),InlineKeyboardButton("📂 پروژه‌ها",callback_data="projects"),InlineKeyboardButton("📊 آخرین گزارش",callback_data="reports")],
       [InlineKeyboardButton("➕ ادامه متره",callback_data="continue_project"),InlineKeyboardButton("📋 جدول جامع",callback_data="table"),InlineKeyboardButton("📄 خروجی",callback_data="exports")],
-      [InlineKeyboardButton("💰 قیمت‌گذاری",callback_data="pricing"),InlineKeyboardButton("⚙️ تنظیمات",callback_data="settings"),InlineKeyboardButton("❓ راهنما",callback_data="help")]
+      [InlineKeyboardButton("⚙️ تنظیمات",callback_data="settings"),InlineKeyboardButton("🌐 زبان",callback_data="language"),InlineKeyboardButton("❓ راهنما",callback_data="help")]
     ])
 
 def calc_mode_menu():
-    return InlineKeyboardMarkup([[InlineKeyboardButton("🧮 شروع محاسبه",callback_data="calc_mode")], [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]])
+    return InlineKeyboardMarkup([
+      [InlineKeyboardButton("⚡ متره سریع",callback_data="mode|quick"),InlineKeyboardButton("🧮 متره دقیق",callback_data="mode|detailed")],
+      [InlineKeyboardButton("🏗 متره اجرایی/خرید",callback_data="mode|procurement")],
+      [InlineKeyboardButton("🌐 زبان / Language",callback_data="language")],
+      [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+    ])
+
+def language_menu():
+    return InlineKeyboardMarkup([
+      [InlineKeyboardButton("🇮🇷 فارسی",callback_data="lang|fa"),InlineKeyboardButton("🇸🇦 العربية",callback_data="lang|ar")],
+      [InlineKeyboardButton("🇬🇧 English",callback_data="lang|en"),InlineKeyboardButton("🇨🇳 中文",callback_data="lang|zh")],
+      [InlineKeyboardButton("⬅️ بازگشت",callback_data="home")]
+    ])
 
 def persistent_menu():
     return InlineKeyboardMarkup([[InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]])
