@@ -263,6 +263,16 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await home(update, context)
         return
 
+    if data == "recalc_last":
+        kind = context.user_data.get("last_calc_kind")
+        values = context.user_data.get("last_calc_values")
+        if not kind or not values:
+            await q.edit_message_text("⚠️ محاسبه قبلی در این نشست موجود نیست.", reply_markup=main_menu())
+            return
+        context.user_data.update({"wizard": kind, "wizard_values": list(values), "wizard_index": 0})
+        await finish_wizard(update, context)
+        return
+
     if data == "edit_last":
         kind = context.user_data.get("last_calc_kind")
         values = context.user_data.get("last_calc_values")
