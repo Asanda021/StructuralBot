@@ -34,6 +34,21 @@ def grid_rebar(area_l, area_w, diameter_mm, spacing_cm, stock_length_m=12.0):
               "cut_lengths_m":[L]*nW+[W]*nL})
     return r
 
+def multi_face_grid_rebar(area_l, area_w, diameter_mm, spacing_cm, faces=2, stock_length_m=12.0):
+    """Two-sided wall/mesh grid takeoff. Faces are explicit drawing inputs."""
+    f=max(1,math.ceil(_num(faces)))
+    base=grid_rebar(area_l,area_w,diameter_mm,spacing_cm,stock_length_m)
+    total_len=base["length_m"]*f
+    r=rebar_summary(diameter_mm,total_len,stock_length_m)
+    r.update({
+        "count_bars":base["count_bars"]*f,
+        "faces":f,
+        "bars_each_direction":[base["bars_each_direction"][0]*f,base["bars_each_direction"][1]*f],
+        "length_each_direction_m":[base["length_each_direction_m"][0]*f,base["length_each_direction_m"][1]*f],
+        "cut_lengths_m":base.get("cut_lengths_m",[])*f,
+    })
+    return r
+
 def line_rebar(length_m, spacing_cm, diameter_mm, stock_length_m=12.0):
     L=_num(length_m); s=_num(spacing_cm)/100
     if s<=0: raise ValueError("فاصله میلگرد باید بزرگ‌تر از صفر باشد")
