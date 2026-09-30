@@ -149,11 +149,13 @@ def ask_text(name,fields,section,typ):
 
 def rcomps(title,r,note=""):
     n=int(r.get("count_bars",0)); branches=r.get("branches",0)
+    dia=f"Φ{r['diameter_mm']:g}"
     return [
-      {"name":f"{title} - تعداد قطعه","value":n,"unit":"عدد","note":note},
-      {"name":f"{title} - طول","value":r["length_m"],"unit":"m","note":f"Φ{r['diameter_mm']:g}"},
-      {"name":f"{title} - وزن","value":r["weight_kg"],"unit":"kg"},
-      {"name":f"{title} - شاخه خرید","value":branches,"unit":"شاخه","note":f"شاخه {r['stock_length_m']:g}m | وزن خرید {r['procurement_weight_kg']:.2f}kg"}
+      {"name":f"{title} - تعداد قطعه","value":n,"unit":"عدد","note":note,"category":"میلگرد"},
+      {"name":f"{title} - طول اجرا","value":r["length_m"],"unit":"m","note":dia,"category":"میلگرد"},
+      {"name":f"{title} - وزن اجرا","value":r["weight_kg"],"unit":"kg","note":dia,"category":"میلگرد"},
+      {"name":f"{title} - شاخه خرید","value":branches,"unit":"شاخه","note":f"{dia} | شاخه {r['stock_length_m']:g}m | وزن خرید {r['procurement_weight_kg']:.2f}kg","category":"میلگرد"},
+      {"name":f"{title} - طول خرید","value":r.get("procurement_length_m",r["length_m"]),"unit":"m","note":f"{dia} | پرت {r.get('waste_percent',0):g}%","category":"میلگرد"}
     ]
 
 def calc_member(section,typ,v):
