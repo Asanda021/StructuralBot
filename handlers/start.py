@@ -118,7 +118,7 @@ def _telegram_user_id(update: Update) -> Optional[int]:
 
 def _is_existing_user(user_id: int) -> bool:
     """Check whether a Telegram user already exists."""
-    if get_user is None:
+    if get_user_by_telegram_id is None:
         return False
 
     try:
