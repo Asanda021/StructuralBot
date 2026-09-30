@@ -4,7 +4,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
 from telegram.error import BadRequest
 from app.db import Database
-from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, format_estimate
+from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, repeated_bar_rebar, format_estimate
 from app.exporter import create_excel, create_pdf
 from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu
 
@@ -31,88 +31,182 @@ def presets_for(section,typ):
         return {"width":w,"depth":d}
     return {}
 
+# Quick-entry values are convenience only; they are never used silently.
+READY={
+ "تعداد":1, "تعداد ستون":1, "تعداد تیر":1,
+ "فاصله تیرچه":50, "قطر حرارتی":8, "فاصله حرارتی":25,
+ "قطر شبکه پایین":16, "فاصله شبکه پایین":20,
+ "قطر شبکه بالا":0, "فاصله شبکه بالا":0,
+ "قطر سنجاقی":10, "فاصله سنجاقی":25,
+ "قطر خاموت":10, "فاصله خاموت":20,
+ "فاصله خاموت عادی":20, "فاصله خاموت بحرانی":10,
+ "قطر میلگرد طولی":16, "تعداد میلگرد طولی هر ستون":8, "تعداد میلگرد طولی هر تیر":4,
+ "قطر میلگرد تقویتی":16, "قطر کمرکش":12,
+ "ضریب بتن":0.18, "طول یونولیت":1.0, "عرض یونولیت":0.5,
+}
+
+def ready_value(section,typ,label):
+    if label=="ضریب بتن":
+        if "دوبل" in typ: return 0.23
+        if "تک" in typ: return 0.18
+    return READY.get(label)
+
 def schema(section,typ):
     if section=="سقف":
         if typ.startswith("تیرچه"):
-            return [("طول سقف","m"),("عرض سقف","m"),("فاصله تیرچه","cm"),("طول تیرچه","m"),
-                    ("قطر حرارتی","mm"),("فاصله حرارتی","cm")]
+            return [
+              ("طول سقف","m"),("عرض سقف","m"),("فاصله تیرچه","cm"),("طول تیرچه","m"),
+              ("قطر حرارتی","mm"),("فاصله حرارتی","cm"),
+              ("طول یونولیت/بلوک","m"),("عرض یونولیت/بلوک","m"),
+              ("تعداد کلاف میانی/ژوئن","عدد"),("طول هر کلاف/ژوئن","m"),("قطر کلاف/ژوئن","mm"),
+              ("تعداد سنجاقی ژوئن","عدد"),("طول هر سنجاقی ژوئن","m"),("قطر سنجاقی ژوئن","mm"),
+              ("تعداد میلگرد منفی","عدد"),("طول هر میلگرد منفی","m"),("قطر میلگرد منفی","mm"),
+              ("تعداد اتکا/ادکا","عدد"),("طول هر اتکا/ادکا","m"),("قطر اتکا/ادکا","mm")
+            ]
         return [("طول سقف","m"),("عرض سقف","m"),("ضخامت/ارتفاع مؤثر سقف","m"),
                 ("قطر حرارتی","mm"),("فاصله حرارتی","cm")]
     if section=="فونداسیون":
+        if typ=="بتن مگر":
+            return [("تعداد","عدد"),("طول","m"),("عرض","m"),("ضخامت مگر","m")]
+        if typ=="شناژ":
+            return [("تعداد","عدد"),("طول","m"),("عرض","m"),("ارتفاع","m"),
+                    ("تعداد میلگرد طولی","عدد"),("قطر میلگرد طولی","mm"),
+                    ("قطر خاموت","mm"),("فاصله خاموت","cm"),("طول هر خاموت","m"),
+                    ("قطر سنجاقی","mm"),("فاصله سنجاقی","cm"),("طول هر سنجاقی","m")]
         return [("تعداد","عدد"),("طول","m"),("عرض","m"),("ضخامت","m"),
-                ("قطر میلگرد اصلی","mm"),("فاصله میلگرد اصلی","cm")]
+                ("قطر شبکه پایین","mm"),("فاصله شبکه پایین","cm"),
+                ("قطر شبکه بالا","mm"),("فاصله شبکه بالا","cm"),
+                ("قطر سنجاقی","mm"),("فاصله سنجاقی","cm"),("طول هر سنجاقی","m"),
+                ("تعداد میلگرد انتظار","عدد"),("طول هر انتظار","m"),("قطر میلگرد انتظار","mm")]
     if section=="ستون":
         return [("تعداد ستون","عدد"),("عرض ستون","m"),("عمق ستون","m"),("ارتفاع","m"),
                 ("تعداد میلگرد طولی هر ستون","عدد"),("قطر میلگرد طولی","mm"),
-                ("قطر خاموت","mm"),("فاصله خاموت","cm")]
+                ("قطر خاموت","mm"),("فاصله خاموت","cm"),("طول هر خاموت","m"),
+                ("تعداد سنجاقی در هر تراز","عدد"),("طول هر سنجاقی","m"),("قطر سنجاقی","mm")]
     if section=="تیر":
         return [("تعداد تیر","عدد"),("طول","m"),("عرض","m"),("ارتفاع","m"),
                 ("تعداد میلگرد طولی هر تیر","عدد"),("قطر میلگرد طولی","mm"),
-                ("قطر خاموت","mm"),("فاصله خاموت","cm")]
+                ("قطر خاموت","mm"),("فاصله خاموت عادی","cm"),("فاصله خاموت بحرانی","cm"),
+                ("طول ناحیه بحرانی هر طرف","m"),("طول هر خاموت","m"),
+                ("تعداد میلگرد تقویتی هر تیر","عدد"),("طول هر میلگرد تقویتی","m"),("قطر میلگرد تقویتی","mm"),
+                ("تعداد سنجاقی هر تیر","عدد"),("طول هر سنجاقی","m"),("قطر سنجاقی","mm"),
+                ("تعداد میلگرد کمرکش","عدد"),("طول هر کمرکش","m"),("قطر کمرکش","mm")]
     if section=="دیوار":
-        return [("طول دیوار","m"),("ارتفاع","m"),("ضخامت","m"),
-                ("قطر قائم","mm"),("فاصله قائم","cm"),("قطر افقی","mm"),("فاصله افقی","cm")]
+        return [("تعداد دیوار","عدد"),("طول دیوار","m"),("ارتفاع","m"),("ضخامت","m"),
+                ("قطر قائم","mm"),("فاصله قائم","cm"),("قطر افقی","mm"),("فاصله افقی","cm"),
+                ("قطر تقویتی","mm"),("تعداد تقویتی","عدد"),("طول هر تقویتی","m")]
     if section=="پله":
-        return [("مساحت","m²"),("ضخامت","m"),("قطر میلگرد اصلی","mm"),("فاصله اصلی","cm"),
+        return [("تعداد","عدد"),("مساحت","m²"),("ضخامت","m"),("قطر میلگرد اصلی","mm"),("فاصله اصلی","cm"),
                 ("قطر حرارتی","mm"),("فاصله حرارتی","cm")]
     return [("مقدار/حجم بتن","m³"),("وزن میلگرد","kg")]
 
-def ask_text(name,fields):
+def ask_text(name,fields,section,typ):
     label,unit=fields[0]
-    return f"✏️ <b>{name}</b>\n\n<b>{label}</b> ({unit})\nعدد را وارد کن.\n\n۰ = در صورت نداشتن این جزء"
+    rv=ready_value(section,typ,label)
+    ready=f"\n⚡ مقدار آماده: <b>{rv}</b> {unit} (قابل ویرایش)" if rv is not None else ""
+    return f"✏️ <b>{name}</b>\n\n<b>{label}</b> ({unit}){ready}\nعدد را وارد کن."
+
+def rcomps(title,r,note=""):
+    n=int(r.get("count_bars",0)); branches=r.get("branches",0)
+    return [
+      {"name":f"{title} - تعداد قطعه","value":n,"unit":"عدد","note":note},
+      {"name":f"{title} - طول","value":r["length_m"],"unit":"m","note":f"Φ{r['diameter_mm']:g}"},
+      {"name":f"{title} - وزن","value":r["weight_kg"],"unit":"kg"},
+      {"name":f"{title} - شاخه خرید","value":branches,"unit":"شاخه","note":f"شاخه {r['stock_length_m']:g}m | وزن خرید {r['procurement_weight_kg']:.2f}kg"}
+    ]
 
 def calc_member(section,typ,v):
     p=presets_for(section,typ)
     if section=="سقف":
         if typ.startswith("تیرچه"):
             data={"slab_type":typ,"length":v[0],"width":v[1],"joist_spacing_cm":v[2],"joist_length_m":v[3],
-                  "thermal_dia":v[4] or None,"thermal_spacing_cm":v[5] or None}
-        else:
-            data={"slab_type":typ,"length":v[0],"width":v[1],"thickness":v[2],
-                  "thermal_dia":v[3] or None,"thermal_spacing_cm":v[4] or None}
-        r=calculate_slab(data); comps=[
-          {"name":"بتن سقف","value":r["concrete_m3"],"unit":"m³","note":f"مساحت × ضریب/ضخامت = {r['concrete_coeff']:.3f}"},
-          {"name":"مساحت سقف","value":r["area_m2"],"unit":"m²"}]
-        if "joist_count" in r:
-            comps += [{"name":"تعداد تیرچه","value":r["joist_count"],"unit":"عدد","note":f"طول کل {r['joist_total_length_m']:.2f} m"},
-                      {"name":"یونولیت","value":r["foam_blocks"],"unit":"عدد","note":"برآورد بر اساس طول تیرچه و بلوک پیش‌فرض 33cm"}]
-        if "thermal" in r:
-            t=r["thermal"]; comps += [{"name":"شبکه حرارتی - طول","value":t["length_m"],"unit":"m"},
-                                      {"name":"شبکه حرارتی - وزن","value":t["weight_kg"],"unit":"kg", "note":f"Φ{t['diameter_mm']:.0f} | {t['branches']} شاخه 12m"},
-                                      {"name":"شبکه حرارتی - شاخه خرید","value":t["branches"],"unit":"شاخه"}]
+                  "thermal_dia":v[4] or None,"thermal_spacing_cm":v[5] or None,
+                  "block_length_m":v[6] or 1.0,"block_width_m":v[7] or 0.5,
+                  "joan_count":v[8],"joan_length_m":v[9],"joan_dia":v[10],
+                  "negative_count":v[14],"negative_length_m":v[15],"negative_dia":v[16],
+                  "otka_count":v[17],"otka_length_m":v[18],"otka_dia":v[19]}
+            r=calculate_slab(data); comps=[
+              {"name":"بتن سقف","value":r["concrete_m3"],"unit":"m³","note":f"مساحت × ضریب {r['concrete_coeff']:.3f}"},
+              {"name":"مساحت سقف","value":r["area_m2"],"unit":"m²"},
+              {"name":"تعداد تیرچه","value":r["joist_count"],"unit":"عدد","note":f"{r['joist_lines']} خط تیرچه × ضریب سیستم"},
+              {"name":"طول کل تیرچه","value":r["joist_total_length_m"],"unit":"m"},
+              {"name":"بلوک/یونولیت","value":r["block_count"],"unit":"عدد","note":f"{r['block_kind']} | {r['block_length_m']}×{r['block_width_m']}m"}]
+            if "thermal" in r: comps += rcomps("شبکه حرارتی دو جهت",r["thermal"],f"X={r['bars_each_direction'][0]} | Y={r['bars_each_direction'][1]}")
+            if "joan" in r["__dict__"] if False else False: pass
+            if r.get("tie_beam_rebar"): comps += rcomps("کلاف/ژوئن",r["tie_beam_rebar"])
+            if r.get("negative"): comps += rcomps("میلگرد منفی",r["negative"])
+            if r.get("otka"): comps += rcomps("اتکا/ادکا",r["otka"])
+            # Separate count/length of ژوئن and explicit سنجاقی ژوئن
+            if v[8] and v[9]: comps.append({"name":"تعداد کلاف/ژوئن","value":v[8],"unit":"عدد","note":f"طول هرکدام {v[9]}m"})
+            if v[11] and v[12] and v[13]:
+                jr=repeated_bar_rebar(v[11],v[12],v[13]); comps += rcomps("سنجاقی ژوئن",jr)
+            return comps
+        data={"slab_type":typ,"length":v[0],"width":v[1],"thickness":v[2],"thermal_dia":v[3] or None,"thermal_spacing_cm":v[4] or None}
+        r=calculate_slab(data); comps=[{"name":"بتن سقف","value":r["concrete_m3"],"unit":"m³","note":f"مساحت × ضخامت {r['concrete_coeff']:.3f}m"},{"name":"مساحت سقف","value":r["area_m2"],"unit":"m²"}]
+        if "thermal" in r: comps += rcomps("شبکه حرارتی دو جهت",r["thermal"],f"X={r['thermal']['bars_each_direction'][0]} | Y={r['thermal']['bars_each_direction'][1]}")
         return comps
+
     if section=="فونداسیون":
-        n,L,W,T,d,s=v; concrete=n*L*W*T; comps=[{"name":"بتن","value":concrete,"unit":"m³"}]
-        if d and s:
-            r=grid_rebar(L,W,d,s); comps += [{"name":"میلگرد اصلی - وزن","value":n*r["weight_kg"],"unit":"kg","note":f"Φ{d:g} @ {s:g}cm"},
-              {"name":"میلگرد اصلی - شاخه خرید","value":n*r["branches"],"unit":"شاخه"}]
+        if typ=="بتن مگر":
+            n,L,W,T=v; return [{"name":"بتن مگر","value":n*L*W*T,"unit":"m³"},{"name":"مساحت مگر","value":n*L*W,"unit":"m²"}]
+        if typ=="شناژ":
+            n,L,W,H,bars,d,sd,ss,slen,pd,ps,plen=v
+            comps=[{"name":"بتن شناژ","value":n*L*W*H,"unit":"m³"}]
+            if bars and d: comps += rcomps("میلگرد طولی",repeated_bar_rebar(n*bars,L,d))
+            if sd and ss and slen:
+                cnt=n*(math.ceil(L/(ss/100))+1); comps += rcomps("خاموت شناژ",repeated_bar_rebar(cnt,slen,sd))
+            if pd and ps and plen:
+                cnt=n*(math.ceil(L/(ps/100))+1); comps += rcomps("سنجاقی شناژ",repeated_bar_rebar(cnt,plen,pd))
+            return comps
+        n,L,W,T,bd,bs,td,ts,pd,ps,plen,en,elen,ed=v
+        comps=[{"name":"بتن فونداسیون","value":n*L*W*T,"unit":"m³"},{"name":"مساحت فونداسیون","value":n*L*W,"unit":"m²"}]
+        if bd and bs: comps += rcomps("شبکه پایین دو جهت",grid_rebar(L,W,bd,bs))
+        if td and ts: comps += rcomps("شبکه بالا دو جهت",grid_rebar(L,W,td,ts))
+        if pd and ps and plen:
+            cnt=n*(math.ceil(L/(ps/100))+1)*(math.ceil(W/(ps/100))+1)
+            comps += rcomps("سنجاقی پی",repeated_bar_rebar(cnt,plen,pd),f"محاسبه از شبکه {ps:g}cm؛ طول هر سنجاقی از دیتیل")
+        if en and elen and ed: comps += rcomps("میلگرد انتظار",repeated_bar_rebar(n*en,elen,ed))
         return comps
-    if section in ("ستون","تیر"):
-        n,a,b,c,bars,d,sd,ss=v
-        concrete=n*a*b*c
-        length=n*bars*c; r=rebar_summary(d,length) if d and length else {"weight_kg":0,"branches":0}
-        stirrups=max(1,math.ceil(c/(ss/100))+1) if ss else 0
-        slen=stirrups*(2*(a+b)*0.9)*n
-        sr=rebar_summary(sd,slen) if sd and slen else {"weight_kg":0,"branches":0}
-        return [{"name":"بتن","value":concrete,"unit":"m³"},
-          {"name":"میلگرد طولی - وزن","value":r["weight_kg"],"unit":"kg","note":f"Φ{d:g} | {bars:g} عدد در هر عضو"},
-          {"name":"میلگرد طولی - شاخه خرید","value":r["branches"],"unit":"شاخه"},
-          {"name":"خاموت - وزن","value":sr["weight_kg"],"unit":"kg","note":f"Φ{sd:g} @ {ss:g}cm"},
-          {"name":"خاموت - شاخه خرید","value":sr["branches"],"unit":"شاخه"}]
+
+    if section=="ستون":
+        n,a,b,h,bars,d,sd,ss,slen,pin,plen,pd=v
+        comps=[{"name":"بتن ستون","value":n*a*b*h,"unit":"m³"},{"name":"مساحت مقطع","value":a*b,"unit":"m²"}]
+        if bars and d: comps += rcomps("میلگرد طولی",repeated_bar_rebar(n*bars,h,d),f"{bars:g} عدد در هر ستون")
+        if sd and ss and slen:
+            cnt=n*(math.ceil(h/(ss/100))+1); comps += rcomps("خاموت",repeated_bar_rebar(cnt,slen,sd))
+        if pin and plen and pd:
+            levels=max(1,math.ceil(h/(ss/100))+1) if ss else pin
+            comps += rcomps("سنجاقی ستون",repeated_bar_rebar(n*levels*pin,plen,pd))
+        return comps
+
+    if section=="تیر":
+        n,L,a,h,bars,d,sd,ss,cs,clen,slen,rcount,rlen,rd,pin,plen,pd,kcount,klen,kd=v
+        comps=[{"name":"بتن تیر","value":n*L*a*h,"unit":"m³"},{"name":"طول تیر","value":n*L,"unit":"m"}]
+        if bars and d: comps += rcomps("میلگرد طولی",repeated_bar_rebar(n*bars,L,d),f"{bars:g} عدد در هر تیر")
+        if sd and slen:
+            normal=max(0,L-2*clen)
+            c_normal=(math.ceil(normal/(ss/100))+1) if ss and normal>0 else 0
+            c_critical=(2*(math.ceil(clen/(cs/100))+1)) if cs and clen>0 else 0
+            total=n*(c_normal+c_critical); 
+            if total: comps += rcomps("خاموت",repeated_bar_rebar(total,slen,sd),f"عادی {c_normal} | بحرانی دو طرف {c_critical}")
+        if rcount and rlen and rd: comps += rcomps("میلگرد تقویتی",repeated_bar_rebar(n*rcount,rlen,rd))
+        if pin and plen and pd: comps += rcomps("سنجاقی تیر",repeated_bar_rebar(n*pin,plen,pd))
+        if kcount and klen and kd: comps += rcomps("کمرکش تیر",repeated_bar_rebar(n*kcount,klen,kd))
+        return comps
+
     if section=="دیوار":
-        L,H,T,vd,vs,hd,hs=v; concrete=L*H*T
-        comps=[{"name":"بتن","value":concrete,"unit":"m³"}]
-        if vd and vs:
-            r=grid_rebar(H,L,vd,vs); comps += [{"name":"میلگرد قائم - وزن","value":r["weight_kg"],"unit":"kg"},{"name":"میلگرد قائم - شاخه خرید","value":r["branches"],"unit":"شاخه"}]
-        if hd and hs:
-            r=grid_rebar(L,H,hd,hs); comps += [{"name":"میلگرد افقی - وزن","value":r["weight_kg"],"unit":"kg"},{"name":"میلگرد افقی - شاخه خرید","value":r["branches"],"unit":"شاخه"}]
+        n,L,H,T,vd,vs,hd,hs,rd,rc,rl=v
+        comps=[{"name":"بتن دیوار","value":n*L*H*T,"unit":"m³"},{"name":"مساحت دیوار","value":n*L*H,"unit":"m²"}]
+        if vd and vs: comps += rcomps("میلگرد قائم",grid_rebar(H,L,vd,vs))
+        if hd and hs: comps += rcomps("میلگرد افقی",grid_rebar(L,H,hd,hs))
+        if rd and rc and rl: comps += rcomps("میلگرد تقویتی",repeated_bar_rebar(n*rc,rl,rd))
         return comps
+
     if section=="پله":
-        area,t,d,s,td,ts=v; comps=[{"name":"بتن پله","value":area*t,"unit":"m³"}]
-        if d and s:
-            r=grid_rebar(area**0.5,area**0.5,d,s); comps += [{"name":"میلگرد اصلی - وزن","value":r["weight_kg"],"unit":"kg"},{"name":"میلگرد اصلی - شاخه خرید","value":r["branches"],"unit":"شاخه"}]
-        if td and ts:
-            r=grid_rebar(area**0.5,area**0.5,td,ts); comps += [{"name":"میلگرد حرارتی - وزن","value":r["weight_kg"],"unit":"kg"},{"name":"میلگرد حرارتی - شاخه خرید","value":r["branches"],"unit":"شاخه"}]
+        n,area,t,d,s,td,ts=v; side=math.sqrt(area)
+        comps=[{"name":"بتن پله","value":n*area*t,"unit":"m³"},{"name":"مساحت پله","value":n*area,"unit":"m²"}]
+        if d and s: comps += rcomps("میلگرد اصلی",grid_rebar(side,side,d,s))
+        if td and ts: comps += rcomps("میلگرد حرارتی دو جهت",grid_rebar(side,side,td,ts))
         return comps
     return [{"name":"بتن","value":v[0],"unit":"m³"},{"name":"میلگرد","value":v[1],"unit":"kg"}]
 
@@ -122,7 +216,7 @@ def show_member_types(q,section):
 async def start_cmd(update,context):
     db.ensure_user(update.effective_user.id,update.effective_user.first_name or "")
     context.user_data.clear()
-    await update.message.reply_text("🏗 <b>StructuralBot</b>\n\n<b>متره جامع از روی نقشه</b>\nاطلاعات خام نقشه را بگیر؛ ربات مقدار بتن، میلگرد، شاخه، تیرچه و یونولیت را محاسبه می‌کند.",parse_mode="HTML",reply_markup=main_menu())
+    await update.message.reply_text("🏗 <b>StructuralBot</b>\n\n<b>متره جامع از روی نقشه</b>\nاطلاعات خام نقشه را بگیر؛ ربات مقدار بتن، میلگرد، شاخه، تیرچه، بلوک/یونولیت و اجزای تقویتی را محاسبه می‌کند.",parse_mode="HTML",reply_markup=main_menu())
 
 def reset(context,name):
     context.user_data.clear(); context.user_data.update({"project_name":name,"members":[],"history":[]})
@@ -160,23 +254,19 @@ async def callback(update,context):
         await show_member_types(q,data.split("|",1)[1]); return
     if data.startswith("member|"):
         _,section,typ=data.split("|",2)
-        context.user_data.update({"current_section":section,"current_type":typ,"current_values":[],"current_queue":schema(section,typ),"current_edit":None,"current_preset":None})
-        p=presets_for(section,typ)
-        if p:
-            context.user_data["current_preset"]=p
+        context.user_data.update({"current_section":section,"current_type":typ,"current_values":[],"current_queue":schema(section,typ),"current_edit":None,"current_preset":presets_for(section,typ)})
         await ask_next(q,context); return
     if data.startswith("edit|"):
         idx=int(data.split("|")[1]); m=context.user_data["members"][idx]
         context.user_data.update({"current_section":m["section"],"current_type":m["type"],"current_values":m.get("raw",[]),
-                                  "current_queue":schema(m["section"],m["type"]),"current_edit":idx})
+                                  "current_queue":schema(m["section"],m["type"]),"current_edit":idx,"current_preset":presets_for(m["section"],m["type"])})
         await ask_next(q,context); return
     if data.startswith("delete|"):
         idx=int(data.split("|")[1]); context.user_data["members"].pop(idx); await review(q,context); return
     if data=="edit_members":
         rows=[]
         for i,m in enumerate(context.user_data.get("members",[])):
-            rows.append([InlineKeyboardButton(f"✏️ {i+1}. {m['member']}",callback_data=f"edit|{i}"),
-                         InlineKeyboardButton("❌",callback_data=f"delete|{i}")])
+            rows.append([InlineKeyboardButton(f"✏️ {i+1}. {m['member']}",callback_data=f"edit|{i}"),InlineKeyboardButton("❌",callback_data=f"delete|{i}")])
         rows.append([InlineKeyboardButton("⬅️ بازبینی",callback_data="finish_takeoff")])
         await q.edit_message_text("✏️ <b>اصلاح یا حذف عضو</b>",parse_mode="HTML",reply_markup=InlineKeyboardMarkup(rows)); return
     if data=="finish_takeoff": await review(q,context); return
@@ -208,10 +298,14 @@ async def callback(update,context):
             await update.effective_message.reply_document(open(x,"rb"),caption="📊 Excel - متره جامع")
             await update.effective_message.reply_document(open(p,"rb"),caption="📄 PDF - متره جامع")
         return
+    if data.startswith("ready|"):
+        value=float(data.split("|",1)[1])
+        context.user_data["current_values"].append(value); context.user_data["current_queue"].pop(0)
+        await ask_next(q,context); return
     if data in ("pricing","settings","help"):
         msg={"pricing":"💰 قیمت‌گذاری در مرحله بعد روی همین اقلام و واحدها سوار می‌شود.",
-             "settings":"⚙️ طول شاخه پیش‌فرض میلگرد ۱۲ متر است و بعداً از تنظیمات قابل تغییر می‌شود.",
-             "help":"❓ از روی نقشه بخش و تیپ را انتخاب کن. ربات اطلاعات هندسی و مشخصات آرماتور را می‌گیرد و مقدار بتن، میلگرد، وزن و تعداد شاخه را محاسبه می‌کند."}[data]
+             "settings":"⚙️ طول شاخه پیش‌فرض میلگرد ۱۲ متر است.",
+             "help":"❓ تیپ‌ها و اعداد آماده فقط برای ورود سریع‌اند؛ مقدار نهایی باید با نقشه و دیتیل پروژه تطبیق داشته باشد."}[data]
         await q.edit_message_text(msg,reply_markup=back_home()); return
 
 async def ask_next(q,context):
@@ -219,11 +313,12 @@ async def ask_next(q,context):
     if not queue:
         await finish_member(q,context); return
     label,unit=queue[0]
-    # apply column presets automatically and skip dimensions
     if context.user_data.get("current_preset") and label in ("عرض ستون","عمق ستون"):
         p=context.user_data["current_preset"]; key="width" if label=="عرض ستون" else "depth"
         context.user_data["current_values"].append(p[key]); context.user_data["current_queue"].pop(0); await ask_next(q,context); return
-    await q.edit_message_text(ask_text(context.user_data["current_type"],queue),parse_mode="HTML",reply_markup=back_home())
+    rv=ready_value(context.user_data["current_section"],context.user_data["current_type"],label)
+    extra=[InlineKeyboardButton(f"⚡ استفاده از مقدار آماده: {rv} {unit}",callback_data=f"ready|{rv}")] if rv is not None else None
+    await q.edit_message_text(ask_text(context.user_data["current_type"],queue,context.user_data["current_section"],context.user_data["current_type"]),parse_mode="HTML",reply_markup=back_home(extra))
 
 async def finish_member(q,context):
     section=context.user_data["current_section"]; typ=context.user_data["current_type"]; vals=context.user_data["current_values"]
@@ -235,7 +330,7 @@ async def finish_member(q,context):
     if idx is None: context.user_data.setdefault("members",[]).append(m)
     else: context.user_data["members"][idx]=m
     context.user_data["current_edit"]=None
-    await q.edit_message_text(f"✅ <b>{m['member']}</b> محاسبه شد.\n\nاجزای بتن و آرماتور در همین مرحله ثبت شدند.",parse_mode="HTML",
+    await q.edit_message_text(f"✅ <b>{m['member']}</b> محاسبه شد.\n\nبتن، میلگرد، طول، وزن، شاخه و اجزای وابسته در همین مرحله ثبت شدند.",parse_mode="HTML",
                                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")],
                                                                    [InlineKeyboardButton("🔎 بازبینی",callback_data="finish_takeoff")],
                                                                    [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]]))
@@ -251,16 +346,19 @@ async def message(update,context):
         except ValueError: await update.message.reply_text("❌ فقط عدد وارد کن."); return
         if value<0: await update.message.reply_text("❌ عدد منفی مجاز نیست."); return
         context.user_data["current_values"].append(value); context.user_data["current_queue"].pop(0)
-        if context.user_data["current_queue"]:
-            label,unit=context.user_data["current_queue"][0]
-            await update.message.reply_text(f"⏳ ثبت شد.\n\nمرحله بعد: <b>{label}</b> ({unit})\n۰ = حذف این جزء",parse_mode="HTML",reply_markup=back_home())
-        else:
-            # continue using a message-only result path
-            class Q:
-                async def edit_message_text(self,*a,**kw): await update.message.reply_text(*a,**kw)
-            await finish_member(Q(),context)
-        return
+        await ask_next_message(update,context); return
     await update.message.reply_text("از منوی زیر انتخاب کن.",reply_markup=main_menu())
+
+async def ask_next_message(update,context):
+    if context.user_data.get("current_queue"):
+        label,unit=context.user_data["current_queue"][0]
+        rv=ready_value(context.user_data["current_section"],context.user_data["current_type"],label)
+        ready=f"\n⚡ مقدار آماده: {rv} {unit}" if rv is not None else ""
+        await update.message.reply_text(f"⏳ ثبت شد.\n\nمرحله بعد: <b>{label}</b> ({unit}){ready}",parse_mode="HTML",reply_markup=back_home())
+    else:
+        class Q:
+            async def edit_message_text(self,*a,**kw): await update.message.reply_text(*a,**kw)
+        await finish_member(Q(),context)
 
 async def error_handler(update,context):
     if isinstance(context.error,BadRequest) and "Message is not modified" in str(context.error): return
@@ -271,7 +369,7 @@ def main():
     db.init(); threading.Thread(target=health_server,daemon=True).start()
     app=Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start",start_cmd)); app.add_handler(CallbackQueryHandler(callback)); app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,message)); app.add_error_handler(error_handler)
-    log.info("Starting StructuralBot - drawing-driven takeoff v3")
+    log.info("Starting StructuralBot - drawing-driven takeoff v4")
     app.run_polling(drop_pending_updates=True)
 
 if __name__=="__main__": main()
