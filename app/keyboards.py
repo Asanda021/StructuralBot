@@ -174,6 +174,19 @@ def rebar_equiv_target_menu(source):
     rows.append([InlineKeyboardButton("⬅️ قطر مبدأ",callback_data="rebar_equiv")])
     return InlineKeyboardMarkup(rows)
 
+def rebar_equiv_count_menu(source,target):
+    counts=[2,3,4,5,6,8,10,12,14,16,20,24,30,32]
+    rows=[]
+    row=[]
+    for n in counts:
+        row.append(InlineKeyboardButton(str(n),callback_data=f"eqcount|{source}|{target}|{n}"))
+        if len(row)==4:
+            rows.append(row); row=[]
+    if row: rows.append(row)
+    rows.append([InlineKeyboardButton("⬅️ قطر جایگزین",callback_data=f"eqsrc|{source}")])
+    rows.append([InlineKeyboardButton("🏠 منو",callback_data="home")])
+    return InlineKeyboardMarkup(rows)
+
 
 def input_keyboard(values=None, unit=""):
     """Preset picker plus manual entry. Presets are shortcuts, never design decisions."""
