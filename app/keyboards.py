@@ -151,7 +151,9 @@ def rebar_equivalency_menu():
       [InlineKeyboardButton("Φ20 ↔ Φ22",callback_data="eq|20|22"),InlineKeyboardButton("Φ22 ↔ Φ25",callback_data="eq|22|25")],
       [InlineKeyboardButton("Φ25 ↔ Φ28",callback_data="eq|25|28"),InlineKeyboardButton("Φ28 ↔ Φ32",callback_data="eq|28|32")],
       [InlineKeyboardButton("⬅️ بازگشت",callback_data="home")]
-    ])def input_keyboard(values=None, unit=""):
+    ])
+
+def input_keyboard(values=None, unit=""):
     """Preset picker plus manual entry. Presets are shortcuts, never design decisions."""
     rows=[]
     if values:
