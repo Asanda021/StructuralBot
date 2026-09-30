@@ -78,8 +78,9 @@ def review_menu():
 
 def report_menu():
     return InlineKeyboardMarkup([
+      [InlineKeyboardButton("📤 خروجی نهایی",callback_data="exports"),InlineKeyboardButton("📋 خروجی قابل کپی",callback_data="copy_output")],
       [InlineKeyboardButton("➕ افزودن/اصلاح",callback_data="continue_project"),InlineKeyboardButton("📋 جدول جامع",callback_data="table")],
-      [InlineKeyboardButton("📊 Excel + PDF",callback_data="exports")],[InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
+      [InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
     ])
 
 
