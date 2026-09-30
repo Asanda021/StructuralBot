@@ -423,7 +423,8 @@ async def callback(update,context):
     if data.startswith("standard|"):
         val=data.split("|",1)[1]
         db.set_settings(update.effective_user.id,standard=val)
-        await q.edit_message_text("✅ مرجع گزارش ذخیره شد.",reply_markup=settings_menu()); return
+        names={"iran":"مقررات ملی ایران","aci":"ACI 318","ec2":"Eurocode 2","china":"China GB/T 50010-2010(2024) + GB/T 50011-2010(2024)"}
+        await q.edit_message_text(f"✅ مرجع گزارش: <b>{names.get(val,val)}</b>\\n\\nبرای حالت چین، استاندارد بتن GB/T 50010-2010(2024) در گزارش ثبت می‌شود و استاندارد لرزه‌ای GB/T 50011-2010(2024) نیز به‌عنوان مرجع پروژه درج می‌گردد. این انتخاب طراحی خودکار انجام نمی‌دهد.",parse_mode="HTML",reply_markup=settings_menu()); return
     if data=="concrete_settings":
         await q.edit_message_text("🏗 <b>رده بتن</b>",parse_mode="HTML",reply_markup=concrete_settings_menu()); return
     if data.startswith("concrete_grade|"):
