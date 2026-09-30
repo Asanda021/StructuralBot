@@ -149,6 +149,20 @@ def main():
              "procurement_weight_kg": 42.667},
         ],
     }])
+    # Export QA sheet must be generated for professional review.
+    qa_result = estimate_members([{
+        "section": "ستون", "member": "C2",
+        "components": [{
+            "name": "بتن ستون", "value": 1.0, "unit": "m³", "category": "بتن"
+        }]
+    }])
+    with tempfile.TemporaryDirectory() as d:
+        qa_xlsx = create_excel(qa_result, "QA Test", os.path.join(d, "qa.xlsx"))
+        from openpyxl import load_workbook
+        book = load_workbook(qa_xlsx, read_only=True)
+        assert "کنترل کیفیت" in book.sheetnames
+        book.close()
+
     with tempfile.TemporaryDirectory() as d:
         xlsx = create_excel(full_result, "Smoke Test", os.path.join(d, "smoke.xlsx"))
         pdf = create_pdf(full_result, "Smoke Test", os.path.join(d, "smoke.pdf"))
