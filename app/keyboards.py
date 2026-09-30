@@ -193,7 +193,7 @@ def input_keyboard(values=None, unit=""):
         if row: rows.append(row)
     rows.append([KeyboardButton("✏️ ورود دستی")])
     rows.append([KeyboardButton("⬅️ مرحله قبل"), KeyboardButton("📋 ورودی‌ها")])
-    rows.append([KeyboardButton("❌ لغو عضو")])
+    rows.append([KeyboardButton("❌ لغو ورود عضو")])
     rows.append([KeyboardButton("🏠 خانه"), KeyboardButton("📂 پروژه‌ها"), KeyboardButton("🧮 شروع برآورد")])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True, one_time_keyboard=False, is_persistent=True,
                                input_field_placeholder="مقدار آماده را انتخاب کن یا ورود دستی بزن")
@@ -213,7 +213,7 @@ def field_menu(values=None, unit=""):
         InlineKeyboardButton("📋 ورودی‌ها",callback_data="show_inputs")
     ])
     rows.append([
-        InlineKeyboardButton("❌ لغو عضو",callback_data="cancel_member"),
+        InlineKeyboardButton("❌ لغو ورود عضو",callback_data="cancel_member"),
         InlineKeyboardButton("🏠 منو",callback_data="home")
     ])
     rows.append([InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
