@@ -217,6 +217,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "edit_current":
+        context.user_data["editing_saved"] = True
         rows = []
         for i, (key, label, unit) in enumerate(FIELDS):
             rows.append([InlineKeyboardButton(
