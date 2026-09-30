@@ -150,14 +150,30 @@ def rebar_settings_menu():
     ])
 
 def rebar_equivalency_menu():
-    return InlineKeyboardMarkup([
-      [InlineKeyboardButton("Φ8 ↔ Φ10",callback_data="eq|8|10"),InlineKeyboardButton("Φ10 ↔ Φ12",callback_data="eq|10|12")],
-      [InlineKeyboardButton("Φ12 ↔ Φ14",callback_data="eq|12|14"),InlineKeyboardButton("Φ14 ↔ Φ16",callback_data="eq|14|16")],
-      [InlineKeyboardButton("Φ16 ↔ Φ18",callback_data="eq|16|18"),InlineKeyboardButton("Φ18 ↔ Φ20",callback_data="eq|18|20")],
-      [InlineKeyboardButton("Φ20 ↔ Φ22",callback_data="eq|20|22"),InlineKeyboardButton("Φ22 ↔ Φ25",callback_data="eq|22|25")],
-      [InlineKeyboardButton("Φ25 ↔ Φ28",callback_data="eq|25|28"),InlineKeyboardButton("Φ28 ↔ Φ32",callback_data="eq|28|32")],
-      [InlineKeyboardButton("⬅️ بازگشت",callback_data="home")]
-    ])
+    diameters=[8,10,12,14,16,18,20,22,25,28,32]
+    rows=[]
+    row=[]
+    for d in diameters:
+        row.append(InlineKeyboardButton(f"Φ{d}",callback_data=f"eqsrc|{d}"))
+        if len(row)==3:
+            rows.append(row); row=[]
+    if row: rows.append(row)
+    rows.append([InlineKeyboardButton("⬅️ بازگشت",callback_data="home")])
+    return InlineKeyboardMarkup(rows)
+
+def rebar_equiv_target_menu(source):
+    diameters=[8,10,12,14,16,18,20,22,25,28,32]
+    rows=[]
+    row=[]
+    for d in diameters:
+        if d==source: continue
+        row.append(InlineKeyboardButton(f"Φ{d}",callback_data=f"eqdst|{source}|{d}"))
+        if len(row)==3:
+            rows.append(row); row=[]
+    if row: rows.append(row)
+    rows.append([InlineKeyboardButton("⬅️ قطر مبدأ",callback_data="rebar_equiv")])
+    return InlineKeyboardMarkup(rows)
+
 
 def input_keyboard(values=None, unit=""):
     """Preset picker plus manual entry. Presets are shortcuts, never design decisions."""
