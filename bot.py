@@ -421,7 +421,7 @@ def calc_member(section,typ,v):
                    {"name":"تعداد تیرچه","value":r["joist_count"],"unit":"عدد","note":f"{r['joist_lines']} خط تیرچه × ضریب سیستم"},
                    {"name":"طول کل تیرچه","value":r["joist_total_length_m"],"unit":"m"},
                    {"name":"بلوک/یونولیت","value":r["block_count"],"unit":"عدد","note":f"{r['block_kind']} | {r['block_length_m']}×{r['block_width_m']}m"}]
-            if "thermal" in r: comps += rcomps("شبکه حرارتی دو جهت",r["thermal"],f"X={r['thermal']['bars_each_direction'][0]} | Y={r['thermal']['bars_each_direction'][1]}")
+            if "thermal" in r:\n                comps += rcomps("شبکه حرارتی - X",grid_direction_rebar(data["length"],data["width"],data["thermal_dia"],data["thermal_spacing_cm"],"X"))\n                comps += rcomps("شبکه حرارتی - Y",grid_direction_rebar(data["length"],data["width"],data["thermal_dia"],data["thermal_spacing_cm"],"Y"))
             if r.get("tie_beam_rebar"): comps += rcomps("کلاف/ژوئن",r["tie_beam_rebar"])
             if r.get("negative"): comps += rcomps("میلگرد منفی",r["negative"])
             if r.get("otka"): comps += rcomps("اتکا/ادکا",r["otka"])
@@ -449,7 +449,7 @@ def calc_member(section,typ,v):
         openings=[{"length":ol,"width":ow,"count":oc}] if oc and ol and ow else []
         r=calculate_slab({"slab_type":typ,"length":L,"width":W,"thickness":T,"thermal_dia":td or None,"thermal_spacing_cm":ts or None,"openings":openings})
         comps=[{"name":"بتن سقف","value":r["concrete_m3"],"unit":"m³","note":f"مساحت خالص × ضخامت {r['concrete_coeff']:.3f}m"},{"name":"مساحت سقف","value":r["area_m2"],"unit":"m²"},{"name":"مساحت بازشو","value":r["opening_area_m2"],"unit":"m²"}]
-        if "thermal" in r: comps += rcomps("شبکه حرارتی دو جهت",r["thermal"],f"X={r['thermal']['bars_each_direction'][0]} | Y={r['thermal']['bars_each_direction'][1]}")
+        if "thermal" in r:\n            comps += rcomps("شبکه حرارتی - X",grid_direction_rebar(L,W,td,ts,"X"))\n            comps += rcomps("شبکه حرارتی - Y",grid_direction_rebar(L,W,td,ts,"Y"))
         return comps
 
     if section=="فونداسیون":
