@@ -3,7 +3,7 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
 from telegram.ext import (
     Application, CallbackQueryHandler, CommandHandler,
@@ -85,6 +85,164 @@ async def home(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🏠 منوی اصلی", reply_markup=main_menu())
 
 
+def wizard_keyboard(options, custom_label="✏️ ورود دستی"):
+    rows = []
+    row = []
+    for label, value in options:
+        row.append(InlineKeyboardButton(label, callback_data=f"wizval|{value}"))
+        if len(row) == 3:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton(custom_label, callback_data="wizcustom")])
+    rows.append([InlineKeyboardButton("❌ لغو", callback_data="home")])
+    return InlineKeyboardMarkup(rows)
+
+
+def wizard_prompt(title, labels, index, options=None, manual=False):
+    label = labels[index]
+    text = (
+        f"📐 <b>{title}</b>\\n\\n"
+        f"مرحله {index + 1} از {len(labels)}\\n"
+        f"<b>{label}</b> را انتخاب کن.\\n\\n"
+        "برای سرعت، یکی از گزینه‌ها را بزن؛ یا «ورود دستی» را انتخاب کن و فقط همین مقدار را تایپ کن."
+    )
+    markup = wizard_keyboard(options or []) if not manual else InlineKeyboardMarkup([
+        [InlineKeyboardButton("⬅️ برگشت", callback_data=f"wizback|{max(index-1,0)}")],
+        [InlineKeyboardButton("❌ لغو", callback_data="home")],
+    ])
+    return text, markup
+
+
+def begin_wizard(context, kind):
+    specs = {
+        "foundation": ("پی", ["عرض پی (m)", "طول پی (m)", "ضخامت پی (m)"]),
+        "column": ("ستون", ["عرض ستون (m)", "عمق ستون (m)", "ارتفاع ستون (m)"]),
+        "beam": ("تیر", ["عرض تیر (m)", "ارتفاع تیر (m)", "طول تیر (m)"]),
+        "slab": ("سقف", ["ضخامت سقف (m)", "طول سقف (m)", "عرض سقف (m)"]),
+        "quantity": ("برآورد بتن", ["بعد اول (m)", "بعد دوم (m)", "بعد سوم (m)"]),
+        "rebar_eq": ("معادل‌سازی میلگرد", ["قطر اول (mm)", "قطر دوم (mm)"]),
+        "bbs": ("BBS / Cut List", ["قطر میلگرد (mm)", "تعداد میلگرد", "طول هر قطعه (m)"]),
+    }
+    title, labels = specs[kind]
+    context.user_data.clear()
+    context.user_data.update({"wizard": kind, "wizard_index": 0, "wizard_values": []})
+    return title, labels
+
+
+def wizard_options(kind, index):
+    common = {
+        "foundation": [
+            [("0.30", "0.30"), ("0.40", "0.40"), ("0.50", "0.50")],
+            [("1.00", "1.00"), ("1.50", "1.50"), ("2.00", "2.00")],
+            [("0.30", "0.30"), ("0.40", "0.40"), ("0.50", "0.50")],
+        ],
+        "column": [
+            [("0.30", "0.30"), ("0.40", "0.40"), ("0.50", "0.50")],
+            [("0.30", "0.30"), ("0.40", "0.40"), ("0.50", "0.50")],
+            [("3.00", "3.00"), ("3.50", "3.50"), ("4.00", "4.00")],
+        ],
+        "beam": [
+            [("0.25", "0.25"), ("0.30", "0.30"), ("0.40", "0.40")],
+            [("0.40", "0.40"), ("0.50", "0.50"), ("0.60", "0.60")],
+            [("4.00", "4.00"), ("5.00", "5.00"), ("6.00", "6.00")],
+        ],
+        "slab": [
+            [("0.12", "0.12"), ("0.15", "0.15"), ("0.20", "0.20")],
+            [("4.00", "4.00"), ("5.00", "5.00"), ("6.00", "6.00")],
+            [("3.00", "3.00"), ("4.00", "4.00"), ("5.00", "5.00")],
+        ],
+        "quantity": [
+            [("0.15", "0.15"), ("0.20", "0.20"), ("0.30", "0.30")],
+            [("4.00", "4.00"), ("5.00", "5.00"), ("6.00", "6.00")],
+            [("3.00", "3.00"), ("4.00", "4.00"), ("5.00", "5.00")],
+        ],
+        "rebar_eq": [
+            [("12", "12"), ("14", "14"), ("16", "16"), ("18", "18"), ("20", "20"), ("22", "22"), ("25", "25"), ("28", "28"), ("32", "32")],
+            [("12", "12"), ("14", "14"), ("16", "16"), ("18", "18"), ("20", "20"), ("22", "22"), ("25", "25"), ("28", "28"), ("32", "32")],
+        ],
+        "bbs": [
+            [("12", "12"), ("14", "14"), ("16", "16"), ("18", "18"), ("20", "20"), ("22", "22"), ("25", "25"), ("28", "28"), ("32", "32")],
+            [("5", "5"), ("10", "10"), ("15", "15"), ("20", "20"), ("25", "25"), ("30", "30")],
+            [("3", "3"), ("4", "4"), ("5", "5"), ("6", "6"), ("8", "8"), ("10", "10"), ("12", "12")],
+        ],
+    }
+    return common[kind][index]
+
+
+def wizard_labels(kind):
+    return {
+        "foundation": ["عرض پی (m)", "طول پی (m)", "ضخامت پی (m)"],
+        "column": ["عرض ستون (m)", "عمق ستون (m)", "ارتفاع ستون (m)"],
+        "beam": ["عرض تیر (m)", "ارتفاع تیر (m)", "طول تیر (m)"],
+        "slab": ["ضخامت سقف (m)", "طول سقف (m)", "عرض سقف (m)"],
+        "quantity": ["بعد اول (m)", "بعد دوم (m)", "بعد سوم (m)"],
+        "rebar_eq": ["قطر اول (mm)", "قطر دوم (mm)"],
+        "bbs": ["قطر میلگرد (mm)", "تعداد میلگرد", "طول هر قطعه (m)"],
+    }[kind]
+
+
+def wizard_title(kind):
+    return {
+        "foundation": "پی",
+        "column": "ستون",
+        "beam": "تیر",
+        "slab": "سقف",
+        "quantity": "برآورد بتن",
+        "rebar_eq": "معادل‌سازی میلگرد",
+        "bbs": "BBS / Cut List",
+    }[kind]
+
+
+async def show_wizard_step(target, context, index=None, manual=False):
+    kind = context.user_data["wizard"]
+    if index is not None:
+        context.user_data["wizard_index"] = index
+    index = context.user_data["wizard_index"]
+    labels = wizard_labels(kind)
+    text, markup = wizard_prompt(
+        wizard_title(kind), labels, index,
+        wizard_options(kind, index) if not manual else None,
+        manual=manual,
+    )
+    if hasattr(target, "edit_message_text"):
+        await target.edit_message_text(text, parse_mode="HTML", reply_markup=markup)
+    else:
+        await target.reply_text(text, parse_mode="HTML", reply_markup=markup)
+
+
+async def finish_wizard(update, context):
+    kind = context.user_data["wizard"]
+    values = context.user_data["wizard_values"]
+    uid = update.effective_user.id
+    if kind == "foundation":
+        title, result = "پی", foundation_calc(*values)
+    elif kind == "column":
+        title, result = "ستون", column_calc(*values)
+    elif kind == "beam":
+        title, result = "تیر", beam_calc(*values)
+    elif kind == "slab":
+        title, result = "سقف", slab_calc(*values)
+    elif kind == "quantity":
+        title, result = "برآورد بتن", concrete_for_dimensions(*values)
+    elif kind == "rebar_eq":
+        title, result = "معادل‌سازی میلگرد", rebar_equivalent(*values)
+    else:
+        title, result = "BBS / Cut List", bbs_cutlist(*values)
+
+    lines = "\\n".join(f"• {k}: {clean_number(v)}" for k, v in result.items())
+    db.ensure_user(uid, update.effective_user.first_name or "")
+    db.save_calc(uid, title, lines)
+    context.user_data.clear()
+    await update.effective_message.reply_text(
+        f"✅ <b>{title}</b>\\n\\n{lines}\\n\\n"
+        "⚠️ این خروجی برای برآورد اولیه است و جایگزین طراحی نهایی مهندس محاسب نیست.",
+        parse_mode="HTML",
+        reply_markup=main_menu(),
+    )
+
+
 async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     data = q.data or ""
@@ -95,32 +253,65 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await home(update, context)
         return
 
+    if data.startswith("wizval|"):
+        if "wizard" not in context.user_data:
+            await q.edit_message_text("این مرحله منقضی شده. دوباره از منو شروع کن.", reply_markup=main_menu())
+            return
+        try:
+            value = float(data.split("|", 1)[1])
+            context.user_data["wizard_values"].append(value)
+        except (ValueError, KeyError):
+            await q.edit_message_text("ورودی نامعتبر است.", reply_markup=main_menu())
+            return
+
+        index = context.user_data["wizard_index"] + 1
+        if index >= len(wizard_labels(context.user_data["wizard"])):
+            await finish_wizard(update, context)
+        else:
+            context.user_data["wizard_index"] = index
+            await show_wizard_step(q, context)
+        return
+
+    if data == "wizcustom":
+        if "wizard" not in context.user_data:
+            await q.edit_message_text("این مرحله منقضی شده. دوباره از منو شروع کن.", reply_markup=main_menu())
+            return
+        index = context.user_data["wizard_index"]
+        label = wizard_labels(context.user_data["wizard"])[index]
+        await q.edit_message_text(
+            f"✏️ <b>{label}</b>\\n\\n"
+            "فقط همین مقدار را تایپ کن.\\n"
+            "مثال: <code>0.35</code>",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("❌ لغو", callback_data="home")]
+            ]),
+        )
+        context.user_data["manual"] = True
+        return
+
+    if data.startswith("wizback|"):
+        if "wizard" in context.user_data:
+            idx = int(data.split("|", 1)[1])
+            context.user_data["wizard_index"] = idx
+            if len(context.user_data["wizard_values"]) > idx:
+                context.user_data["wizard_values"] = context.user_data["wizard_values"][:idx]
+            await show_wizard_step(q, context)
+        return
+
     if data == "calc":
         context.user_data.clear()
         await q.edit_message_text("📐 نوع محاسبه را انتخاب کن:", reply_markup=calc_menu())
         return
 
     if data in {"foundation", "column", "beam", "slab"}:
-        context.user_data["step"] = data
-        names = {
-            "foundation": "پی",
-            "column": "ستون",
-            "beam": "تیر",
-            "slab": "سقف",
-        }
-        examples = {
-            "foundation": "0.60, 2.00, 0.40",
-            "column": "0.40, 0.40, 3.00",
-            "beam": "0.30, 0.50, 5.00",
-            "slab": "0.15, 5.00, 4.00",
-        }
-        await q.edit_message_text(
-            f"📐 <b>{names[data]}</b>\n\n"
-            f"سه مقدار را با کاما بفرست:\n<code>{examples[data]}</code>\n\n"
-            "همه ابعاد بر حسب متر هستند.",
-            parse_mode="HTML",
-            reply_markup=back_menu(),
-        )
+        title, labels = begin_wizard(context, data)
+        await show_wizard_step(q, context)
+        return
+
+    if data == "quantity":
+        begin_wizard(context, "quantity")
+        await show_wizard_step(q, context)
         return
 
     if data == "rebar":
@@ -129,66 +320,39 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "rebar_eq":
-        context.user_data["step"] = "rebar_eq"
-        await q.edit_message_text(
-            "🔄 <b>معادل‌سازی میلگرد</b>\\n\\nدو قطر را با کاما بفرست.\\nمثال: <code>16, 20</code>",
-            parse_mode="HTML", reply_markup=back_menu(),
-        )
+        begin_wizard(context, "rebar_eq")
+        await show_wizard_step(q, context)
         return
 
     if data == "bbs":
-        context.user_data["step"] = "bbs"
-        await q.edit_message_text(
-            "📋 <b>BBS / Cut List</b>\\n\\nقطر، تعداد و طول هر قطعه را با کاما بفرست.\\nمثال: <code>16, 20, 8.5</code>",
-            parse_mode="HTML", reply_markup=back_menu(),
-        )
+        begin_wizard(context, "bbs")
+        await show_wizard_step(q, context)
         return
 
     if data == "codes":
         await q.edit_message_text(
-            "📚 <b>کدهای طراحی</b>\\n\\nنسخه سبک فعلی ورودی کد را جدا نگه می‌دارد.\\nدر فاز بعد کدهای ایران و سایر کشورها به‌صورت Adapter اضافه می‌شوند.",
+            "📚 <b>کدهای طراحی</b>\\n\\n"
+            "نسخه سبک فعلی ورودی کد را جدا نگه می‌دارد.\\n"
+            "در فاز بعد کدهای ایران و سایر کشورها به‌صورت Adapter اضافه می‌شوند.",
             parse_mode="HTML", reply_markup=back_menu(),
-        )
-        return
-
-    if data == "quantity":
-        context.user_data["step"] = "quantity"
-        await q.edit_message_text(
-            "🧮 <b>برآورد بتن</b>\n\n"
-            "ضخامت/بعد اول، بعد دوم، بعد سوم را با کاما بفرست.\n"
-            "مثال: <code>0.30, 5, 4</code>",
-            parse_mode="HTML",
-            reply_markup=back_menu(),
-        )
-        return
-
-    if data == "rebar":
-        context.user_data["step"] = "rebar"
-        await q.edit_message_text(
-            "🔩 <b>معادل‌سازی میلگرد</b>\n\n"
-            "دو قطر را با کاما بفرست.\n"
-            "مثال: <code>16, 20</code>",
-            parse_mode="HTML",
-            reply_markup=back_menu(),
         )
         return
 
     if data == "projects":
         projects = db.projects(update.effective_user.id)
-        lines = "\n".join(f"• {p[1]}" for p in projects) if projects else "هنوز پروژه‌ای ثبت نشده."
+        lines = "\\n".join(f"• {p[1]}" for p in projects) if projects else "هنوز پروژه‌ای ثبت نشده."
         context.user_data["step"] = "project"
         await q.edit_message_text(
-            "🏗 <b>پروژه‌های من</b>\n\n" + lines +
-            "\n\nنام پروژه جدید را بفرست تا ذخیره شود.",
-            parse_mode="HTML",
-            reply_markup=back_menu(),
+            "🏗 <b>پروژه‌های من</b>\\n\\n" + lines +
+            "\\n\\nنام پروژه جدید را بفرست تا ذخیره شود.",
+            parse_mode="HTML", reply_markup=back_menu(),
         )
         return
 
     if data == "reports":
         last = db.last_calc(update.effective_user.id)
         if last:
-            text = f"📊 <b>{last[0]}</b>\n\n{last[1]}"
+            text = f"📊 <b>{last[0]}</b>\\n\\n{last[1]}"
         else:
             text = "📊 هنوز محاسبه‌ای ذخیره نشده."
         await q.edit_message_text(text, parse_mode="HTML", reply_markup=back_menu())
@@ -196,7 +360,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "account":
         await q.edit_message_text(
-            "👤 <b>حساب کاربری</b>\n\nنسخه پایه فعال است.\n"
+            "👤 <b>حساب کاربری</b>\\n\\nنسخه پایه فعال است.\\n"
             "ساختار حساب، اعتبار و پرداخت برای توسعه بعدی جدا نگه داشته شده.",
             parse_mode="HTML", reply_markup=back_menu(),
         )
@@ -204,14 +368,14 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "settings":
         await q.edit_message_text(
-            "⚙️ <b>تنظیمات</b>\n\nواحد فعلی: متر / کیلوگرم\nزبان: فارسی",
+            "⚙️ <b>تنظیمات</b>\\n\\nواحد فعلی: متر / کیلوگرم\\nزبان: فارسی",
             parse_mode="HTML", reply_markup=back_menu(),
         )
         return
 
     if data == "ai":
         await q.edit_message_text(
-            "🤖 <b>دستیار هوشمند</b>\n\n"
+            "🤖 <b>دستیار هوشمند</b>\\n\\n"
             "فعلاً موتور محاسبات مستقل است. اتصال AI در مرحله بعد به‌عنوان لایه کمکی اضافه می‌شود.",
             parse_mode="HTML", reply_markup=back_menu(),
         )
@@ -221,6 +385,32 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("wizard"):
+        kind = context.user_data["wizard"]
+        if not context.user_data.get("manual"):
+            await update.message.reply_text(
+                "از دکمه‌های همین مرحله استفاده کن؛ اگر می‌خواهی عدد را خودت وارد کنی، «✏️ ورود دستی» را بزن.",
+                reply_markup=wizard_keyboard(wizard_options(kind, context.user_data["wizard_index"])),
+            )
+            return
+        text = (update.message.text or "").strip().replace("،", ".")
+        try:
+            value = float(text)
+            if value <= 0:
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("❌ فقط یک عدد مثبت وارد کن. مثال: <code>0.35</code>", parse_mode="HTML")
+            return
+        context.user_data["wizard_values"].append(value)
+        context.user_data["manual"] = False
+        index = context.user_data["wizard_index"] + 1
+        if index >= len(wizard_labels(kind)):
+            await finish_wizard(update, context)
+        else:
+            context.user_data["wizard_index"] = index
+            await show_wizard_step(update.message, context)
+        return
+
     step = context.user_data.get("step")
     text = (update.message.text or "").strip()
     uid = update.effective_user.id
@@ -232,71 +422,5 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ پروژه «{text}» ذخیره شد.", reply_markup=main_menu())
         return
 
-    if step not in {"foundation", "column", "beam", "slab", "quantity", "rebar_eq", "bbs"}:
-        await update.message.reply_text("از منوی زیر یک گزینه انتخاب کن.", reply_markup=main_menu())
-        return
+    await update.message.reply_text("از منوی زیر یک گزینه انتخاب کن.", reply_markup=main_menu())
 
-    try:
-        count = 2 if step == "rebar_eq" else 3
-        values = parse_numbers(text, count)
-        if step == "foundation":
-            title, result = "پی", foundation_calc(*values)
-        elif step == "column":
-            title, result = "ستون", column_calc(*values)
-        elif step == "beam":
-            title, result = "تیر", beam_calc(*values)
-        elif step == "slab":
-            title, result = "سقف", slab_calc(*values)
-        elif step == "quantity":
-            title, result = "برآورد بتن", concrete_for_dimensions(*values)
-        else:
-            title, result = "معادل‌سازی میلگرد", rebar_equivalent(*values)
-    except (ValueError, TypeError):
-        example = "16, 20" if step == "rebar_eq" else ("16, 20, 8.5" if step == "bbs" else "0.30, 5, 4")
-        await update.message.reply_text(f"❌ ورودی نامعتبر است. مثال: {example}")
-        return
-
-    lines = "\n".join(f"• {k}: {clean_number(v)}" for k, v in result.items())
-    db.ensure_user(uid, update.effective_user.first_name or "")
-    db.save_calc(uid, title, lines)
-    context.user_data.clear()
-    await update.message.reply_text(
-        f"✅ <b>{title}</b>\n\n{lines}\n\n"
-        "⚠️ این خروجی برای برآورد اولیه است و جایگزین طراحی نهایی مهندس محاسب نیست.",
-        parse_mode="HTML",
-        reply_markup=main_menu(),
-    )
-
-
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    if isinstance(context.error, BadRequest) and "Message is not modified" in str(context.error):
-        return
-    log.exception("Unhandled update", exc_info=context.error)
-
-
-def build_app():
-    if not TOKEN:
-        raise RuntimeError("BOT_TOKEN is not set")
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message))
-    app.add_error_handler(error_handler)
-    return app
-
-
-def main():
-    db.init()
-    threading.Thread(target=health_server, daemon=True).start()
-    app = build_app()
-    log.info("StructuralBot Lite starting")
-    app.run_polling(
-        allowed_updates=Update.ALL_TYPES,
-        drop_pending_updates=True,
-        poll_interval=0.0,
-        timeout=10,
-    )
-
-
-if __name__ == "__main__":
-    main()
