@@ -123,6 +123,7 @@ logger = logging.getLogger(
 from handlers.start import (
     start_command,
     language_callback,
+    unit_system_callback,
 )
 
 
