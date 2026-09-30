@@ -748,8 +748,6 @@ async def callback(update,context):
         m=ms[idx]; result=estimate_members([m])
         concrete=result.get("concrete_total_m3",0)
 
-        # Mobile-safe procurement table: avoid wide monospaced columns because
-        # Persian/Arabic RTL text makes fixed-width tables visually unstable.
         groups={}
         for comp in m.get("components",[]):
             if comp.get("category")!="میلگرد": continue
@@ -759,7 +757,7 @@ async def callback(update,context):
             base=name.split(" - ")[0]
             g=groups.setdefault((base,float(dia)),{
                 "pieces":0,"length":0.0,"weight":0.0,"branches":0,
-                "buy_weight":0.0,"stock":12.0,"cut_lengths":[]
+                "buy_weight":0.0,"buy_length":0.0,"stock":12.0,"cut_lengths":[]
             })
             if name.endswith(" - تعداد قطعه"):
                 g["pieces"]+=int(comp.get("value",0))
@@ -775,55 +773,75 @@ async def callback(update,context):
                 if "شاخه " in note and "m" in note:
                     try: g["stock"]=float(note.split("شاخه ",1)[1].split("m",1)[0])
                     except Exception: pass
+            elif name.endswith(" - طول خرید"):
+                g["buy_length"]+=float(comp.get("value",0))
 
-        tw=tb=tl=tp=0
-        table=["<b>نوع میلگرد</b>  |  <b>قطر</b>  |  <b>قطعه</b>  |  <b>شاخه</b>  |  <b>طول</b>  |  <b>وزن</b>"]
-        table.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        tw=tb=tl=tp=buy_weight=buy_length=waste=0.0
+        blocks=[]
         for n,(key,g) in enumerate(groups.items(),1):
             base,dia=key
-            avg=(g["length"]/g["pieces"]) if g["pieces"] else 0
-            length_each=f"{avg:.2f}"
+            length_each=(g["length"]/g["pieces"]) if g["pieces"] else 0
             if g["cut_lengths"]:
                 unique=sorted(set(round(x,3) for x in g["cut_lengths"]))
-                length_each=", ".join(f"{x:g}" for x in unique[:3])
-                if len(unique)>3: length_each+="…"
-            table.append(
-                f"<b>{n}. {base}</b> | Φ{dia:g} | {g['pieces']} | {g['branches']} | "
-                f"{g['length']:.2f}m | {g['weight']:.2f}kg"
-            )
-            table.append(
-                f"   ↳ طول هر قطعه: {length_each}m  •  شاخه استاندارد: {g['stock']:g}m  •  وزن خرید: {g['buy_weight']:.2f}kg"
-            )
+                if len(unique)==1: length_each=unique[0]
+            if not g["buy_length"] and g["branches"]:
+                g["buy_length"]=g["branches"]*g["stock"]
+            g["waste"]=max(0.0,g["buy_length"]-g["length"])
+            blocks += [
+                f"<b>{n}. {base}</b>",
+                f"قطر: <b>Φ{dia:g}</b>",
+                f"تعداد قطعه: <b>{g['pieces']} عدد</b>",
+                f"طول هر قطعه: <b>{length_each:.2f} m</b>",
+                f"طول کل اجرا: <b>{g['length']:.2f} m</b>",
+                f"شاخه خرید: <b>{g['branches']} × {g['stock']:g}m</b>",
+                f"طول خرید: <b>{g['buy_length']:.2f} m</b>",
+                f"پرت خرید: <b>{g['waste']:.2f} m</b>",
+                f"وزن اجرا: <b>{g['weight']:.2f} kg</b>",
+                f"وزن خرید: <b>{g['buy_weight']:.2f} kg</b>",
+                "────────────────"
+            ]
             tp+=g["pieces"]; tb+=g["branches"]; tl+=g["length"]; tw+=g["weight"]
-
-        if groups:
-            table.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            table.append(f"<b>جمع</b> | — | {tp} | {tb} | {tl:.2f}m | {tw:.2f}kg")
-            table_text="\n".join(table)
-        else:
-            table_text="میلگردی برای این عضو ثبت نشده است."
+            buy_weight+=g["buy_weight"]; buy_length+=g["buy_length"]; waste+=g["waste"]
 
         other=[]
         for comp in m.get("components",[]):
             if comp.get("category")=="میلگرد": continue
-            other.append(f"• {comp['name']}: <b>{fmt(comp['value'])}</b> {comp['unit']}")
+            name=str(comp.get("name",""))
+            # Concrete and area are already shown in the member summary.
+            if name in ("بتن فونداسیون","بتن پله","بتن","مساحت فونداسیون","مساحت پله"):
+                continue
+            other.append(f"• {name}: <b>{fmt(comp['value'])}</b> {comp['unit']}")
 
         lines=[
-            "🧮 <b>محاسبات نهایی عضو</b>",
-            "",
+            "🧮 <b>محاسبات نهایی عضو</b>","",
             f"🏷 <b>عضو:</b> {m['member']}",
-            f"🧱 <b>بتن:</b> {fmt(concrete)} m³",
-            "",
-            "📋 <b>جدول تفصیلی میلگرد و خرید</b>",
-            table_text,
-            "",
-            f"⚖️ <b>جمع وزن اجرای میلگرد:</b> {fmt(tw)} kg",
-            f"📦 <b>جمع شاخه خرید:</b> {tb} شاخه",
-            "",
-            "📦 <b>سایر اقلام متره:</b>",
-            *(other or ["• موردی ثبت نشده است."])
+            f"🧱 <b>حجم بتن:</b> {fmt(concrete)} m³",
         ]
+        for comp in m.get("components",[]):
+            if comp.get("category")!="میلگرد" and comp.get("name") in ("مساحت فونداسیون","مساحت پله"):
+                lines.append(f"📐 <b>مساحت:</b> {fmt(comp['value'])} {comp['unit']}")
+                break
+        lines += ["","🔩 <b>جزئیات میلگرد</b>"]
+        if blocks: lines += blocks[:-1]
+        else: lines.append("میلگردی برای این عضو ثبت نشده است.")
+        lines += [
+            "",
+            "════════════════════════",
+            "📊 <b>جمع میلگرد عضو</b>","",
+            f"تعداد کل قطعات: <b>{int(tp)} عدد</b>",
+            f"طول کل اجرا: <b>{tl:.2f} m</b>",
+            f"وزن کل اجرا: <b>{tw:.2f} kg</b>",
+            "",
+            f"شاخه خرید: <b>{int(tb)} شاخه</b>",
+            f"طول کل خرید: <b>{buy_length:.2f} m</b>",
+            f"پرت خرید: <b>{waste:.2f} m</b>",
+            f"وزن کل خرید: <b>{buy_weight:.2f} kg</b>",
+        ]
+        if other:
+            lines += ["","📦 <b>سایر اقلام متره</b>",*other]
+
         await q.edit_message_text("\n".join(lines),parse_mode="HTML",reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("📋 کپی نتیجه عضو",callback_data="copy_member_output")],
             [InlineKeyboardButton("✅ تأیید نهایی عضو",callback_data="member_confirm")],
             [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit")],
             [InlineKeyboardButton("🔎 بازبینی پروژه",callback_data="finish_takeoff")],
