@@ -76,10 +76,19 @@ def schema(section,typ):
               ("تعداد کلاف میانی/ژوئن","عدد"),("طول هر کلاف/ژوئن","m"),("قطر کلاف/ژوئن","mm"),
               ("تعداد سنجاقی ژوئن","عدد"),("طول هر سنجاقی ژوئن","m"),("قطر سنجاقی ژوئن","mm"),
               ("تعداد میلگرد منفی","عدد"),("طول هر میلگرد منفی","m"),("قطر میلگرد منفی","mm"),
-              ("تعداد اتکا/ادکا","عدد"),("طول هر اتکا/ادکا","m"),("قطر اتکا/ادکا","mm")
+              ("تعداد اتکا/ادکا","عدد"),("طول هر اتکا/ادکا","m"),("قطر اتکا/ادکا","mm"),
+              ("تعداد بازشو","عدد"),("طول بازشو","m"),("عرض بازشو","m")
+            ]
+        if typ in ("وافل","یوبوت"):
+            return [
+              ("طول سقف","m"),("عرض سقف","m"),("ضخامت کل سقف","m"),("ضخامت لایه رویه/تاپینگ","m"),
+              ("طول ماژول خالی","m"),("عرض ماژول خالی","m"),("ارتفاع ماژول خالی","m"),
+              ("فاصله ماژول","cm"),("قطر حرارتی","mm"),("فاصله حرارتی","cm"),
+              ("تعداد بازشو","عدد"),("طول بازشو","m"),("عرض بازشو","m")
             ]
         return [("طول سقف","m"),("عرض سقف","m"),("ضخامت/ارتفاع مؤثر سقف","m"),
-                ("قطر حرارتی","mm"),("فاصله حرارتی","cm")]
+                ("قطر حرارتی","mm"),("فاصله حرارتی","cm"),
+                ("تعداد بازشو","عدد"),("طول بازشو","m"),("عرض بازشو","m")]
     if section=="فونداسیون":
         if typ=="بتن مگر":
             return [("تعداد","عدد"),("طول","m"),("عرض","m"),("ضخامت مگر","m")]
@@ -168,24 +177,41 @@ def calc_member(section,typ,v):
                   "block_length_m":v[6] or 1.0,"block_width_m":v[7] or 0.5,
                   "joan_count":v[8],"joan_length_m":v[9],"joan_dia":v[10],
                   "negative_count":v[14],"negative_length_m":v[15],"negative_dia":v[16],
-                  "otka_count":v[17],"otka_length_m":v[18],"otka_dia":v[19]}
-            r=calculate_slab(data); comps=[
-              {"name":"بتن سقف","value":r["concrete_m3"],"unit":"m³","note":f"مساحت × ضریب {r['concrete_coeff']:.3f}"},
-              {"name":"مساحت سقف","value":r["area_m2"],"unit":"m²"},
-              {"name":"تعداد تیرچه","value":r["joist_count"],"unit":"عدد","note":f"{r['joist_lines']} خط تیرچه × ضریب سیستم"},
-              {"name":"طول کل تیرچه","value":r["joist_total_length_m"],"unit":"m"},
-              {"name":"بلوک/یونولیت","value":r["block_count"],"unit":"عدد","note":f"{r['block_kind']} | {r['block_length_m']}×{r['block_width_m']}m"}]
-            if "thermal" in r: comps += rcomps("شبکه حرارتی دو جهت",r["thermal"],f"X={r['bars_each_direction'][0]} | Y={r['bars_each_direction'][1]}")
+                  "otka_count":v[17],"otka_length_m":v[18],"otka_dia":v[19],
+                  "openings":[{"length":v[21],"width":v[22],"count":v[20]}] if v[20] and v[21] and v[22] else []}
+            r=calculate_slab(data)
+            comps=[{"name":"بتن سقف","value":r["concrete_m3"],"unit":"m³","note":f"مساحت خالص × ضریب {r['concrete_coeff']:.3f}"},
+                   {"name":"مساحت سقف","value":r["area_m2"],"unit":"m²"},{"name":"مساحت بازشو","value":r["opening_area_m2"],"unit":"m²"},
+                   {"name":"تعداد تیرچه","value":r["joist_count"],"unit":"عدد","note":f"{r['joist_lines']} خط تیرچه × ضریب سیستم"},
+                   {"name":"طول کل تیرچه","value":r["joist_total_length_m"],"unit":"m"},
+                   {"name":"بلوک/یونولیت","value":r["block_count"],"unit":"عدد","note":f"{r['block_kind']} | {r['block_length_m']}×{r['block_width_m']}m"}]
+            if "thermal" in r: comps += rcomps("شبکه حرارتی دو جهت",r["thermal"],f"X={r['thermal']['bars_each_direction'][0]} | Y={r['thermal']['bars_each_direction'][1]}")
             if r.get("tie_beam_rebar"): comps += rcomps("کلاف/ژوئن",r["tie_beam_rebar"])
             if r.get("negative"): comps += rcomps("میلگرد منفی",r["negative"])
             if r.get("otka"): comps += rcomps("اتکا/ادکا",r["otka"])
-            # Separate count/length of ژوئن and explicit سنجاقی ژوئن
             if v[8] and v[9]: comps.append({"name":"تعداد کلاف/ژوئن","value":v[8],"unit":"عدد","note":f"طول هرکدام {v[9]}m"})
-            if v[11] and v[12] and v[13]:
-                jr=repeated_bar_rebar(v[11],v[12],v[13]); comps += rcomps("سنجاقی ژوئن",jr)
+            if v[11] and v[12] and v[13]: comps += rcomps("سنجاقی ژوئن",repeated_bar_rebar(v[11],v[12],v[13]))
             return comps
-        data={"slab_type":typ,"length":v[0],"width":v[1],"thickness":v[2],"thermal_dia":v[3] or None,"thermal_spacing_cm":v[4] or None}
-        r=calculate_slab(data); comps=[{"name":"بتن سقف","value":r["concrete_m3"],"unit":"m³","note":f"مساحت × ضخامت {r['concrete_coeff']:.3f}m"},{"name":"مساحت سقف","value":r["area_m2"],"unit":"m²"}]
+        if typ in ("وافل","یوبوت"):
+            L,W,T,top,ml,mw,mh,spacing,td,ts,oc,ol,ow=v
+            area=L*W
+            pitch_x=ml+spacing/100
+            pitch_y=mw+spacing/100
+            nx=max(1,math.ceil(L/pitch_x)) if pitch_x>0 else 0
+            ny=max(1,math.ceil(W/pitch_y)) if pitch_y>0 else 0
+            modules=nx*ny
+            void_volume=modules*ml*mw*mh
+            opening_area=oc*ol*ow if oc and ol and ow else 0
+            concrete=max(0,area*T-void_volume-opening_area*top)
+            comps=[{"name":"بتن سقف","value":concrete,"unit":"m³","note":f"حجم خالص {typ} پس از کسر فضای خالی ماژول و بازشو"},
+                   {"name":"مساحت سقف","value":area,"unit":"m²"},{"name":"تعداد ماژول خالی","value":modules,"unit":"عدد"},
+                   {"name":"حجم فضای خالی","value":void_volume,"unit":"m³"},{"name":"مساحت بازشو","value":opening_area,"unit":"m²"}]
+            if td and ts: comps += rcomps("شبکه حرارتی دو جهت",grid_rebar(L,W,td,ts),f"{typ} | X/Y")
+            return comps
+        L,W,T,td,ts,oc,ol,ow=v
+        openings=[{"length":ol,"width":ow,"count":oc}] if oc and ol and ow else []
+        r=calculate_slab({"slab_type":typ,"length":L,"width":W,"thickness":T,"thermal_dia":td or None,"thermal_spacing_cm":ts or None,"openings":openings})
+        comps=[{"name":"بتن سقف","value":r["concrete_m3"],"unit":"m³","note":f"مساحت خالص × ضخامت {r['concrete_coeff']:.3f}m"},{"name":"مساحت سقف","value":r["area_m2"],"unit":"m²"},{"name":"مساحت بازشو","value":r["opening_area_m2"],"unit":"m²"}]
         if "thermal" in r: comps += rcomps("شبکه حرارتی دو جهت",r["thermal"],f"X={r['thermal']['bars_each_direction'][0]} | Y={r['thermal']['bars_each_direction'][1]}")
         return comps
 
