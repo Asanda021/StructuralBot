@@ -426,12 +426,14 @@ async def unit_system_callback(
     )
 
     if query.message is not None:
+        from handlers.main_menu import show_main_menu
+
         await query.message.edit_text(
             selected
             + "\n\n"
-            + "🏗️ تنظیمات اولیه کامل شد.\n"
-            + "از منوی اصلی می‌توانید پروژه و محاسبات خود را شروع کنید."
+            + "🏗️ تنظیمات اولیه کامل شد."
         )
+        await show_main_menu(update, context)
 
 
 # ---------------------------------------------------------------------
