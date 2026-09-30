@@ -61,13 +61,13 @@ def main():
     # Foundation mesh: repeated units must preserve explicit cut pieces.
     import bot
     foundation = bot.calc_member("فونداسیون", "پی منفرد",
-        [2, 2.0, 1.8, 0.45, 12, 20, 10, 25, 4, 1.0, 8, 4, 1.2, 16])
+        [2, 2.0, 1.8, 0.45, 12, 20, 10, 25, 4, 1.0, 16])
     concrete = next(x for x in foundation if x["name"] == "بتن فونداسیون")
-    bottom = next(x for x in foundation if x["name"] == "شبکه پایین دو جهت - تعداد قطعه")
-    pins = next(x for x in foundation if x["name"] == "سنجاقی پی - تعداد قطعه")
+    bottom = next(x for x in foundation if x["name"] == "میلگرد شبکه پایین - دو جهت - تعداد قطعه")
+    top = next(x for x in foundation if x["name"] == "میلگرد شبکه بالا - دو جهت - تعداد قطعه")
     assert abs(concrete["value"] - 3.24) < 1e-9
     assert bottom["value"] > 0
-    assert pins["value"] == 8
+    assert top["value"] > 0
 
     # U-Boot/waffle geometric takeoff path is expected to be supplied by bot.
     # Here we validate the generic slab engine remains usable for solid slabs.
