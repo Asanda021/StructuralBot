@@ -1,0 +1,49 @@
+services:
+  structuralbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: structuralbot
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      STRUCTURALBOT_TESTING: "false"
+      AI_ENABLED: "${AI_ENABLED:-false}"
+      AI_PROVIDER: "${AI_PROVIDER:-placeholder}"
+      PAYMENT_PROVIDER: "${PAYMENT_PROVIDER:-placeholder}"
+      PAYMENT_GATEWAY_ENABLED: "${PAYMENT_GATEWAY_ENABLED:-false}"
+
+    volumes:
+      - structuralbot_data:/app/data
+      - structuralbot_reports:/app/reports/generated
+      - structuralbot_logs:/app/logs
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import bot; print('StructuralBot OK')"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    stop_grace_period: 30s
+
+volumes:
+  structuralbot_data:
+    name: structuralbot_data
+
+  structuralbot_reports:
+    name: structuralbot_reports
+
+  structuralbot_logs:
+    name: structuralbot_logs
