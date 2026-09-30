@@ -262,8 +262,10 @@ def calc_member(section,typ,v):
         if sd and ss and slen:
             cnt=n*(math.ceil(h/(ss/100))+1); comps += rcomps("خاموت",repeated_bar_rebar(cnt,slen,sd))
         if pin and plen and pd:
-            levels=max(1,math.ceil(h/(ss/100))+1) if ss else pin
-            comps += rcomps("سنجاقی ستون",repeated_bar_rebar(n*levels*pin,plen,pd))
+            # Number of crossties at each stirrup level is an explicit drawing/detail input.
+            levels=max(1,math.ceil(h/(ss/100))+1) if ss else 1
+            comps += rcomps("سنجاقی ستون",repeated_bar_rebar(n*levels*pin,plen,pd),
+                            f"{pin:g} عدد در هر تراز × {levels:g} تراز")
         return comps
 
     if section=="تیر":
