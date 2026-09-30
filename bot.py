@@ -164,10 +164,16 @@ async def finish_project(update, context):
     report = format_estimate(result)
     uid = update.effective_user.id
     db.ensure_user(uid, update.effective_user.first_name or "")
-    db.save_calc(uid, "متره ساختمان بتنی", report)
+    project_id = context.user_data.get("project_id")
+    if not project_id:
+        project_id = db.add_project(uid, context.user_data.get("project_name", "پروژه بدون نام"))
+    db.save_estimate(uid, project_id, data, result, report)
+    project_name = context.user_data.get("project_name", "پروژه")
     context.user_data.clear()
     context.user_data["last_estimate"] = result
     context.user_data["last_report"] = report
+    context.user_data["last_project_id"] = project_id
+    context.user_data["last_project_name"] = project_name
     await update.effective_message.reply_text(
         "✅ <b>متره اولیه پروژه آماده شد</b>\n\n" + report,
         parse_mode="HTML",
@@ -186,8 +192,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "new_project":
-        begin_project(context)
-        await show_step(q, context)
+        context.user_data.clear()
+        context.user_data["awaiting_project_name"] = True
+        await q.edit_message_text(
+            "🏗 <b>پروژه جدید</b>\n\nنام پروژه را بفرست.",
+            parse_mode="HTML", reply_markup=cancel_menu()
+        )
         return
 
     if data.startswith("pv|"):
@@ -239,12 +249,13 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "recalc_project":
-        if "last_estimate" not in context.user_data:
-            await q.edit_message_text("محاسبه قبلی در این نشست موجود نیست.", reply_markup=main_menu())
+        last = db.last_estimate(update.effective_user.id)
+        if not last:
+            await q.edit_message_text("هنوز برآوردی ذخیره نشده.", reply_markup=main_menu())
             return
         await q.edit_message_text(
-            format_estimate(context.user_data["last_estimate"]),
-            reply_markup=report_menu(),
+            format_estimate(last["result"]),
+            parse_mode="HTML", reply_markup=report_menu()
         )
         return
 
