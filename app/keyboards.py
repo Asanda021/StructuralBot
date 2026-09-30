@@ -17,8 +17,7 @@ def main_menu():
 
 def calc_mode_menu():
     return InlineKeyboardMarkup([
-      [InlineKeyboardButton("⚡ متره سریع",callback_data="mode|quick"),InlineKeyboardButton("🧮 متره دقیق",callback_data="mode|detailed")],
-      [InlineKeyboardButton("🏗 متره اجرایی/خرید",callback_data="mode|procurement")],
+      [InlineKeyboardButton("🧮 شروع برآورد",callback_data="start_estimate")],
       [InlineKeyboardButton("🌐 زبان / Language",callback_data="language")],
       [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
     ])
