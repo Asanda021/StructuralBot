@@ -58,7 +58,7 @@ class Database:
 
     def settings(self,user_id):
         with self.connect() as c:
-            row=c.execute("SELECT language,calc_mode FROM user_settings WHERE user_id=?",(user_id,)).fetchone()
+            row=c.execute("SELECT language,calc_mode,unit_system,concrete_grade,rebar_grade,standard,stock_length_m FROM user_settings WHERE user_id=?",(user_id,)).fetchone()
         return {"language":row[0],"calc_mode":row[1],"unit_system":row[2],"concrete_grade":row[3],"rebar_grade":row[4],"standard":row[5],"stock_length_m":row[6]} if row else {"language":"fa","calc_mode":"detailed","unit_system":"metric","concrete_grade":"C25","rebar_grade":"A3","standard":"iran","stock_length_m":12.0}
 
     def last_calc(self,user_id):
