@@ -19,12 +19,15 @@ def calc_mode_menu():
       [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
     ])
 
-def language_menu():
-    return InlineKeyboardMarkup([
+def language_menu(initial=False):
+    rows=[
       [InlineKeyboardButton("🇮🇷 فارسی",callback_data="lang|fa"),InlineKeyboardButton("🇸🇦 العربية",callback_data="lang|ar")],
       [InlineKeyboardButton("🇬🇧 English",callback_data="lang|en"),InlineKeyboardButton("🇨🇳 中文",callback_data="lang|zh")],
-      [InlineKeyboardButton("⬅️ بازگشت",callback_data="home")]
-    ])
+    ]
+    if not initial:
+        rows.append([InlineKeyboardButton("⬅️ بازگشت",callback_data="home")])
+    return InlineKeyboardMarkup(rows)
+
 
 def persistent_menu():
     return ReplyKeyboardMarkup([
