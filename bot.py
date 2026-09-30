@@ -711,7 +711,6 @@ async def callback(update,context):
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("➕ افزودن عضو",callback_data="choose_section")],
-                [InlineKeyboardButton("✅ تأیید پروژه",callback_data="confirm_project")],
                 [InlineKeyboardButton("📋 جدول جامع",callback_data="table")],
                 [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
             ])
@@ -859,7 +858,6 @@ async def callback(update,context):
             [InlineKeyboardButton("📋 کپی نتیجه عضو",callback_data="copy_member_output")],
             [InlineKeyboardButton("✅ تأیید نهایی عضو",callback_data="member_confirm")],
             [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit")],
-            [InlineKeyboardButton("✅ تأیید پروژه",callback_data="confirm_project")],
             [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")]
         ])); return
     if data=="member_confirm":
@@ -870,7 +868,6 @@ async def callback(update,context):
         await q.edit_message_text(f"✅ <b>{m['member']}</b> با موفقیت تأیید نهایی شد.\n\nاین عضو در متره پروژه ثبت شد و آماده ورود به عضو بعدی یا بازبینی کامل پروژه است.",parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")],
-                [InlineKeyboardButton("✅ تأیید پروژه",callback_data="confirm_project")],
                 [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit")],
                 [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
             ])); return
@@ -884,30 +881,7 @@ async def callback(update,context):
                                   "current_queue":sc[preset_count:],"current_history":[],"current_edit":idx,
                                   "current_preset":presets_for(m["section"],m["type"])})
         await ask_next(q,context); return
-    if data=="confirm_project": await review(q,context); return
-    if data=="confirm_project":
-        ms=context.user_data.get("members",[])
-        qa=quality_check_members(ms)
-        result=estimate_members(ms) if ms else {"concrete_total_m3":0,"rebar_by_diameter":{}}
-        concrete=result.get("concrete_total_m3",0)
-        rebar=sum(float(x.get("weight_kg",0)) for x in result.get("rebar_by_diameter",{}).values())
-        warnings=len(qa.get("warnings",[]))
-        await q.edit_message_text(
-            "🔐 <b>تأیید نهایی پروژه</b>\\n\\n"
-            f"پروژه: <b>{context.user_data.get('project_name','-')}</b>\\n"
-            f"تعداد اعضا: <b>{len(ms)}</b>\\n"
-            f"بتن: <b>{fmt(concrete)} m³</b>\\n"
-            f"وزن میلگرد اجرا: <b>{fmt(rebar)} kg</b>\\n"
-            f"هشدار کنترل: <b>{warnings}</b>\\n\\n"
-            "بعد از ذخیره نهایی، گزارش پروژه به‌عنوان آخرین متره ثبت می‌شود.",
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("💾 تأیید و ذخیره نهایی",callback_data="final_save")],
-                [InlineKeyboardButton("✏️ اصلاح",callback_data="edit_members")],
-                [InlineKeyboardButton("⬅️ بازگشت به بازبینی",callback_data="confirm_project")]
-            ])
-        )
-        return
+
     if data=="final_save":
         await save_final(update,context); return
     if data=="back":
@@ -968,6 +942,17 @@ async def callback(update,context):
         for k in ("current_section","current_type","current_values","current_queue","current_history","current_edit","current_preset"):
             context.user_data.pop(k,None)
         await q.edit_message_text("❌ <b>ورود این عضو لغو شد.</b>\n\nمی‌توانی عضو دیگری را انتخاب کنی.",parse_mode="HTML",reply_markup=section_menu())
+        return
+    if data=="member_prev":
+        values=context.user_data.get("current_values",[])
+        history=context.user_data.get("current_history",[])
+        queue=context.user_data.get("current_queue",[])
+        if values and history:
+            values.pop()
+            queue.insert(0,history.pop())
+            await ask_next(q,context)
+        else:
+            await q.edit_message_text("⬅️ مرحله قبلی در دسترس نیست.",reply_markup=back_home())
         return
     if data=="back_field":
         values=context.user_data.get("current_values",[])
@@ -1052,11 +1037,9 @@ async def finish_member(q,context):
         f"✅ <b>{m['member']}</b> محاسبه شد.\n\nحالا نتیجه این عضو را نهایی کن یا در صورت نیاز اصلاحش کن.",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ بازگشت به مرحله قبل",callback_data="member_prev"),InlineKeyboardButton("➡️ رفتن به مرحله بعد",callback_data="choose_section")],
             [InlineKeyboardButton("🧮 محاسبه نهایی عضو",callback_data="member_calculate")],
-            [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit")],
-            [InlineKeyboardButton("✅ تأیید پروژه",callback_data="confirm_project")],
-            [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")],
-            [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+            [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit"),InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
         ])
     )
 
@@ -1180,8 +1163,7 @@ async def finish_member_message(update,context):
     await update.message.reply_text(
         f"✅ <b>{m['member']}</b> محاسبه شد.\\n\\nبتن، میلگرد، وزن، شاخه خرید و اجزای وابسته ثبت شد.",
         parse_mode="HTML", reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")],
-            [InlineKeyboardButton("✅ تأیید پروژه",callback_data="confirm_project")],
+            [InlineKeyboardButton("⬅️ بازگشت به مرحله قبل",callback_data="member_prev"),InlineKeyboardButton("➡️ رفتن به مرحله بعد",callback_data="choose_section")],
             [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
         ])
     )
