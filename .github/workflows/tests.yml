@@ -60,6 +60,30 @@ jobs:
         run: |
           pip install pytest pytest-asyncio
 
+      - name: Check tracked environment files
+        shell: bash
+        run: |
+          if git ls-files | grep -E '\.env        run: |
+          python --version
+          pip --version
+
+      - name: Compile Python files
+        run: |
+          python -m compileall -q .
+
+      - name: Run test suite
+        run: |
+          pytest -ra
+
+      - name: Check Git status
+        if: always()
+        run: |
+          git status --short
+; then
+            echo "A real .env file must never be tracked."
+            exit 1
+          fi
+
       - name: Verify Python version
         run: |
           python --version

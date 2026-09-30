@@ -1,5 +1,6 @@
 import sqlite3
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Iterator
 
 from config import DATABASE_PATH
@@ -18,9 +19,17 @@ def get_connection() -> Iterator[sqlite3.Connection]:
     and rolled back if an exception occurs.
     """
 
-    connection = sqlite3.connect(DATABASE_PATH)
+    database_path = Path(DATABASE_PATH)
+    database_path.parent.mkdir(parents=True, exist_ok=True)
+
+    connection = sqlite3.connect(
+        database_path,
+        timeout=30,
+    )
 
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute("PRAGMA busy_timeout = 5000")
 
     try:
         yield connection

@@ -414,3 +414,42 @@ def test_no_duplicate_python_module_paths() -> None:
         "Duplicate Python module paths detected:\n"
         + "\n".join(duplicates)
     )
+
+
+def test_production_config_requires_secret_key(monkeypatch):
+    import importlib
+    import config
+
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("BOT_TOKEN", "123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk")
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+
+    importlib.reload(config)
+
+    try:
+        try:
+            config.validate_config()
+        except RuntimeError as exc:
+            assert "SECRET_KEY" in str(exc)
+        else:
+            raise AssertionError("Production config must require SECRET_KEY.")
+    finally:
+        monkeypatch.setenv("APP_ENV", "development")
+        importlib.reload(config)
+
+
+def test_database_enables_foreign_keys(tmp_path, monkeypatch):
+    import importlib
+    import database
+
+    db_path = tmp_path / "test.db"
+    monkeypatch.setenv("DATABASE_PATH", str(db_path))
+
+    import config
+    importlib.reload(config)
+    importlib.reload(database)
+
+    with database.get_connection() as connection:
+        enabled = connection.execute("PRAGMA foreign_keys").fetchone()[0]
+
+    assert enabled == 1
