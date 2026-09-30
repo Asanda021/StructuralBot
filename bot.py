@@ -4,7 +4,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMa
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
 from telegram.error import BadRequest
 from app.db import Database
-from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, repeated_bar_rebar, format_estimate
+from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, multi_face_grid_rebar, repeated_bar_rebar, format_estimate
 from app.exporter import create_excel, create_pdf
 from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu
 
@@ -53,7 +53,7 @@ READY={
  "قطر خاموت":10, "فاصله خاموت":20,
  "فاصله خاموت عادی":20, "فاصله خاموت بحرانی":10,
  "قطر میلگرد طولی":16, "تعداد میلگرد طولی هر ستون":8, "تعداد میلگرد طولی هر تیر":4,
- "قطر میلگرد تقویتی":16, "قطر کمرکش":12,
+ "قطر میلگرد تقویتی":16, "قطر کمرکش":12, "تعداد وجه مسلح":2,
  "طول هر خاموت":1.0, "طول هر سنجاقی":0.8,
  "طول هر میلگرد تقویتی":2.0, "طول هر کمرکش":1.0,
  "تعداد میلگرد تقویتی هر تیر":2, "تعداد سنجاقی هر تیر":2, "تعداد میلگرد کمرکش":2,
@@ -108,7 +108,7 @@ def schema(section,typ):
                 ("تعداد میلگرد کمرکش","عدد"),("طول هر کمرکش","m"),("قطر کمرکش","mm")]
     if section=="دیوار":
         return [("تعداد دیوار","عدد"),("طول دیوار","m"),("ارتفاع","m"),("ضخامت","m"),
-                ("قطر قائم","mm"),("فاصله قائم","cm"),("قطر افقی","mm"),("فاصله افقی","cm"),
+                ("تعداد وجه مسلح","عدد"),("قطر قائم","mm"),("فاصله قائم","cm"),("قطر افقی","mm"),("فاصله افقی","cm"),
                 ("قطر تقویتی","mm"),("تعداد تقویتی","عدد"),("طول هر تقویتی","m")]
     if section=="پله":
         return [("تعداد","عدد"),("مساحت","m²"),("ضخامت","m"),("قطر میلگرد اصلی","mm"),("فاصله اصلی","cm"),
@@ -237,10 +237,31 @@ def calc_member(section,typ,v):
         return comps
 
     if section=="دیوار":
-        n,L,H,T,vd,vs,hd,hs,rd,rc,rl=v
-        comps=[{"name":"بتن دیوار","value":n*L*H*T,"unit":"m³"},{"name":"مساحت دیوار","value":n*L*H,"unit":"m²"}]
-        if vd and vs: comps += rcomps("میلگرد قائم",grid_rebar(H,L,vd,vs))
-        if hd and hs: comps += rcomps("میلگرد افقی",grid_rebar(L,H,hd,hs))
+        # v11 = legacy single-face format; v12 = current two-face format.
+        if len(v)==11:
+            n,L,H,T,vd,vs,hd,hs,rd,rc,rl=v
+            faces=1
+        else:
+            n,L,H,T,faces,vd,vs,hd,hs,rd,rc,rl=v
+        comps=[{"name":"بتن دیوار","value":n*L*H*T,"unit":"m³"},
+               {"name":"مساحت یک وجه دیوار","value":n*L*H,"unit":"m²"},
+               {"name":"تعداد وجه مسلح","value":faces,"unit":"وجه"}]
+        if vd and vs:
+            r=multi_face_grid_rebar(H,L,vd,vs,faces)
+            r["count_bars"]*=n
+            r["length_m"]*=n; r["weight_kg"]*=n; r["branches"]=math.ceil(r["procurement_length_m"]*n/r["stock_length_m"])
+            r["procurement_length_m"]=r["branches"]*r["stock_length_m"]
+            r["procurement_weight_kg"]=r["diameter_mm"]**2/162*r["procurement_length_m"]
+            r["cut_lengths_m"]=r.get("cut_lengths_m",[])*n
+            comps += rcomps("میلگرد قائم دو وجه",r,f"{faces:g} وجه × {n:g} دیوار")
+        if hd and hs:
+            r=multi_face_grid_rebar(L,H,hd,hs,faces)
+            r["count_bars"]*=n
+            r["length_m"]*=n; r["weight_kg"]*=n; r["branches"]=math.ceil(r["procurement_length_m"]*n/r["stock_length_m"])
+            r["procurement_length_m"]=r["branches"]*r["stock_length_m"]
+            r["procurement_weight_kg"]=r["diameter_mm"]**2/162*r["procurement_length_m"]
+            r["cut_lengths_m"]=r.get("cut_lengths_m",[])*n
+            comps += rcomps("میلگرد افقی دو وجه",r,f"{faces:g} وجه × {n:g} دیوار")
         if rd and rc and rl: comps += rcomps("میلگرد تقویتی",repeated_bar_rebar(n*rc,rl,rd))
         return comps
 
