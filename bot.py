@@ -9,7 +9,7 @@ from telegram.ext import Application, CallbackQueryHandler, CommandHandler, Cont
 
 from app.db import Database
 from app.engine import estimate_building, format_estimate
-from app.keyboards import main_menu, cancel_menu, back_home, report_menu
+from app.keyboards import main_menu, cancel_menu, back_home, report_menu, review_menu
 
 TOKEN = os.getenv("BOT" + "_TOKEN")
 DB_PATH = os.getenv("DATABASE_PATH", "/tmp/structuralbot.db")
@@ -107,7 +107,7 @@ def value_keyboard(key):
 def prompt_for(key, index):
     _, label, unit = next(x for x in FIELDS if x[0] == key)
     text = (
-        f"🏗 <b>متره ساختمان بتنی</b>\n\n"
+        f"🏗 <b>برآورد مقادیر ساختمان بتنی</b>\n\n"
         f"مرحله {index + 1} از {len(FIELDS)}\n"
         f"<b>{label}</b> ({unit}) را انتخاب کن.\n\n"
         "برای سرعت از گزینه‌های آماده استفاده کن یا ورود دستی را بزن."
@@ -121,7 +121,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text(
         "🏗 <b>StructuralBot</b>\n\n"
-        "متره و برآورد ساختمان بتنی\n"
+        "برآورد مقادیر و مصالح ساختمان بتنی\n"
         "محاسبات طراحی سازه در این نسخه ارائه نمی‌شود.",
         parse_mode="HTML",
         reply_markup=main_menu(),
@@ -176,7 +176,7 @@ async def finish_project(update, context):
     context.user_data["last_project_id"] = project_id
     context.user_data["last_project_name"] = project_name
     await update.effective_message.reply_text(
-        "✅ <b>متره اولیه پروژه آماده شد</b>\n\n" + report,
+        "✅ <b>برآورد مقادیر اولیه پروژه آماده شد</b>\n\n" + report,
         parse_mode="HTML",
         reply_markup=report_menu(),
     )
@@ -214,6 +214,31 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "review_saved":
         await show_review(q, context)
+        return
+
+    if data == "edit_current":
+        rows = []
+        for i, (key, label, unit) in enumerate(FIELDS):
+            rows.append([InlineKeyboardButton(
+                f"✏️ {label}: {n(context.user_data['takeoff_values'].get(key, 0))} {unit}",
+                callback_data=f"edit_saved|{i}"
+            )])
+        rows.append([InlineKeyboardButton("🔎 بازبینی دوباره", callback_data="review_saved")])
+        rows.append([InlineKeyboardButton("❌ لغو", callback_data="home")])
+        await q.edit_message_text(
+            "✏️ <b>ویرایش اطلاعات</b>\n\nبخش موردنظر را انتخاب کن.",
+            parse_mode="HTML", reply_markup=InlineKeyboardMarkup(rows)
+        )
+        return
+
+    if data == "previous_step":
+        if context.user_data.get("takeoff"):
+            idx = max(0, context.user_data.get("takeoff_index", len(FIELDS)) - 1)
+            context.user_data["takeoff_index"] = idx
+            context.user_data["manual"] = False
+            await show_step(q, context)
+        else:
+            await q.edit_message_text("جلسه برآورد منقضی شده.", reply_markup=main_menu())
         return
 
     if data.startswith("pv|"):
@@ -369,18 +394,25 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_review(target, context):
     values = context.user_data["takeoff_values"]
-    lines = ["🔎 <b>بررسی اطلاعات پروژه</b>", ""]
-    for key, label, unit in FIELDS:
-        lines.append(f"• {label}: {n(values[key])} {unit}")
-    lines += ["", "اگر اطلاعات درست است، «تأیید و محاسبه» را بزن."]
-    markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ تأیید و محاسبه", callback_data="confirm_project")],
-        [InlineKeyboardButton("❌ لغو", callback_data="home")],
-    ])
+    groups = [
+        ("🏗 مشخصات پروژه", FIELDS[0:3]),
+        ("🧱 فونداسیون", FIELDS[3:6]),
+        ("🏢 ستون‌ها", FIELDS[6:10]),
+        ("📏 تیرها", FIELDS[10:13]),
+        ("⬜ سقف", FIELDS[13:14]),
+        ("🪜 راه‌پله", FIELDS[14:16]),
+    ]
+    lines = ["🔎 <b>بازبینی نهایی اطلاعات</b>", "", "قبل از محاسبه، مقادیر زیر را کنترل کن:"]
+    for title, fields in groups:
+        lines.append("")
+        lines.append(f"<b>{title}</b>")
+        for key, label, unit in fields:
+            lines.append(f"• {label}: <b>{n(values[key])}</b> {unit}")
+    lines += ["", "⚠️ هنوز محاسبه نهایی انجام نشده است."]
     if hasattr(target, "edit_message_text"):
-        await target.edit_message_text("\n".join(lines), parse_mode="HTML", reply_markup=markup)
+        await target.edit_message_text("\n".join(lines), parse_mode="HTML", reply_markup=review_menu())
     else:
-        await target.reply_text("\n".join(lines), parse_mode="HTML", reply_markup=markup)
+        await target.reply_text("\n".join(lines), parse_mode="HTML", reply_markup=review_menu())
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
