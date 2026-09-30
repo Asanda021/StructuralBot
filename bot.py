@@ -68,8 +68,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.ensure_user(user.id, user.first_name or "")
     context.user_data.clear()
     await update.message.reply_text(
-        "🏗 <b>StructuralBot</b>\n\n"
-        "نسخه سبک محاسبات و برآورد سازه آماده است.\n"
+        "🏗 <b>StructuralBot</b>
+
+"
+        "نسخه سبک محاسبات و برآورد سازه آماده است.
+"
         "از منوی زیر شروع کن.",
         parse_mode="HTML",
         reply_markup=main_menu(),
@@ -115,19 +118,64 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "slab": "0.15, 5.00, 4.00",
         }
         await q.edit_message_text(
-            f"📐 <b>{names[data]}</b>\n\n"
-            f"سه مقدار را با کاما بفرست:\n<code>{examples[data]}</code>\n\n"
+            f"📐 <b>{names[data]}</b>
+
+"
+            f"سه مقدار را با کاما بفرست:
+<code>{examples[data]}</code>
+
+"
             "همه ابعاد بر حسب متر هستند.",
             parse_mode="HTML",
             reply_markup=back_menu(),
         )
         return
 
-    if data == "rebar":\n        context.user_data.clear()\n        await q.edit_message_text("🔩 ابزارهای میلگرد:", reply_markup=rebar_menu())\n        return\n\n    if data == "rebar_eq":\n        context.user_data["step"] = "rebar_eq"\n        await q.edit_message_text(\n            "🔄 <b>معادل‌سازی میلگرد</b>\\n\\nدو قطر را با کاما بفرست.\\nمثال: <code>16, 20</code>",\n            parse_mode="HTML", reply_markup=back_menu(),\n        )\n        return\n\n    if data == "bbs":\n        context.user_data["step"] = "bbs"\n        await q.edit_message_text(\n            "📋 <b>BBS / Cut List</b>\\n\\nقطر، تعداد و طول هر قطعه را با کاما بفرست.\\nمثال: <code>16, 20, 8.5</code>",\n            parse_mode="HTML", reply_markup=back_menu(),\n        )\n        return\n\n    if data == "codes":\n        await q.edit_message_text(\n            "📚 <b>کدهای طراحی</b>\\n\\nنسخه سبک فعلی ورودی کد را جدا نگه می‌دارد.\\nدر فاز بعد کدهای ایران و سایر کشورها به‌صورت Adapter اضافه می‌شوند.",\n            parse_mode="HTML", reply_markup=back_menu(),\n        )\n        return\n\n    if data == "quantity":
+    if data == "rebar":
+        context.user_data.clear()
+        await q.edit_message_text("🔩 ابزارهای میلگرد:", reply_markup=rebar_menu())
+        return
+
+    if data == "rebar_eq":
+        context.user_data["step"] = "rebar_eq"
+        await q.edit_message_text(
+            "🔄 <b>معادل‌سازی میلگرد</b>\
+\
+دو قطر را با کاما بفرست.\
+مثال: <code>16, 20</code>",
+            parse_mode="HTML", reply_markup=back_menu(),
+        )
+        return
+
+    if data == "bbs":
+        context.user_data["step"] = "bbs"
+        await q.edit_message_text(
+            "📋 <b>BBS / Cut List</b>\
+\
+قطر، تعداد و طول هر قطعه را با کاما بفرست.\
+مثال: <code>16, 20, 8.5</code>",
+            parse_mode="HTML", reply_markup=back_menu(),
+        )
+        return
+
+    if data == "codes":
+        await q.edit_message_text(
+            "📚 <b>کدهای طراحی</b>\
+\
+نسخه سبک فعلی ورودی کد را جدا نگه می‌دارد.\
+در فاز بعد کدهای ایران و سایر کشورها به‌صورت Adapter اضافه می‌شوند.",
+            parse_mode="HTML", reply_markup=back_menu(),
+        )
+        return
+
+    if data == "quantity":
         context.user_data["step"] = "quantity"
         await q.edit_message_text(
-            "🧮 <b>برآورد بتن</b>\n\n"
-            "ضخامت/بعد اول، بعد دوم، بعد سوم را با کاما بفرست.\n"
+            "🧮 <b>برآورد بتن</b>
+
+"
+            "ضخامت/بعد اول، بعد دوم، بعد سوم را با کاما بفرست.
+"
             "مثال: <code>0.30, 5, 4</code>",
             parse_mode="HTML",
             reply_markup=back_menu(),
@@ -137,8 +185,11 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "rebar":
         context.user_data["step"] = "rebar"
         await q.edit_message_text(
-            "🔩 <b>معادل‌سازی میلگرد</b>\n\n"
-            "دو قطر را با کاما بفرست.\n"
+            "🔩 <b>معادل‌سازی میلگرد</b>
+
+"
+            "دو قطر را با کاما بفرست.
+"
             "مثال: <code>16, 20</code>",
             parse_mode="HTML",
             reply_markup=back_menu(),
@@ -147,11 +198,16 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "projects":
         projects = db.projects(update.effective_user.id)
-        lines = "\n".join(f"• {p[1]}" for p in projects) if projects else "هنوز پروژه‌ای ثبت نشده."
+        lines = "
+".join(f"• {p[1]}" for p in projects) if projects else "هنوز پروژه‌ای ثبت نشده."
         context.user_data["step"] = "project"
         await q.edit_message_text(
-            "🏗 <b>پروژه‌های من</b>\n\n" + lines +
-            "\n\nنام پروژه جدید را بفرست تا ذخیره شود.",
+            "🏗 <b>پروژه‌های من</b>
+
+" + lines +
+            "
+
+نام پروژه جدید را بفرست تا ذخیره شود.",
             parse_mode="HTML",
             reply_markup=back_menu(),
         )
@@ -160,7 +216,9 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "reports":
         last = db.last_calc(update.effective_user.id)
         if last:
-            text = f"📊 <b>{last[0]}</b>\n\n{last[1]}"
+            text = f"📊 <b>{last[0]}</b>
+
+{last[1]}"
         else:
             text = "📊 هنوز محاسبه‌ای ذخیره نشده."
         await q.edit_message_text(text, parse_mode="HTML", reply_markup=back_menu())
@@ -168,7 +226,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "account":
         await q.edit_message_text(
-            "👤 <b>حساب کاربری</b>\n\nنسخه پایه فعال است.\n"
+            "👤 <b>حساب کاربری</b>
+
+نسخه پایه فعال است.
+"
             "ساختار حساب، اعتبار و پرداخت برای توسعه بعدی جدا نگه داشته شده.",
             parse_mode="HTML", reply_markup=back_menu(),
         )
@@ -176,14 +237,19 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "settings":
         await q.edit_message_text(
-            "⚙️ <b>تنظیمات</b>\n\nواحد فعلی: متر / کیلوگرم\nزبان: فارسی",
+            "⚙️ <b>تنظیمات</b>
+
+واحد فعلی: متر / کیلوگرم
+زبان: فارسی",
             parse_mode="HTML", reply_markup=back_menu(),
         )
         return
 
     if data == "ai":
         await q.edit_message_text(
-            "🤖 <b>دستیار هوشمند</b>\n\n"
+            "🤖 <b>دستیار هوشمند</b>
+
+"
             "فعلاً موتور محاسبات مستقل است. اتصال AI در مرحله بعد به‌عنوان لایه کمکی اضافه می‌شود.",
             parse_mode="HTML", reply_markup=back_menu(),
         )
@@ -228,12 +294,17 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ ورودی نامعتبر است. مثال: {example}")
         return
 
-    lines = "\n".join(f"• {k}: {clean_number(v)}" for k, v in result.items())
+    lines = "
+".join(f"• {k}: {clean_number(v)}" for k, v in result.items())
     db.ensure_user(uid, update.effective_user.first_name or "")
     db.save_calc(uid, title, lines)
     context.user_data.clear()
     await update.message.reply_text(
-        f"✅ <b>{title}</b>\n\n{lines}\n\n"
+        f"✅ <b>{title}</b>
+
+{lines}
+
+"
         "⚠️ این خروجی برای برآورد اولیه است و جایگزین طراحی نهایی مهندس محاسب نیست.",
         parse_mode="HTML",
         reply_markup=main_menu(),
