@@ -1,13 +1,13 @@
 import logging, os, threading, tempfile, math, html
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
 from telegram.error import BadRequest
 from app.db import Database
 from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, multi_face_grid_rebar, repeated_bar_rebar, format_estimate
 from app.exporter import create_excel, create_pdf
 from ai.assistant import explain_takeoff
-from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, walls_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu, rebar_equiv_source_menu, rebar_equiv_target_menu, language_menu
+from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu, walls_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu, rebar_equiv_source_menu, rebar_equiv_target_menu, language_menu
 
 TOKEN=os.getenv("BOT_TOKEN")
 DB_PATH=os.getenv("DATABASE_PATH","/tmp/structuralbot.db")
@@ -1197,7 +1197,7 @@ async def message(update,context):
     if text in ("🏠 خانه","🏠 منو"):
         context.user_data.clear()
         await update.message.reply_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu())
-        await update.message.reply_text("",reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text("منوی ثابت:",reply_markup=persistent_menu())
         return
     if text=="📂 پروژه‌ها":
         ps=db.projects(update.effective_user.id)
@@ -1215,7 +1215,7 @@ async def message(update,context):
         context.user_data.setdefault("current_history",[]).append(queue[0])
         context.user_data["current_values"].append(value); context.user_data["current_queue"].pop(0)
         await ask_next_message(update,context); return
-    await update.message.reply_text("از دکمه‌های همین پیام برای ادامه استفاده کن.")
+    await update.message.reply_text("از منوی زیر انتخاب کن.",reply_markup=persistent_menu())
 
 async def ask_next_message(update,context):
     if context.user_data.get("current_queue"):
