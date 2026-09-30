@@ -918,7 +918,7 @@ async def callback(update,context):
         if not r:
             last=db.last_estimate(update.effective_user.id)
             r=last["result"] if last else None
-        extra=(f"\n\n🧠 <b>توضیح هوشمند</b>\n{r.get("ai_explanation")}" if r and r.get("ai_explanation") else "")
+        extra=(f"\n\n🧠 <b>توضیح هوشمند</b>\n{r.get('ai_explanation')}" if r and r.get("ai_explanation") else "")
         await q.edit_message_text((format_estimate(r)+extra) if r else "هنوز گزارشی ثبت نشده است.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
     if data=="projects":
         ps=db.projects(update.effective_user.id); rows=[[InlineKeyboardButton(p[1],callback_data=f"open|{p[0]}")] for p in ps]
