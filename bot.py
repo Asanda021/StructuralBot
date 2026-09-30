@@ -342,9 +342,11 @@ def show_member_types(q,section):
     return q.edit_message_text(f"🏗 <b>{section}</b>\n\nنوع عضو را از تیپ‌های آماده انتخاب کن یا سفارشی را بزن.",parse_mode="HTML",reply_markup=type_menu(section))
 
 async def start_cmd(update,context):
-    db.ensure_user(update.effective_user.id,update.effective_user.first_name or "")
+    uid=update.effective_user.id
+    db.ensure_user(uid,update.effective_user.first_name or "")
+    db.set_settings(uid)
     context.user_data.clear()
-    await update.message.reply_text("🏗 <b>StructuralBot</b>\n\n<b>متره جامع از روی نقشه</b>\nبرای ورود به حالت محاسبه، دکمه زیر را بزن.",parse_mode="HTML",reply_markup=calc_mode_menu())
+    await update.message.reply_text("🏗 <b>StructuralBot</b>\n\n<b>متره جامع از روی نقشه</b>\n\nنسخه فعلی، ایده‌های محاسباتی و تجربه UX ربات قبلی را در یک معماری سبک و بدون Mini App جمع کرده است.\n\nابتدا حالت متره را انتخاب کن.",parse_mode="HTML",reply_markup=calc_mode_menu())
 
 def reset(context,name):
     context.user_data.clear(); context.user_data.update({"project_name":name,"members":[],"history":[]})
@@ -377,7 +379,23 @@ async def callback(update,context):
         context.user_data.clear(); await q.edit_message_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu()); return
     if data=="calc_mode":
         context.user_data["calculation_mode"]=True
+        db.set_settings(update.effective_user.id,calc_mode="detailed")
         await q.edit_message_text("🧮 <b>حالت محاسبه فعال شد</b>\n\nحالا پروژه جدید را شروع کن یا یک پروژه را ادامه بده.",parse_mode="HTML",reply_markup=main_menu()); return
+    if data.startswith("mode|"):
+        mode=data.split("|",1)[1]
+        labels={"quick":"⚡ متره سریع","detailed":"🧮 متره دقیق","procurement":"🏗 متره اجرایی/خرید"}
+        context.user_data["calculation_mode"]=True
+        context.user_data["calc_mode"]=mode
+        db.set_settings(update.effective_user.id,calc_mode=mode)
+        await q.edit_message_text(f"✅ <b>{labels.get(mode,mode)}</b> فعال شد.\n\nورودی‌های اصلی از نقشه گرفته می‌شوند و در پایان، بتن/میلگرد/شاخه خرید و Cut List طبق اطلاعات موجود گزارش می‌شوند.",parse_mode="HTML",reply_markup=main_menu()); return
+    if data=="language":
+        await q.edit_message_text("🌐 <b>انتخاب زبان رابط کاربری</b>",parse_mode="HTML",reply_markup=__import__("app.keyboards",fromlist=["language_menu"]).language_menu()); return
+    if data.startswith("lang|"):
+        lang=data.split("|",1)[1]
+        db.set_settings(update.effective_user.id,language=lang)
+        context.user_data["language"]=lang
+        names={"fa":"فارسی","ar":"العربية","en":"English","zh":"中文"}
+        await q.edit_message_text(f"🌐 زبان رابط روی <b>{names.get(lang,lang)}</b> ذخیره شد.\n\nمحاسبات و واحدها مستقل از زبان باقی می‌مانند.",parse_mode="HTML",reply_markup=main_menu()); return
     if data=="restart":
         context.user_data.clear()
         await q.edit_message_text("🔄 <b>شروع مجدد</b>\n\nتمام اطلاعات موقت این مرحله پاک شد. برای شروع دوباره، حالت محاسبه را فعال کن.",parse_mode="HTML",reply_markup=calc_mode_menu()); return
@@ -480,10 +498,18 @@ async def callback(update,context):
             context.user_data.setdefault("current_history",[]).append(queue[0])
             context.user_data["current_values"].append(value); queue.pop(0)
         await ask_next(q,context); return
-    if data in ("pricing","settings","help"):
-        msg={"pricing":"💰 قیمت‌گذاری در مرحله بعد روی همین اقلام و واحدها سوار می‌شود.",
-             "settings":"⚙️ طول شاخه پیش‌فرض میلگرد ۱۲ متر است.",
-             "help":"❓ تیپ‌ها و اعداد آماده فقط برای ورود سریع‌اند؛ مقدار نهایی باید با نقشه و دیتیل پروژه تطبیق داشته باشد."}[data]
+    if data=="project_inputs":
+        ms=context.user_data.get("members",[])
+        lines=["📋 <b>ورودی‌های پروژه</b>",""]
+        for i,m in enumerate(ms,1):
+            lines.append(f"{i}. <b>{m.get('member','عضو')}</b>")
+            for j,(label,unit) in enumerate(schema(m["section"],m["type"])):
+                if j < len(m.get("raw",[])): lines.append(f"• {label}: {fmt(m['raw'][j])} {unit}")
+        await q.edit_message_text("\n".join(lines) if ms else "هنوز ورودی‌ای ثبت نشده.",parse_mode="HTML",reply_markup=back_home()); return
+    if data in ("settings","help"):
+        mode=db.settings(update.effective_user.id).get("calc_mode","detailed")
+        msg={"settings":f"⚙️ <b>تنظیمات متره</b>\n\nحالت فعلی: <b>{mode}</b>\nطول شاخه پیش‌فرض میلگرد: <b>۱۲ متر</b>\n\nتیپ‌های آماده فقط میانبر هستند و مقدار نهایی باید با نقشه کنترل شود.",
+             "help":"❓ StructuralBot متره ساختمان بتنی را عضو‌به‌عضو انجام می‌دهد؛ هندسه یک‌بار وارد می‌شود و خروجی بتن، میلگرد، شاخه خرید، پرت و Cut List در گزارش جامع جمع می‌شود."}[data]
         await q.edit_message_text(msg,reply_markup=back_home()); return
 
 async def ask_next(q,context):
