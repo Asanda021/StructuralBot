@@ -449,6 +449,41 @@ def create_user(
         return cursor.lastrowid
 
 
+def update_user_preferences(
+    user_id: int,
+    language: str | None = None,
+    unit_system: str | None = None,
+):
+    """Update onboarding preferences for a Telegram user."""
+    fields = []
+    values = []
+
+    if language is not None:
+        fields.append("language = ?")
+        values.append(language)
+
+    if unit_system is not None:
+        fields.append("unit_system = ?")
+        values.append(unit_system)
+
+    if not fields:
+        return False
+
+    values.append(user_id)
+
+    with get_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            f"""
+            UPDATE users
+            SET {", ".join(fields)}
+            WHERE telegram_id = ?
+            """,
+            tuple(values),
+        )
+        return cursor.rowcount > 0
+
+
 # =========================================================
 # PROJECT HELPERS
 # =========================================================
