@@ -179,3 +179,17 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# Extended legacy UX smoke checks
+from app.db import Database
+import tempfile, os
+_fd, _p = tempfile.mkstemp(suffix=".db"); os.close(_fd)
+try:
+    _db=Database(_p); _db.init(); _db.set_settings(1, unit_system="metric", concrete_grade="C30", rebar_grade="A3", standard="iran", stock_length_m=12)
+    _s=_db.settings(1)
+    assert _s["concrete_grade"]=="C30" and _s["stock_length_m"]==12.0
+    print("settings_extended OK")
+finally:
+    try: os.remove(_p)
+    except OSError: pass
