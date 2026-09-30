@@ -106,11 +106,12 @@ def value_keyboard(key):
 
 def prompt_for(key, index):
     _, label, unit = next(x for x in FIELDS if x[0] == key)
+    progress = "█" * (index + 1) + "░" * (len(FIELDS) - index - 1)
     text = (
         f"🏗 <b>برآورد مقادیر ساختمان بتنی</b>\n\n"
-        f"مرحله {index + 1} از {len(FIELDS)}\n"
+        f"گام {index + 1} از {len(FIELDS)}  |  <code>{progress}</code>\n"
         f"<b>{label}</b> ({unit}) را انتخاب کن.\n\n"
-        "برای سرعت از گزینه‌های آماده استفاده کن یا ورود دستی را بزن."
+        "⚡ برای سرعت از کلیدهای آماده استفاده کن؛ در صورت نیاز «ورود دستی» را بزن."
     )
     return text, value_keyboard(key)
 
