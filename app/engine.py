@@ -298,7 +298,9 @@ def estimate_building(data):
             "concrete":concrete,"formwork":formwork,"rebar":rebar,"totals":{"concrete_net":c,"formwork_net":f,"rebar_net":r}}
 
 def format_estimate(result):
+    mode=result.get("report_mode","detailed")
     lines=["📋 <b>گزارش جامع متره ساختمان بتنی</b>","",
+           f"حالت گزارش: <b>{mode}</b>","",
            f"اعضای متره‌شده: <b>{result.get('member_count',0)}</b>",
            f"ردیف‌های مصالح: <b>{result.get('item_count',0)}</b>",""]
     for m in result.get("members",[]):
@@ -308,9 +310,14 @@ def format_estimate(result):
             lines.append(f"• {c['name']}: <b>{c['value']:,.2f}</b> {c['unit']}{extra}")
     lines += ["","<b>جمع‌بندی بتن</b>",f"• حجم کل بتن: <b>{result.get('concrete_total_m3',0):,.3f}</b> m³",
                 "","<b>جمع‌بندی میلگرد بر اساس قطر</b>"]
-    for dia,data in result.get("rebar_by_diameter",{}).items():
-        lines.append(f"• Φ{float(dia):g}: <b>{data.get('weight_kg',0):,.2f}</b> kg | {data.get('branches',0)} شاخه 12m | وزن خرید {data.get('procurement_weight_kg',0):,.2f} kg")
+    if mode != "quick":
+        for dia,data in result.get("rebar_by_diameter",{}).items():
+            lines.append(f"• Φ{float(dia):g}: <b>{data.get('weight_kg',0):,.2f}</b> kg | {data.get('branches',0)} شاخه 12m | وزن خرید {data.get('procurement_weight_kg',0):,.2f} kg")
     lines += ["","<b>جمع‌بندی واحدها</b>"]
     for u,v in result.get("totals_by_unit",{}).items(): lines.append(f"• {u}: <b>{v:,.2f}</b>")
+    if mode == "procurement":
+        lines += ["","<b>Cut List / خرید</b>"]
+        for dia,data in result.get("cut_list",{}).items():
+            lines.append(f"• Φ{float(dia):g}: {data.get('stock_bars',0)} شاخه | مصرف {data.get('used_length_m',0):,.2f}m | پرت برش {data.get('waste_length_m',0):,.2f}m")
     lines += ["","⚠️ کنترل نهایی با نقشه‌های مصوب و دیتیل‌های اجرایی ضروری است."]
     return "\n".join(lines)
