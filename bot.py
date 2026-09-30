@@ -1012,7 +1012,7 @@ async def callback(update,context):
             last=db.last_estimate(update.effective_user.id)
             r=last["result"] if last else None
         extra=(f"\n\n🧠 <b>توضیح هوشمند</b>\n{r.get('ai_explanation')}" if r and r.get("ai_explanation") else "")
-        await q.edit_message_text(english_report(r) if r else "No takeoff data is available yet.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
+        await q.edit_message_text(english_report(r, db.settings(update.effective_user.id).get("language","fa")) if r else "No takeoff data is available yet.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
     if data=="reports":
         r=context.user_data.get("last_result")
         if not r and context.user_data.get("members"):
@@ -1022,7 +1022,7 @@ async def callback(update,context):
             last=db.last_estimate(update.effective_user.id)
             r=last["result"] if last else None
         extra=(f"\n\n🧠 <b>توضیح هوشمند</b>\n{r.get('ai_explanation')}" if r and r.get("ai_explanation") else "")
-        await q.edit_message_text(english_report(r) if r else "No takeoff report is available yet.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
+        await q.edit_message_text(english_report(r, db.settings(update.effective_user.id).get("language","fa")) if r else "No takeoff report is available yet.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
     if data=="projects":
         ps=db.projects(update.effective_user.id); rows=[[InlineKeyboardButton(p[1],callback_data=f"open|{p[0]}")] for p in ps]
         rows.append([InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")])
@@ -1037,8 +1037,8 @@ async def callback(update,context):
         last=db.last_estimate(update.effective_user.id)
         if not last: await q.edit_message_text("هنوز گزارشی برای خروجی نیست.",reply_markup=main_menu()); return
         with tempfile.TemporaryDirectory() as d:
-            x=create_excel(last["result"],last["project_name"],os.path.join(d,"StructuralBot_Takeoff.xlsx"))
-            p=create_pdf(last["result"],last["project_name"],os.path.join(d,"StructuralBot_Takeoff.pdf"))
+            x=create_excel(last["result"],last["project_name"],os.path.join(d,"StructuralBot_Takeoff.xlsx"),db.settings(update.effective_user.id).get("language","fa"))
+            p=create_pdf(last["result"],last["project_name"],os.path.join(d,"StructuralBot_Takeoff.pdf"),db.settings(update.effective_user.id).get("language","fa"))
             await update.effective_message.reply_document(open(x,"rb"),caption="📊 Excel - متره جامع")
             await update.effective_message.reply_document(open(p,"rb"),caption="📄 PDF - متره جامع")
         return
@@ -1145,7 +1145,9 @@ async def finish_member(q,context):
         context.user_data["project_id"]=pid
     try:
         draft=estimate_members(context.user_data.get("members",[]))
-        db.save_draft(uid,pid,{"members":context.user_data.get("members",[])},draft)
+        draft["project_settings"]=db.settings(uid)
+        draft["report_mode"]=draft["project_settings"].get("calc_mode","detailed")
+        db.save_draft(uid,pid,{"members":context.user_data.get("members",[]),"language":draft["project_settings"].get("language","fa")},draft)
         context.user_data["last_result"]=draft
     except Exception as e:
         log.warning("draft save failed: %s",e)
