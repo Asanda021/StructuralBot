@@ -120,6 +120,52 @@ def calculate_slab(data):
         result["thermal"]=grid_rebar(L,W,data["thermal_dia"],data["thermal_spacing_cm"])
     return result
 
+def cut_list_by_diameter(members, stock_length_m=12.0):
+    """Create a procurement-oriented cut list from explicit bar pieces.
+    Uses a first-fit decreasing bin pack; it never invents bar lengths.
+    """
+    stock=_num(stock_length_m)
+    pieces=defaultdict(list)
+    for m in members:
+        for c in m.get("components",[]):
+            if c.get("category")!="میلگرد" or c.get("unit")!="m":
+                continue
+            name=str(c.get("name",""))
+            if "طول اجرا" not in name:
+                continue
+            dia=c.get("diameter_mm")
+            if dia is None:
+                continue
+            # Prefer explicit piece length metadata; otherwise use the component total
+            # as one piece. Callers can provide cut_lengths_m for true cutting data.
+            cuts=c.get("cut_lengths_m")
+            if cuts:
+                pieces[float(dia)].extend(_num(x) for x in cuts)
+            else:
+                pieces[float(dia)].append(_num(c["value"]))
+    result={}
+    for dia, lengths in sorted(pieces.items()):
+        bins=[]
+        for length in sorted(lengths, reverse=True):
+            if length>stock:
+                bins.append({"pieces":[length],"used_m":length,"waste_m":0.0,"oversize":True})
+                continue
+            placed=False
+            for b in bins:
+                if b["used_m"]+length<=stock+1e-9:
+                    b["pieces"].append(length); b["used_m"]+=length
+                    b["waste_m"]=stock-b["used_m"]; placed=True; break
+            if not placed:
+                bins.append({"pieces":[length],"used_m":length,"waste_m":stock-length,"oversize":False})
+        result[str(dia)]={
+            "diameter_mm":dia,"stock_length_m":stock,
+            "pieces_count":len(lengths),"stock_bars":len(bins),
+            "used_length_m":sum(b["used_m"] for b in bins),
+            "waste_length_m":sum(b["waste_m"] for b in bins),
+            "bars":bins
+        }
+    return result
+
 def estimate_members(members):
     rows=[]; totals=defaultdict(float)
     for i,m in enumerate(members,1):
@@ -149,7 +195,7 @@ def estimate_members(members):
                         rebar_by_diameter[key]["procurement_weight_kg"] += float(c.get("procurement_weight_kg",0))
             if c.get("unit")=="m³" and "بتن" in str(c.get("name","")):
                 concrete_total += float(c["value"])
-    return {"version":"takeoff-5.0","method":"drawing_driven_member_takeoff",
+    return {"version":"takeoff-5.0","method":"drawing_driven_member_takeoff","cut_list":cut_list_by_diameter(members),
             "members":members,"items":rows,"totals_by_unit":dict(totals),
             "rebar_by_diameter":{str(k):v for k,v in sorted(rebar_by_diameter.items())},
             "concrete_total_m3":concrete_total,
