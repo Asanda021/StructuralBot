@@ -674,7 +674,7 @@ async def ask_next(q,context):
         await finish_member(q,context); return
     label,unit=queue[0]
     options=ready_options(context.user_data["current_section"],context.user_data["current_type"],label)
-    await q.edit_message_text(ask_text(context.user_data["current_type"],queue,context.user_data["current_section"],context.user_data["current_type"]),parse_mode="HTML",reply_markup=field_menu(options,unit))
+    await q.edit_message_text(ask_text(context.user_data["current_type"],queue,context.user_data["current_section"],context.user_data["current_type"],options),parse_mode="HTML",reply_markup=field_menu(options,unit))
 
 async def finish_member(q,context):
     section=context.user_data["current_section"]; typ=context.user_data["current_type"]; vals=context.user_data["current_values"]
