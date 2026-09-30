@@ -94,13 +94,13 @@ def schema(section,typ):
             return [("تعداد","عدد"),("طول","m"),("عرض","m"),("ضخامت مگر","m")]
         if typ=="شناژ":
             return [("تعداد","عدد"),("طول","m"),("عرض","m"),("ارتفاع","m"),
-                    ("تعداد میلگرد طولی","عدد"),("قطر میلگرد طولی","mm"),
+                    ("تعداد میلگرد طولی هر شناژ","عدد"),("قطر میلگرد طولی","mm"),
                     ("قطر خاموت","mm"),("فاصله خاموت","cm"),("طول هر خاموت","m"),
-                    ("قطر سنجاقی","mm"),("فاصله سنجاقی","cm"),("طول هر سنجاقی","m")]
+                    ("تعداد سنجاقی هر شناژ","عدد"),("طول هر سنجاقی","m"),("قطر سنجاقی","mm")]
         return [("تعداد","عدد"),("طول","m"),("عرض","m"),("ضخامت","m"),
                 ("قطر شبکه پایین","mm"),("فاصله شبکه پایین","cm"),
                 ("قطر شبکه بالا","mm"),("فاصله شبکه بالا","cm"),
-                ("قطر سنجاقی","mm"),("فاصله سنجاقی","cm"),("طول هر سنجاقی","m"),
+                ("تعداد سنجاقی هر فونداسیون","عدد"),("طول هر سنجاقی","m"),("قطر سنجاقی","mm"),
                 ("تعداد میلگرد انتظار","عدد"),("طول هر انتظار","m"),("قطر میلگرد انتظار","mm")]
     if section=="ستون":
         return [("تعداد ستون","عدد"),("عرض ستون","m"),("عمق ستون","m"),("ارتفاع","m"),
@@ -168,6 +168,21 @@ def rcomps(title,r,note=""):
       {"name":f"{title} - طول خرید","value":r.get("procurement_length_m",r["length_m"]),"unit":"m","note":f"{dia} | پرت {r.get('waste_percent',0):g}%","category":"میلگرد","diameter_mm":r["diameter_mm"]}
     ]
 
+def repeated_grid_for_foundation(n,L,W,dia,spacing):
+    """Repeat a drawing-defined two-way foundation mesh for each footing/unit."""
+    r=grid_rebar(L,W,dia,spacing)
+    count=max(1,int(math.ceil(float(n))))
+    r["count_bars"]*=count
+    r["length_m"]*=count
+    r["weight_kg"]*=count
+    r["procurement_length_m"]*=count
+    r["waste_length_m"]*=count
+    r["branches"]=math.ceil(r["procurement_length_m"]/r["stock_length_m"]) if r["procurement_length_m"] else 0
+    r["procurement_length_m"]=r["branches"]*r["stock_length_m"]
+    r["procurement_weight_kg"]=r["diameter_mm"]**2/162*r["procurement_length_m"]
+    r["cut_lengths_m"]=r.get("cut_lengths_m",[])*count
+    return r
+
 def calc_member(section,typ,v):
     p=presets_for(section,typ)
     if section=="سقف":
@@ -219,22 +234,25 @@ def calc_member(section,typ,v):
         if typ=="بتن مگر":
             n,L,W,T=v; return [{"name":"بتن مگر","value":n*L*W*T,"unit":"m³"},{"name":"مساحت مگر","value":n*L*W,"unit":"m²"}]
         if typ=="شناژ":
-            n,L,W,H,bars,d,sd,ss,slen,pd,ps,plen=v
+            n,L,W,H,bars,d,sd,ss,slen,pcount,plen,pd=v
             comps=[{"name":"بتن شناژ","value":n*L*W*H,"unit":"m³"}]
             if bars and d: comps += rcomps("میلگرد طولی",repeated_bar_rebar(n*bars,L,d))
             if sd and ss and slen:
-                cnt=n*(math.ceil(L/(ss/100))+1); comps += rcomps("خاموت شناژ",repeated_bar_rebar(cnt,slen,sd))
-            if pd and ps and plen:
-                cnt=n*(math.ceil(L/(ps/100))+1); comps += rcomps("سنجاقی شناژ",repeated_bar_rebar(cnt,plen,pd))
+                cnt=n*(math.ceil(L/(ss/100))+1)
+                comps += rcomps("خاموت شناژ",repeated_bar_rebar(cnt,slen,sd),f"تعداد خاموت از طول و فاصله نقشه؛ طول قطعه از دیتیل")
+            if pcount and plen and pd:
+                comps += rcomps("سنجاقی شناژ",repeated_bar_rebar(n*pcount,plen,pd),f"{pcount:g} عدد در هر شناژ")
             return comps
-        n,L,W,T,bd,bs,td,ts,pd,ps,plen,en,elen,ed=v
+        n,L,W,T,bd,bs,td,ts,pcount,plen,pd,en,elen,ed=v
         comps=[{"name":"بتن فونداسیون","value":n*L*W*T,"unit":"m³"},{"name":"مساحت فونداسیون","value":n*L*W,"unit":"m²"}]
-        if bd and bs: comps += rcomps("شبکه پایین دو جهت",grid_rebar(L,W,bd,bs))
-        if td and ts: comps += rcomps("شبکه بالا دو جهت",grid_rebar(L,W,td,ts))
-        if pd and ps and plen:
-            cnt=n*(math.ceil(L/(ps/100))+1)*(math.ceil(W/(ps/100))+1)
-            comps += rcomps("سنجاقی پی",repeated_bar_rebar(cnt,plen,pd),f"محاسبه از شبکه {ps:g}cm؛ طول هر سنجاقی از دیتیل")
-        if en and elen and ed: comps += rcomps("میلگرد انتظار",repeated_bar_rebar(n*en,elen,ed))
+        if bd and bs:
+            comps += rcomps("شبکه پایین دو جهت",repeated_grid_for_foundation(n,L,W,bd,bs))
+        if td and ts:
+            comps += rcomps("شبکه بالا دو جهت",repeated_grid_for_foundation(n,L,W,td,ts))
+        if pcount and plen and pd:
+            comps += rcomps("سنجاقی پی",repeated_bar_rebar(n*pcount,plen,pd),f"{pcount:g} عدد در هر فونداسیون؛ تعداد از دیتیل نقشه")
+        if en and elen and ed:
+            comps += rcomps("میلگرد انتظار",repeated_bar_rebar(n*en,elen,ed))
         return comps
 
     if section=="ستون":
