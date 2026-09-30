@@ -14,10 +14,10 @@ def test_catalog_covers_all_configured_languages():
     assert {"fa", "en", "tr", "ar", "ru", "de", "zh-CN"} <= languages
 
 
-def test_iran_has_deterministic_adapters_marked_implemented():
-    assert is_implemented("ir-seismic-2800-5")
-    assert is_implemented("ir-concrete-m9-1399")
-    assert is_implemented("ir-steel-m10-1401")
+def test_iran_catalog_entries_require_edition_specific_adapters():
+    assert not is_implemented("ir-seismic-2800-5")
+    assert not is_implemented("ir-concrete-m9-1399")
+    assert not is_implemented("ir-steel-m10-1401")
 
 
 def test_non_implemented_codes_never_claim_compliance():
