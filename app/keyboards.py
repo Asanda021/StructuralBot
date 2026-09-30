@@ -2,14 +2,16 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton,
 
 def main_menu():
     return InlineKeyboardMarkup([
-      [InlineKeyboardButton("🏗 پروژه جدید",callback_data="new_project"),InlineKeyboardButton("📂 پروژه‌های من",callback_data="projects")],
-      [InlineKeyboardButton("🧮 شروع برآورد",callback_data="start_estimate"),InlineKeyboardButton("➕ ادامه برآورد",callback_data="continue_project")],
-      [InlineKeyboardButton("📋 جدول جامع",callback_data="table")],
-      [InlineKeyboardButton("📊 آخرین گزارش",callback_data="reports"),InlineKeyboardButton("📄 Excel + PDF",callback_data="exports")],
-      [InlineKeyboardButton("🏢 اطلاعات ساختمان",callback_data="building_info"),InlineKeyboardButton("📋 ورودی‌های پروژه",callback_data="project_inputs")],
-      [InlineKeyboardButton("🛠 ابزارهای متره",callback_data="takeoff_menu"),InlineKeyboardButton("🔁 معادل‌سازی میلگرد",callback_data="rebar_equiv")],
-      [InlineKeyboardButton("⚙️ تنظیمات",callback_data="settings"),InlineKeyboardButton("🌐 زبان",callback_data="language")],
-      [InlineKeyboardButton("👤 حساب کاربری",callback_data="account"),InlineKeyboardButton("❓ راهنما",callback_data="help")],
+      [InlineKeyboardButton("🧮 شروع برآورد",callback_data="start_estimate"),
+       InlineKeyboardButton("➕ ادامه برآورد",callback_data="continue_project")],
+      [InlineKeyboardButton("📋 جدول جامع",callback_data="table"),
+       InlineKeyboardButton("📊 آخرین گزارش",callback_data="reports")],
+      [InlineKeyboardButton("📤 Excel + PDF",callback_data="exports"),
+       InlineKeyboardButton("🔁 معادل‌سازی میلگرد",callback_data="rebar_equiv")],
+      [InlineKeyboardButton("⚙️ تنظیمات",callback_data="settings"),
+       InlineKeyboardButton("🌐 زبان",callback_data="language")],
+      [InlineKeyboardButton("👤 حساب کاربری",callback_data="account"),
+       InlineKeyboardButton("❓ راهنما",callback_data="help")],
       [InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
     ])
 
