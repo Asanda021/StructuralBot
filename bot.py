@@ -6,7 +6,7 @@ from telegram.error import BadRequest
 from app.db import Database
 from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, repeated_bar_rebar, format_estimate
 from app.exporter import create_excel, create_pdf
-from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu
+from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu
 
 TOKEN=os.getenv("BOT_TOKEN")
 DB_PATH=os.getenv("DATABASE_PATH","/tmp/structuralbot.db")
@@ -222,7 +222,7 @@ def show_member_types(q,section):
 async def start_cmd(update,context):
     db.ensure_user(update.effective_user.id,update.effective_user.first_name or "")
     context.user_data.clear()
-    await update.message.reply_text("🏗 <b>StructuralBot</b>\n\n<b>متره جامع از روی نقشه</b>\nاطلاعات خام نقشه را بگیر؛ ربات مقدار بتن، میلگرد، شاخه، تیرچه، بلوک/یونولیت و اجزای تقویتی را محاسبه می‌کند.",parse_mode="HTML",reply_markup=main_menu())
+    await update.message.reply_text("🏗 <b>StructuralBot</b>\n\n<b>متره جامع از روی نقشه</b>\nبرای ورود به حالت محاسبه، دکمه زیر را بزن.",parse_mode="HTML",reply_markup=calc_mode_menu())
 
 def reset(context,name):
     context.user_data.clear(); context.user_data.update({"project_name":name,"members":[],"history":[]})
@@ -249,6 +249,12 @@ async def callback(update,context):
     q=update.callback_query; data=q.data or ""; await q.answer()
     if data=="home":
         context.user_data.clear(); await q.edit_message_text("🏠 <b>منوی اصلی</b>",parse_mode="HTML",reply_markup=main_menu()); return
+    if data=="calc_mode":
+        context.user_data["calculation_mode"]=True
+        await q.edit_message_text("🧮 <b>حالت محاسبه فعال شد</b>\n\nحالا پروژه جدید را شروع کن یا یک پروژه را ادامه بده.",parse_mode="HTML",reply_markup=main_menu()); return
+    if data=="restart":
+        context.user_data.clear()
+        await q.edit_message_text("🔄 <b>شروع مجدد</b>\n\nتمام اطلاعات موقت این مرحله پاک شد. برای شروع دوباره، حالت محاسبه را فعال کن.",parse_mode="HTML",reply_markup=calc_mode_menu()); return
     if data=="new_project":
         context.user_data.clear(); context.user_data["awaiting_project_name"]=True
         await q.edit_message_text("🏗 نام پروژه را بفرست.",reply_markup=back_home()); return
@@ -353,7 +359,7 @@ async def message(update,context):
         if value<0: await update.message.reply_text("❌ عدد منفی مجاز نیست."); return
         context.user_data["current_values"].append(value); context.user_data["current_queue"].pop(0)
         await ask_next_message(update,context); return
-    await update.message.reply_text("از منوی زیر انتخاب کن.",reply_markup=main_menu())
+    await update.message.reply_text("از منوی زیر انتخاب کن.",reply_markup=persistent_menu())
 
 async def ask_next_message(update,context):
     if context.user_data.get("current_queue"):
