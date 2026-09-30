@@ -421,7 +421,9 @@ def calc_member(section,typ,v):
                    {"name":"تعداد تیرچه","value":r["joist_count"],"unit":"عدد","note":f"{r['joist_lines']} خط تیرچه × ضریب سیستم"},
                    {"name":"طول کل تیرچه","value":r["joist_total_length_m"],"unit":"m"},
                    {"name":"بلوک/یونولیت","value":r["block_count"],"unit":"عدد","note":f"{r['block_kind']} | {r['block_length_m']}×{r['block_width_m']}m"}]
-            if "thermal" in r:\n                comps += rcomps("شبکه حرارتی - X",grid_direction_rebar(data["length"],data["width"],data["thermal_dia"],data["thermal_spacing_cm"],"X"))\n                comps += rcomps("شبکه حرارتی - Y",grid_direction_rebar(data["length"],data["width"],data["thermal_dia"],data["thermal_spacing_cm"],"Y"))
+            if "thermal" in r:
+                comps += rcomps("شبکه حرارتی - X",grid_direction_rebar(data["length"],data["width"],data["thermal_dia"],data["thermal_spacing_cm"],"X"))
+                comps += rcomps("شبکه حرارتی - Y",grid_direction_rebar(data["length"],data["width"],data["thermal_dia"],data["thermal_spacing_cm"],"Y"))
             if r.get("tie_beam_rebar"): comps += rcomps("کلاف/ژوئن",r["tie_beam_rebar"])
             if r.get("negative"): comps += rcomps("میلگرد منفی",r["negative"])
             if r.get("otka"): comps += rcomps("اتکا/ادکا",r["otka"])
