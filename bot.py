@@ -52,7 +52,7 @@ READY={
  "قطر سنجاقی":10, "فاصله سنجاقی":25,
  "قطر خاموت":10, "فاصله خاموت":20,
  "فاصله خاموت عادی":20, "فاصله خاموت بحرانی":10,
- "قطر میلگرد طولی":16, "تعداد میلگرد طولی هر ستون":8, "تعداد میلگرد طولی هر تیر":4,
+ "قطر میلگرد طولی":16, "تعداد میلگرد طولی هر ستون":8, "تعداد میلگرد طولی هر تیر":4, "تعداد میلگرد بالایی هر تیر":2, "قطر میلگرد بالایی":16,
  "قطر میلگرد تقویتی":16, "قطر کمرکش":12, "تعداد وجه مسلح":2,
  "طول هر خاموت":1.0, "طول هر سنجاقی":0.8,
  "طول هر میلگرد تقویتی":2.0, "طول هر کمرکش":1.0,
@@ -100,7 +100,8 @@ def schema(section,typ):
                 ("تعداد سنجاقی در هر تراز","عدد"),("طول هر سنجاقی","m"),("قطر سنجاقی","mm")]
     if section=="تیر":
         return [("تعداد تیر","عدد"),("طول","m"),("عرض تیر","m"),("ارتفاع تیر","m"),
-                ("تعداد میلگرد طولی هر تیر","عدد"),("قطر میلگرد طولی","mm"),
+                ("تعداد میلگرد پایینی هر تیر","عدد"),("قطر میلگرد پایینی","mm"),
+                ("تعداد میلگرد بالایی هر تیر","عدد"),("قطر میلگرد بالایی","mm"),
                 ("قطر خاموت","mm"),("فاصله خاموت عادی","cm"),("فاصله خاموت بحرانی","cm"),
                 ("طول ناحیه بحرانی هر طرف","m"),("طول هر خاموت","m"),
                 ("تعداد میلگرد تقویتی هر تیر","عدد"),("طول هر میلگرد تقویتی","m"),("قطر میلگرد تقویتی","mm"),
@@ -222,14 +223,20 @@ def calc_member(section,typ,v):
         return comps
 
     if section=="تیر":
-        n,L,a,h,bars,d,sd,ss,cs,clen,slen,rcount,rlen,rd,pin,plen,pd,kcount,klen,kd=v
+        # v20 = legacy single longitudinal-bar line; v22 = separate bottom/top bars.
+        if len(v)==20:
+            n,L,a,h,bars,d,sd,ss,cs,clen,slen,rcount,rlen,rd,pin,plen,pd,kcount,klen,kd=v
+            top_bars=0; top_d=0
+        else:
+            n,L,a,h,bars,d,top_bars,top_d,sd,ss,cs,clen,slen,rcount,rlen,rd,pin,plen,pd,kcount,klen,kd=v
         comps=[{"name":"بتن تیر","value":n*L*a*h,"unit":"m³"},{"name":"طول تیر","value":n*L,"unit":"m"}]
-        if bars and d: comps += rcomps("میلگرد طولی",repeated_bar_rebar(n*bars,L,d),f"{bars:g} عدد در هر تیر")
+        if bars and d: comps += rcomps("میلگرد پایینی تیر",repeated_bar_rebar(n*bars,L,d),f"{bars:g} عدد در هر تیر")
+        if top_bars and top_d: comps += rcomps("میلگرد بالایی تیر",repeated_bar_rebar(n*top_bars,L,top_d),f"{top_bars:g} عدد در هر تیر")
         if sd and slen:
             normal=max(0,L-2*clen)
             c_normal=(math.ceil(normal/(ss/100))+1) if ss and normal>0 else 0
             c_critical=(2*(math.ceil(clen/(cs/100))+1)) if cs and clen>0 else 0
-            total=n*(c_normal+c_critical); 
+            total=n*(c_normal+c_critical)
             if total: comps += rcomps("خاموت",repeated_bar_rebar(total,slen,sd),f"عادی {c_normal} | بحرانی دو طرف {c_critical}")
         if rcount and rlen and rd: comps += rcomps("میلگرد تقویتی",repeated_bar_rebar(n*rcount,rlen,rd))
         if pin and plen and pd: comps += rcomps("سنجاقی تیر",repeated_bar_rebar(n*pin,plen,pd))
