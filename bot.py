@@ -26,14 +26,17 @@ def fmt(v):
     return f"{float(v):,.3f}".rstrip("0").rstrip(".")
 
 def presets_for(section,typ):
-    if section=="ستون" and "×" in typ:
+    if "×" in typ and section in ("ستون","تیر"):
         w,d=[float(x)/100 for x in typ.split("×")]
-        return {"width":w,"depth":d}
+        if section=="ستون": return {"width":w,"depth":d}
+        return {"beam_width":w,"beam_height":d}
     return {}
 
 # Quick-entry values are convenience only; they are never used silently.
 READY={
  "تعداد":1, "تعداد ستون":1, "تعداد تیر":1,
+ "طول":1.2, "عرض":1.2, "ضخامت":0.5, "ارتفاع":3.0,
+ "عرض ستون":0.3, "عمق ستون":0.3, "عرض تیر":0.3, "ارتفاع تیر":0.5,
  "فاصله تیرچه":50, "قطر حرارتی":8, "فاصله حرارتی":25,
  "قطر شبکه پایین":16, "فاصله شبکه پایین":20,
  "قطر شبکه بالا":0, "فاصله شبکه بالا":0,
@@ -42,6 +45,9 @@ READY={
  "فاصله خاموت عادی":20, "فاصله خاموت بحرانی":10,
  "قطر میلگرد طولی":16, "تعداد میلگرد طولی هر ستون":8, "تعداد میلگرد طولی هر تیر":4,
  "قطر میلگرد تقویتی":16, "قطر کمرکش":12,
+ "طول هر خاموت":1.0, "طول هر سنجاقی":0.8,
+ "طول هر میلگرد تقویتی":2.0, "طول هر کمرکش":1.0,
+ "تعداد میلگرد تقویتی هر تیر":2, "تعداد سنجاقی هر تیر":2, "تعداد میلگرد کمرکش":2,
  "ضریب بتن":0.18, "طول یونولیت":1.0, "عرض یونولیت":0.5,
 }
 
@@ -104,7 +110,7 @@ def ask_text(name,fields,section,typ):
     label,unit=fields[0]
     rv=ready_value(section,typ,label)
     ready=f"\n⚡ مقدار آماده: <b>{rv}</b> {unit} (قابل ویرایش)" if rv is not None else ""
-    return f"✏️ <b>{name}</b>\n\n<b>{label}</b> ({unit}){ready}\nعدد را وارد کن."
+    return f"✏️ <b>{name}</b>\n\n<b>{label}</b> ({unit}){ready}\nعدد را وارد کن.\n\n⚠️ اعداد آماده فقط میانبر ورود هستند؛ مقدار نهایی را با نقشه کنترل کن."
 
 def rcomps(title,r,note=""):
     n=int(r.get("count_bars",0)); branches=r.get("branches",0)
@@ -313,8 +319,8 @@ async def ask_next(q,context):
     if not queue:
         await finish_member(q,context); return
     label,unit=queue[0]
-    if context.user_data.get("current_preset") and label in ("عرض ستون","عمق ستون"):
-        p=context.user_data["current_preset"]; key="width" if label=="عرض ستون" else "depth"
+    if context.user_data.get("current_preset") and label in ("عرض ستون","عمق ستون","عرض تیر","ارتفاع تیر"):
+        p=context.user_data["current_preset"]; key={"عرض ستون":"width","عمق ستون":"depth","عرض تیر":"beam_width","ارتفاع تیر":"beam_height"}[label]
         context.user_data["current_values"].append(p[key]); context.user_data["current_queue"].pop(0); await ask_next(q,context); return
     rv=ready_value(context.user_data["current_section"],context.user_data["current_type"],label)
     extra=[InlineKeyboardButton(f"⚡ استفاده از مقدار آماده: {rv} {unit}",callback_data=f"ready|{rv}")] if rv is not None else None
