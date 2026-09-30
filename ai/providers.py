@@ -1,291 +1,162 @@
-"""
-StructuralBot - AI Providers
-
-Provider implementations for the AI service layer.
-
-The application communicates with providers through a common interface.
-This makes it possible to connect different AI services later without
-changing Telegram handlers or engineering calculation modules.
-"""
-
 from __future__ import annotations
 
-import os
-from typing import Any, Dict, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, Iterable, Optional, Protocol
 
-from ai.service import (
-    AIConfigurationError,
-    AIProviderError,
-    AIRequest,
-    AIResponse,
-    EngineeringPromptBuilder,
-)
+from .service import AIProvider, AIRequest, AIResponse
 
 
-# ---------------------------------------------------------
-# GENERIC HTTP PROVIDER INTERFACE
-# ---------------------------------------------------------
+@dataclass(frozen=True)
+class ProviderConfig:
+    name: str
+    model: str
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    enabled: bool = True
+    timeout: float = 30.0
+    extra: Dict[str, Any] = field(default_factory=dict)
 
 
-class BaseAIProvider:
-    """
-    Base provider interface.
+class ProviderFactory(Protocol):
+    def __call__(self, config: ProviderConfig) -> AIProvider:
+        ...
 
-    Concrete providers should implement generate().
-    """
 
-    name = "base"
+class ProviderRegistry:
+    def __init__(self) -> None:
+        self._configs: Dict[str, ProviderConfig] = {}
+        self._factories: Dict[str, ProviderFactory] = {}
 
-    async def generate(
+    def register(
         self,
-        request: AIRequest,
-    ) -> AIResponse:
-        raise NotImplementedError
-
-
-# ---------------------------------------------------------
-# OPENAI-COMPATIBLE PROVIDER
-# ---------------------------------------------------------
-
-
-class OpenAICompatibleProvider(BaseAIProvider):
-    """
-    Provider for APIs that expose an OpenAI-compatible chat interface.
-
-    The actual HTTP client is intentionally not imported here yet.
-    This keeps the core project lightweight until a provider is selected.
-
-    Expected configuration:
-
-        AI_API_KEY
-        AI_BASE_URL
-        AI_MODEL
-
-    Example base URL:
-
-        https://api.openai.com/v1
-
-    The provider can later be connected to any compatible service.
-    """
-
-    name = "openai-compatible"
-
-    def __init__(
-        self,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-        model: Optional[str] = None,
-        timeout: float = 60.0,
+        config: ProviderConfig,
+        factory: Optional[ProviderFactory] = None,
     ) -> None:
+        name = config.name.strip().lower()
+        if not name:
+            raise ValueError("Provider name cannot be empty.")
 
-        self.api_key = (
-            api_key
-            or os.getenv("AI_API_KEY")
-            or os.getenv("OPENAI_API_KEY")
-        )
+        self._configs[name] = config
 
-        self.base_url = (
-            base_url
-            or os.getenv("AI_BASE_URL")
-            or os.getenv(
-                "OPENAI_BASE_URL",
-                "https://api.openai.com/v1",
-            )
-        )
+        if factory is not None:
+            self._factories[name] = factory
 
-        self.model = (
-            model
-            or os.getenv("AI_MODEL")
-        )
+    def unregister(self, name: str) -> None:
+        key = name.strip().lower()
+        self._configs.pop(key, None)
+        self._factories.pop(key, None)
 
-        self.timeout = timeout
+    def get_config(self, name: str) -> ProviderConfig:
+        key = name.strip().lower()
+        try:
+            return self._configs[key]
+        except KeyError as exc:
+            raise KeyError(f"Unknown AI provider: {name}") from exc
 
-    def validate_configuration(self) -> None:
-        """
-        Validate provider configuration.
-        """
+    def get_factory(self, name: str) -> Optional[ProviderFactory]:
+        return self._factories.get(name.strip().lower())
 
-        if not self.api_key:
-            raise AIConfigurationError(
-                "AI API key is not configured."
-            )
+    def exists(self, name: str) -> bool:
+        return name.strip().lower() in self._configs
 
-        if not self.base_url:
-            raise AIConfigurationError(
-                "AI base URL is not configured."
-            )
+    def list_providers(self) -> Iterable[ProviderConfig]:
+        return tuple(self._configs.values())
 
-        if not self.model:
-            raise AIConfigurationError(
-                "AI model is not configured."
-            )
+    def create(self, name: str) -> AIProvider:
+        config = self.get_config(name)
 
-    def build_payload(
-        self,
-        request: AIRequest,
-    ) -> Dict[str, Any]:
-        """
-        Build a provider-neutral OpenAI-compatible payload.
+        if not config.enabled:
+            raise RuntimeError(f"AI provider '{config.name}' is disabled.")
 
-        This method does not perform network communication.
-        """
+        factory = self.get_factory(name)
 
-        self.validate_configuration()
+        if factory is None:
+            return PlaceholderProvider(config)
 
-        messages = EngineeringPromptBuilder.build(
-            request
-        )
-
-        payload: Dict[str, Any] = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": request.temperature,
-        }
-
-        if request.max_tokens is not None:
-            payload["max_tokens"] = request.max_tokens
-
-        return payload
-
-    def build_headers(self) -> Dict[str, str]:
-        """
-        Build HTTP authorization headers.
-        """
-
-        self.validate_configuration()
-
-        return {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-
-    def endpoint(self) -> str:
-        """
-        Return chat completion endpoint.
-        """
-
-        self.validate_configuration()
-
-        return (
-            self.base_url.rstrip("/")
-            + "/chat/completions"
-        )
-
-    async def generate(
-        self,
-        request: AIRequest,
-    ) -> AIResponse:
-        """
-        Generate an AI response.
-
-        Network transport is intentionally separated from this first
-        provider definition. A dedicated HTTP implementation can be added
-        without changing the rest of StructuralBot.
-        """
-
-        self.validate_configuration()
-
-        raise AIProviderError(
-            "AI HTTP transport is not connected yet. "
-            "Provider configuration is ready, but network execution "
-            "must be implemented before production use."
-        )
+        return factory(config)
 
 
-# ---------------------------------------------------------
-# FACTORY
-# ---------------------------------------------------------
-
-
-def create_ai_provider(
-    provider_name: Optional[str] = None,
-) -> BaseAIProvider:
+class PlaceholderProvider:
     """
-    Create an AI provider from configuration.
+    Safe provider used when no external AI service is configured.
 
-    Supported values:
-
-        placeholder
-        openai
-        openai-compatible
+    It deliberately does not pretend to provide an actual AI response.
     """
 
-    name = (
-        provider_name
-        or os.getenv("AI_PROVIDER")
-        or "placeholder"
-    ).strip().lower()
+    def __init__(self, config: ProviderConfig) -> None:
+        self.config = config
 
-    if name in {
-        "placeholder",
-        "none",
-        "disabled",
-    }:
-        from ai.service import PlaceholderAIProvider
+    def generate(self, request: AIRequest) -> AIResponse:
+        message = (
+            "AI provider is not configured. "
+            "Please configure an enabled provider before using AI features."
+        )
 
-        return PlaceholderAIProvider()
+        return AIResponse(
+            text=message,
+            provider=self.config.name,
+            model=self.config.model,
+            usage={},
+            metadata={
+                "configured": False,
+                "provider": self.config.name,
+            },
+        )
 
-    if name in {
-        "openai",
-        "openai-compatible",
-        "openai_compatible",
-    }:
-        return OpenAICompatibleProvider()
 
-    raise AIConfigurationError(
-        f"Unsupported AI provider: {name}"
+def create_provider(
+    config: ProviderConfig,
+    factory: Optional[ProviderFactory] = None,
+) -> AIProvider:
+    if not config.enabled:
+        raise RuntimeError(f"AI provider '{config.name}' is disabled.")
+
+    if factory is not None:
+        return factory(config)
+
+    return PlaceholderProvider(config)
+
+
+def build_default_provider_registry() -> ProviderRegistry:
+    registry = ProviderRegistry()
+
+    registry.register(
+        ProviderConfig(
+            name="placeholder",
+            model="placeholder",
+            enabled=True,
+        )
     )
 
-
-# ---------------------------------------------------------
-# CONFIGURATION HELPERS
-# ---------------------------------------------------------
+    return registry
 
 
-def ai_provider_is_configured() -> bool:
-    """
-    Check whether enough configuration exists for a real AI provider.
-
-    This does not make a network request.
-    """
-
-    provider_name = (
-        os.getenv("AI_PROVIDER")
-        or "placeholder"
-    ).strip().lower()
-
-    if provider_name in {
-        "placeholder",
-        "none",
-        "disabled",
-    }:
-        return False
-
-    api_key = (
-        os.getenv("AI_API_KEY")
-        or os.getenv("OPENAI_API_KEY")
-    )
-
-    model = os.getenv("AI_MODEL")
-
-    return bool(api_key and model)
+_default_registry = build_default_provider_registry()
 
 
-def get_ai_provider_name() -> str:
-    """
-    Return the configured provider name.
-    """
+def get_provider_registry() -> ProviderRegistry:
+    return _default_registry
 
-    return (
-        os.getenv("AI_PROVIDER")
-        or "placeholder"
-    ).strip().lower()
+
+def register_provider(
+    config: ProviderConfig,
+    factory: Optional[ProviderFactory] = None,
+) -> None:
+    _default_registry.register(config, factory)
+
+
+def get_provider(name: str) -> AIProvider:
+    return _default_registry.create(name)
 
 
 __all__ = [
-    "BaseAIProvider",
-    "OpenAICompatibleProvider",
-    "create_ai_provider",
-    "ai_provider_is_configured",
-    "get_ai_provider_name",
+    "ProviderConfig",
+    "ProviderFactory",
+    "ProviderRegistry",
+    "PlaceholderProvider",
+    "create_provider",
+    "build_default_provider_registry",
+    "get_provider_registry",
+    "register_provider",
+    "get_provider",
 ]
