@@ -1282,35 +1282,4 @@ def main() -> None:
 # =========================================================
 
 if __name__ == "__main__":
-    main()# STATEFUL TEXT INPUTS
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, ai_message),
-        group=0,
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, column_message),
-        group=0,
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, beam_message),
-        group=0,
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, slab_message),
-        group=0,
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, equivalency_message),
-        group=0,
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, quantities_message),
-        group=0,
-    )
-
-    # =========================================================
-    bootstrap.
-
-Architecture:
-
-    Telegram
+    main()
