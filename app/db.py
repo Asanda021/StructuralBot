@@ -37,5 +37,17 @@ class Database:
             row=c.execute("SELECT pe.project_id,p.name,pe.inputs_json,pe.result_json FROM project_estimates pe JOIN projects p ON p.id=pe.project_id WHERE p.user_id=? ORDER BY pe.id DESC LIMIT 1",(user_id,)).fetchone()
         if not row:return None
         return {"project_id":row[0],"project_name":row[1],"inputs":json.loads(row[2]),"result":json.loads(row[3])}
+    def set_settings(self,user_id,language=None,calc_mode=None):
+        with self.connect() as c:
+            row=c.execute("SELECT language,calc_mode FROM user_settings WHERE user_id=?",(user_id,)).fetchone()
+            lang=language or (row[0] if row else "fa")
+            mode=calc_mode or (row[1] if row else "detailed")
+            c.execute("INSERT INTO user_settings(user_id,language,calc_mode) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET language=excluded.language,calc_mode=excluded.calc_mode",(user_id,lang,mode))
+
+    def settings(self,user_id):
+        with self.connect() as c:
+            row=c.execute("SELECT language,calc_mode FROM user_settings WHERE user_id=?",(user_id,)).fetchone()
+        return {"language":row[0],"calc_mode":row[1]} if row else {"language":"fa","calc_mode":"detailed"}
+
     def last_calc(self,user_id):
         with self.connect() as c:return c.execute("SELECT title,result FROM calculations WHERE user_id=? ORDER BY id DESC LIMIT 1",(user_id,)).fetchone()
