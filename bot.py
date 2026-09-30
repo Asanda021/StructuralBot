@@ -646,6 +646,44 @@ async def callback(update,context):
             rows.append([InlineKeyboardButton(f"✏️ {i+1}. {m['member']}",callback_data=f"edit|{i}"),InlineKeyboardButton("📑",callback_data=f"copy|{i}"),InlineKeyboardButton("❌",callback_data=f"delete|{i}")])
         rows.append([InlineKeyboardButton("⬅️ بازبینی",callback_data="finish_takeoff")])
         await q.edit_message_text("✏️ <b>اصلاح یا حذف عضو</b>",parse_mode="HTML",reply_markup=InlineKeyboardMarkup(rows)); return
+    if data=="member_calculate":
+        idx=context.user_data.get("current_member_index"); ms=context.user_data.get("members",[])
+        if idx is None or idx<0 or idx>=len(ms):
+            await q.edit_message_text("❌ عضو جاری پیدا نشد.",reply_markup=section_menu()); return
+        m=ms[idx]; result=estimate_members([m])
+        concrete=result.get("concrete_total_m3",0)
+        rebar=sum(float(x.get("weight_kg",0)) for x in result.get("rebar_by_diameter",{}).values())
+        lines=[f"🧮 <b>محاسبه نهایی عضو</b>","",f"عضو: <b>{m['member']}</b>",f"بتن: <b>{fmt(concrete)} m³</b>",f"وزن میلگرد اجرا: <b>{fmt(rebar)} kg</b>",""]
+        for comp in m.get("components",[]):
+            lines.append(f"• {comp['name']}: {fmt(comp['value'])} {comp['unit']}")
+        await q.edit_message_text("\n".join(lines),parse_mode="HTML",reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ تأیید نهایی عضو",callback_data="member_confirm")],
+            [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit")],
+            [InlineKeyboardButton("🔎 بازبینی پروژه",callback_data="finish_takeoff")],
+            [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")]
+        ])); return
+    if data=="member_confirm":
+        idx=context.user_data.get("current_member_index"); ms=context.user_data.get("members",[])
+        if idx is None or idx<0 or idx>=len(ms):
+            await q.edit_message_text("❌ عضو جاری پیدا نشد.",reply_markup=section_menu()); return
+        m=ms[idx]
+        await q.edit_message_text(f"✅ <b>{m['member']}</b> با موفقیت تأیید نهایی شد.\n\nاین عضو در متره پروژه ثبت شد و آماده ورود به عضو بعدی یا بازبینی کامل پروژه است.",parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("➕ عضو بعدی",callback_data="choose_section")],
+                [InlineKeyboardButton("🔎 بازبینی پروژه",callback_data="finish_takeoff")],
+                [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit")],
+                [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+            ])); return
+    if data=="member_edit":
+        idx=context.user_data.get("current_member_index"); ms=context.user_data.get("members",[])
+        if idx is None or idx<0 or idx>=len(ms):
+            await q.edit_message_text("❌ عضو جاری پیدا نشد.",reply_markup=section_menu()); return
+        m=ms[idx]; raw=list(m.get("raw",[])); sc=schema(m["section"],m["type"])
+        preset_count=len(COMPOUND_PRESETS.get(m["section"],{}).get(m["type"],[]))
+        context.user_data.update({"current_section":m["section"],"current_type":m["type"],"current_values":raw[:preset_count],
+                                  "current_queue":sc[preset_count:],"current_history":[],"current_edit":idx,
+                                  "current_preset":presets_for(m["section"],m["type"])})
+        await ask_next(q,context); return
     if data=="finish_takeoff": await review(q,context); return
     if data=="confirm_project":
         ms=context.user_data.get("members",[])
