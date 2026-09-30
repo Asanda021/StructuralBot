@@ -283,7 +283,9 @@ def calc_member(section,typ,v):
             c_normal=(math.ceil(normal/(ss/100))+1) if ss and normal>0 else 0
             c_critical=(2*(math.ceil(clen/(cs/100))+1)) if cs and clen>0 else 0
             total=n*(c_normal+c_critical)
-            if total: comps += rcomps("خاموت",repeated_bar_rebar(total,slen,sd),f"عادی {c_normal} | بحرانی دو طرف {c_critical}")
+            if total:
+                comps += rcomps("خاموت",repeated_bar_rebar(total,slen,sd),
+                                f"عادی {c_normal} | بحرانی دو طرف {c_critical} | طول قطعه از دیتیل نقشه")
         if rcount and rlen and rd: comps += rcomps("میلگرد تقویتی",repeated_bar_rebar(n*rcount,rlen,rd))
         if pin and plen and pd: comps += rcomps("سنجاقی تیر",repeated_bar_rebar(n*pin,plen,pd))
         if kcount and klen and kd: comps += rcomps("کمرکش تیر",repeated_bar_rebar(n*kcount,klen,kd))
