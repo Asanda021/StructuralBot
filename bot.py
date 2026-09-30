@@ -325,9 +325,12 @@ def english_report(result):
     for dia,data in result.get("rebar_by_diameter",{}).items():
         by_dia[float(dia)]=data
     names={
-        "میلگرد شبکه پایین - دو جهت":"Bottom Reinforcement",
-        "میلگرد شبکه بالا - دو جهت":"Top Reinforcement",
-        "شبکه حرارتی دو جهت":"Thermal Reinforcement",
+        "میلگرد شبکه پایین - X":"Bottom Reinforcement - X Direction",
+        "میلگرد شبکه پایین - Y":"Bottom Reinforcement - Y Direction",
+        "میلگرد شبکه بالا - X":"Top Reinforcement - X Direction",
+        "میلگرد شبکه بالا - Y":"Top Reinforcement - Y Direction",
+        "شبکه حرارتی - X":"Thermal Reinforcement - X Direction",
+        "شبکه حرارتی - Y":"Thermal Reinforcement - Y Direction",
         "میلگرد طولی":"Longitudinal Reinforcement",
         "میلگرد طولی ستون":"Column Longitudinal Reinforcement",
         "میلگرد پایینی تیر":"Beam Bottom Reinforcement",
@@ -372,6 +375,19 @@ def rcomps(title,r,note=""):
       {"name":f"{title} - شاخه خرید","value":branches,"unit":"شاخه","note":f"{dia} | شاخه {r['stock_length_m']:g}m | وزن خرید {r['procurement_weight_kg']:.2f}kg","category":"میلگرد","diameter_mm":r["diameter_mm"],"procurement_weight_kg":r["procurement_weight_kg"]},
       {"name":f"{title} - طول خرید","value":r.get("procurement_length_m",r["length_m"]),"unit":"m","note":f"{dia} | پرت {r.get('waste_percent',0):g}%","category":"میلگرد","diameter_mm":r["diameter_mm"]}
     ]
+
+def grid_direction_rebar(L,W,dia,spacing,direction,count=1):
+    """Return one explicit X/Y reinforcement direction for a grid."""
+    base=grid_rebar(L,W,dia,spacing)
+    i=0 if direction=="X" else 1
+    piece_count=base["bars_each_direction"][i]*int(count)
+    piece_length=base["length_each_direction_m"][i]/max(1,base["bars_each_direction"][i])
+    total_length=base["length_each_direction_m"][i]*int(count)
+    r=rebar_summary(dia,total_length,base["stock_length_m"])
+    r["count_bars"]=piece_count
+    r["length_each_m"]=piece_length
+    r["cut_lengths_m"]=[piece_length]*piece_count
+    return r
 
 def repeated_grid_for_foundation(n,L,W,dia,spacing):
     """Repeat a drawing-defined two-way foundation mesh for each footing/unit."""
@@ -426,7 +442,8 @@ def calc_member(section,typ,v):
             comps=[{"name":"بتن سقف","value":concrete,"unit":"m³","note":f"حجم خالص {typ} پس از کسر فضای خالی ماژول و بازشو"},
                    {"name":"مساحت سقف","value":area,"unit":"m²"},{"name":"تعداد ماژول خالی","value":modules,"unit":"عدد"},
                    {"name":"حجم فضای خالی","value":void_volume,"unit":"m³"},{"name":"مساحت بازشو","value":opening_area,"unit":"m²"}]
-            if td and ts: comps += rcomps("شبکه حرارتی دو جهت",grid_rebar(L,W,td,ts),f"{typ} | X/Y")
+            if td and ts: comps += rcomps("شبکه حرارتی - X",grid_direction_rebar(L,W,td,ts,"X"))
+                comps += rcomps("شبکه حرارتی - Y",grid_direction_rebar(L,W,td,ts,"Y"))
             return comps
         L,W,T,td,ts,oc,ol,ow=v
         openings=[{"length":ol,"width":ow,"count":oc}] if oc and ol and ow else []
@@ -451,9 +468,11 @@ def calc_member(section,typ,v):
         n,L,W,T,bd,bs,td,ts,en,elen,ed=v
         comps=[{"name":"بتن فونداسیون","value":n*L*W*T,"unit":"m³"},{"name":"مساحت فونداسیون","value":n*L*W,"unit":"m²"}]
         if bd and bs:
-            comps += rcomps("میلگرد شبکه پایین - دو جهت",repeated_grid_for_foundation(n,L,W,bd,bs))
+            comps += rcomps("میلگرد شبکه پایین - X",grid_direction_rebar(L,W,bd,bs,"X",n))
+            comps += rcomps("میلگرد شبکه پایین - Y",grid_direction_rebar(L,W,bd,bs,"Y",n))
         if td and ts:
-            comps += rcomps("میلگرد شبکه بالا - دو جهت",repeated_grid_for_foundation(n,L,W,td,ts))
+            comps += rcomps("میلگرد شبکه بالا - X",grid_direction_rebar(L,W,td,ts,"X",n))
+            comps += rcomps("میلگرد شبکه بالا - Y",grid_direction_rebar(L,W,td,ts,"Y",n))
         if en and elen and ed:
             comps += rcomps("میلگرد انتظار",repeated_bar_rebar(n*en,elen,ed))
         return comps
