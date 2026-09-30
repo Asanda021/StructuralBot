@@ -1,4 +1,4 @@
-import logging, os, threading, tempfile, math
+import logging, os, threading, tempfile, math, html
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
@@ -521,6 +521,55 @@ async def review(q,context):
         for c in m["components"]: lines.append(f"• {c['name']}: {fmt(c['value'])} {c['unit']}")
     if not ms: lines.append("\nهنوز عضوی ثبت نشده.")
     await q.edit_message_text("\n".join(lines),parse_mode="HTML",reply_markup=review_menu())
+
+def _copyable_report(result, project_name):
+    lines=[
+        "STRUCTURALBOT — گزارش متره و برآورد",
+        f"پروژه: {project_name}",
+        "",
+        f"تعداد اعضا: {result.get('member_count',0)}",
+        f"حجم کل بتن: {result.get('concrete_total_m3',0):,.3f} m³",
+        "",
+        "جمع کل میلگرد — تفکیک نوع"
+    ]
+    groups={}
+    for m in result.get("members",[]):
+        for c in m.get("components",[]):
+            if c.get("category")!="میلگرد": continue
+            name=str(c.get("name","")); dia=c.get("diameter_mm")
+            if dia is None: continue
+            base=name.split(" - ")[0]
+            g=groups.setdefault((base,float(dia)),{"pieces":0,"length":0.0,"weight":0.0,"branches":0,"buy_weight":0.0,"buy_length":0.0})
+            if name.endswith(" - تعداد قطعه"): g["pieces"]+=int(c.get("value",0))
+            elif name.endswith(" - طول اجرا"): g["length"]+=float(c.get("value",0))
+            elif name.endswith(" - وزن اجرا"): g["weight"]+=float(c.get("value",0))
+            elif name.endswith(" - شاخه خرید"):
+                g["branches"]+=int(c.get("value",0)); g["buy_weight"]+=float(c.get("procurement_weight_kg",0))
+            elif name.endswith(" - طول خرید"): g["buy_length"]+=float(c.get("value",0))
+    if groups:
+        for (base,dia),g in groups.items():
+            lines += [
+                "",
+                f"نوع میلگرد: {base}",
+                f"قطر: Φ{dia:g}",
+                f"تعداد قطعه: {g['pieces']}",
+                f"طول اجرا: {g['length']:.2f} m",
+                f"وزن اجرا: {g['weight']:.2f} kg",
+                f"شاخه خرید: {g['branches']}",
+                f"طول خرید: {g['buy_length']:.2f} m",
+                f"وزن خرید: {g['buy_weight']:.2f} kg",
+            ]
+    else:
+        lines.append("میلگردی ثبت نشده است.")
+    lines += ["","خلاصه خرید بر اساس قطر"]
+    for dia,d in result.get("rebar_by_diameter",{}).items():
+        lines.append(f"Φ{dia}: {d.get('branches',0)} شاخه | {d.get('procurement_weight_kg',0):.2f} kg خرید | {d.get('weight_kg',0):.2f} kg اجرا")
+    lines += ["","کنترل کیفیت: "+("بدون هشدار" if result.get("qa",{}).get("ok") else f"{len(result.get('qa',{}).get('warnings',[]))} هشدار")]
+    for w in result.get("qa",{}).get("warnings",[])[:12]:
+        lines.append("هشدار: "+str(w))
+    if result.get("ai_explanation"):
+        lines += ["","توضیح هوشمند:",str(result["ai_explanation"])]
+    return "\n".join(lines)
 
 async def save_final(update,context):
     ms=context.user_data.get("members",[])
