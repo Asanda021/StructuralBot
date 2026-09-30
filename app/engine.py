@@ -22,7 +22,13 @@ def estimate_building(data):
     ]
     positive(*(data[k] for k in required))
 
-    floors = data["floors"]
+    for key in ("floors", "foundation_count", "columns_per_floor"):
+        value = float(data[key])
+        if not value.is_integer():
+            raise ValueError(f"{key} must be an integer")
+    floors = int(data["floors"])
+    data["foundation_count"] = int(data["foundation_count"])
+    data["columns_per_floor"] = int(data["columns_per_floor"])
     area = data["area"]
 
     concrete = {
