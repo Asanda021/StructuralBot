@@ -77,8 +77,8 @@ READY_OPTIONS = {
  "فاصله خاموت بحرانی":[8,10,12.5,15,17.5,20],
  "فاصله سنجاقی":[10,15,20,25,30],
  "قطر حرارتی":[6,8,10,12],
- "قطر شبکه پایین":[10,12,14,16,18,20],
- "قطر شبکه بالا":[10,12,14,16,18,20],
+ "قطر میلگرد شبکه پایین":[10,12,14,16,18,20],
+ "قطر میلگرد شبکه بالا":[10,12,14,16,18,20],
  "قطر قائم":[10,12,14,16,18,20],
  "قطر افقی":[8,10,12,14,16],
  "قطر میلگرد طولی":[12,14,16,18,20,22,25,28,32],
@@ -100,7 +100,6 @@ READY_OPTIONS = {
  "تعداد سنجاقی هر تیر":[1,2,3,4,6,8],
  "تعداد میلگرد کمرکش":[1,2,3,4,6,8],
  "تعداد وجه مسلح":[1,2],
- "تعداد سنجاقی هر فونداسیون":[0,2,4,6,8,10,12],
  "تعداد میلگرد انتظار":[0,2,4,6,8,10,12,16],
  "تعداد کلاف میانی/ژوئن":[0,1,2,3,4,5,6],
  "تعداد سنجاقی ژوئن":[0,2,4,6,8,10,12],
@@ -166,6 +165,9 @@ def ready_value(section,typ,label):
     return vals[0] if vals else None
 
 def schema(section,typ):
+    # Foundation has no pin/snagakhi input in this takeoff model.
+    if section=="فونداسیون" and typ!="بتن مگر":
+        pass
     if section=="سقف":
         if typ.startswith("تیرچه"):
             return [
@@ -195,11 +197,10 @@ def schema(section,typ):
             return [("تعداد","عدد"),("طول","m"),("عرض","m"),("ارتفاع","m"),
                     ("تعداد میلگرد طولی هر شناژ","عدد"),("قطر میلگرد طولی","mm"),
                     ("قطر خاموت","mm"),("فاصله خاموت","cm"),("طول هر خاموت","m"),
-                    ("تعداد سنجاقی هر شناژ","عدد"),("طول هر سنجاقی","m"),("قطر سنجاقی","mm")]
+                    ("تعداد میلگرد انتظار","عدد"),("طول هر انتظار","m"),("قطر میلگرد انتظار","mm")]
         return [("تعداد","عدد"),("طول","m"),("عرض","m"),("ضخامت","m"),
-                ("قطر شبکه پایین","mm"),("فاصله شبکه پایین","cm"),
-                ("قطر شبکه بالا","mm"),("فاصله شبکه بالا","cm"),
-                ("تعداد سنجاقی هر فونداسیون","عدد"),("طول هر سنجاقی","m"),("قطر سنجاقی","mm"),
+                ("قطر میلگرد شبکه پایین","mm"),("فاصله میلگرد شبکه پایین","cm"),
+                ("قطر میلگرد شبکه بالا","mm"),("فاصله میلگرد شبکه بالا","cm"),
                 ("تعداد میلگرد انتظار","عدد"),("طول هر انتظار","m"),("قطر میلگرد انتظار","mm")]
     if section=="ستون":
         return [("تعداد ستون","عدد"),("عرض ستون","m"),("عمق ستون","m"),("ارتفاع","m"),
@@ -240,7 +241,7 @@ def input_keyboard(values=None, unit="", compound=None):
     row=[]
     for title,_ in source:
         row.append(KeyboardButton(f"⚡ {title}" + (f" {unit}" if not compound else "")))
-        if len(row)==2: rows.append(row); row=[]
+        if len(row)==4: rows.append(row); row=[]
     if row: rows.append(row)
     rows.append([KeyboardButton("✏️ ورود دستی")])
     rows.append([KeyboardButton("⬅️ مرحله قبل"), KeyboardButton("📋 ورودی‌ها")])
@@ -254,7 +255,7 @@ def field_menu(values=None, unit="", compound=None):
     row=[]
     for title,_ in source:
         row.append(InlineKeyboardButton(f"⚡ {title}" + (f" {unit}" if not compound else ""),callback_data=f"preset|{title}" if compound else f"ready|{title}"))
-        if len(row)==2: rows.append(row); row=[]
+        if len(row)==4: rows.append(row); row=[]
     if row: rows.append(row)
     rows.append([InlineKeyboardButton("✏️ ورود دستی",callback_data="manual")])
     rows.append([InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back_field"),InlineKeyboardButton("📋 ورودی‌ها",callback_data="show_inputs")])
@@ -348,23 +349,21 @@ def calc_member(section,typ,v):
         if typ=="بتن مگر":
             n,L,W,T=v; return [{"name":"بتن مگر","value":n*L*W*T,"unit":"m³"},{"name":"مساحت مگر","value":n*L*W,"unit":"m²"}]
         if typ=="شناژ":
-            n,L,W,H,bars,d,sd,ss,slen,pcount,plen,pd=v
+            n,L,W,H,bars,d,sd,ss,slen,en,elen,ed=v
             comps=[{"name":"بتن شناژ","value":n*L*W*H,"unit":"m³"}]
             if bars and d: comps += rcomps("میلگرد طولی",repeated_bar_rebar(n*bars,L,d))
             if sd and ss and slen:
                 cnt=n*(math.ceil(L/(ss/100))+1)
                 comps += rcomps("خاموت شناژ",repeated_bar_rebar(cnt,slen,sd),f"تعداد خاموت از طول و فاصله نقشه؛ طول قطعه از دیتیل")
-            if pcount and plen and pd:
-                comps += rcomps("سنجاقی شناژ",repeated_bar_rebar(n*pcount,plen,pd),f"{pcount:g} عدد در هر شناژ")
+            if en and elen and ed:
+                comps += rcomps("میلگرد انتظار شناژ",repeated_bar_rebar(n*en,elen,ed))
             return comps
-        n,L,W,T,bd,bs,td,ts,pcount,plen,pd,en,elen,ed=v
+        n,L,W,T,bd,bs,td,ts,en,elen,ed=v
         comps=[{"name":"بتن فونداسیون","value":n*L*W*T,"unit":"m³"},{"name":"مساحت فونداسیون","value":n*L*W,"unit":"m²"}]
         if bd and bs:
-            comps += rcomps("شبکه پایین دو جهت",repeated_grid_for_foundation(n,L,W,bd,bs))
+            comps += rcomps("میلگرد شبکه پایین - دو جهت",repeated_grid_for_foundation(n,L,W,bd,bs))
         if td and ts:
-            comps += rcomps("شبکه بالا دو جهت",repeated_grid_for_foundation(n,L,W,td,ts))
-        if pcount and plen and pd:
-            comps += rcomps("سنجاقی پی",repeated_bar_rebar(n*pcount,plen,pd),f"{pcount:g} عدد در هر فونداسیون؛ تعداد از دیتیل نقشه")
+            comps += rcomps("میلگرد شبکه بالا - دو جهت",repeated_grid_for_foundation(n,L,W,td,ts))
         if en and elen and ed:
             comps += rcomps("میلگرد انتظار",repeated_bar_rebar(n*en,elen,ed))
         return comps
@@ -749,14 +748,24 @@ async def message(update,context):
             await update.message.reply_text(f"✏️ <b>مرحله {progress_text(context)[0]} از {progress_text(context)[1]}</b>\n🎯 {queue[0][0]} ({queue[0][1]})\nمقدار دلخواه را وارد کن.",parse_mode="HTML",reply_markup=input_keyboard([],queue[0][1],compound_options(context.user_data["current_section"],context.user_data["current_type"],queue[0][0])))
         return
     if text.startswith("⚡ "):
-        parts=text.split()
-        if len(parts)>=2:
-            try: value=float(parts[1].replace("،","."))
+        title=text[2:].strip()
+        queue=context.user_data.get("current_queue",[])
+        if queue:
+            section=context.user_data.get("current_section","")
+            typ=context.user_data.get("current_type","")
+            opts=compound_options(section,typ,queue[0][0])
+            match=next((vals for name,vals in opts if name==title),None)
+            if match is not None:
+                apply_compound_preset(context,match)
+                await ask_next_message(update,context)
+                return
+            raw=title.split()[0] if title else ""
+            try: value=float(raw.replace("،","."))
             except ValueError: value=None
-            if value is not None and context.user_data.get("current_queue"):
-                context.user_data.setdefault("current_history",[]).append(context.user_data["current_queue"][0])
+            if value is not None:
+                context.user_data.setdefault("current_history",[]).append(queue[0])
                 context.user_data["current_values"].append(value)
-                context.user_data["current_queue"].pop(0)
+                queue.pop(0)
                 await ask_next_message(update,context)
                 return
     if text=="⬅️ مرحله قبل":
