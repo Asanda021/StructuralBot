@@ -1,0 +1,24 @@
+name: StructuralBot Smoke Test
+
+on:
+  push:
+    branches:
+      - smoke-test-20260930
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile Python sources
+        run: python -m compileall -q .
+      - name: Run smoke tests
+        run: python -m unittest discover -s tests -p "test_*.py" -v
