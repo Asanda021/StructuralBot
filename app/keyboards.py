@@ -2,23 +2,23 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton,
 
 def main_menu():
     return InlineKeyboardMarkup([
-      [InlineKeyboardButton("🧮 شروع برآورد",callback_data="start_estimate"),
+      [InlineKeyboardButton("🧮 برآورد جدید",callback_data="start_estimate"),
        InlineKeyboardButton("➕ ادامه برآورد",callback_data="continue_project")],
-      [InlineKeyboardButton("📋 جدول جامع",callback_data="table"),
-       InlineKeyboardButton("📊 آخرین گزارش",callback_data="reports")],
-      [InlineKeyboardButton("📤 Excel + PDF",callback_data="exports"),
-       InlineKeyboardButton("🔁 معادل‌سازی میلگرد",callback_data="rebar_equiv")],
+      [InlineKeyboardButton("📋 گزارش جامع متره",callback_data="table"),
+       InlineKeyboardButton("📊 آخرین گزارش متره",callback_data="reports")],
+      [InlineKeyboardButton("📤 خروجی Excel / PDF",callback_data="exports"),
+       InlineKeyboardButton("🔁 معادل‌سازی آرماتور",callback_data="rebar_equiv")],
       [InlineKeyboardButton("⚙️ تنظیمات",callback_data="settings"),
        InlineKeyboardButton("🌐 زبان",callback_data="language")],
       [InlineKeyboardButton("👤 حساب کاربری",callback_data="account"),
-       InlineKeyboardButton("❓ راهنما",callback_data="help")],
-      [InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
+       InlineKeyboardButton("❓ راهنمای سامانه",callback_data="help")],
+      [InlineKeyboardButton("🔄 بازنشانی فرآیند",callback_data="restart")]
     ])
 
 def calc_mode_menu():
     return InlineKeyboardMarkup([
-      [InlineKeyboardButton("🧮 شروع برآورد",callback_data="start_estimate")],
-      [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+      [InlineKeyboardButton("🧮 برآورد جدید",callback_data="start_estimate")],
+      [InlineKeyboardButton("🏠 منوی اصلیی اصلی",callback_data="home")]
     ])
 
 def language_menu(initial=False):
@@ -33,14 +33,14 @@ def language_menu(initial=False):
 
 def persistent_menu():
     return ReplyKeyboardMarkup([
-        [KeyboardButton("🏠 خانه"), KeyboardButton("📂 پروژه‌ها"), KeyboardButton("🧮 شروع برآورد")]
+        [KeyboardButton("🏠 خانه"), KeyboardButton("📂 پروژه‌ها"), KeyboardButton("🧮 برآورد جدید")]
     ], resize_keyboard=True, one_time_keyboard=False, is_persistent=True,
        input_field_placeholder="خانه | پروژه‌ها | شروع برآورد")
 
 def back_home(extra=None):
     rows=[]
     if extra: rows.append(extra)
-    rows.append([InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back"),InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
+    rows.append([InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back"),InlineKeyboardButton("🏠 منوی اصلی",callback_data="home"),InlineKeyboardButton("🔄 بازنشانی فرآیند",callback_data="restart")])
     return InlineKeyboardMarkup(rows)
 
 def section_menu():
@@ -48,9 +48,9 @@ def section_menu():
       [InlineKeyboardButton("🧱 فونداسیون",callback_data="sec|فونداسیون"),InlineKeyboardButton("🏢 ستون",callback_data="sec|ستون")],
       [InlineKeyboardButton("📏 تیر",callback_data="sec|تیر"),InlineKeyboardButton("⬜ سقف",callback_data="sec|سقف")],
       [InlineKeyboardButton("🧱 دیوار",callback_data="sec|دیوار"),InlineKeyboardButton("🪜 پله",callback_data="sec|پله")],
-      [InlineKeyboardButton("🔩 آرماتور/مدفون",callback_data="sec|آرماتور")],
-      [InlineKeyboardButton("➕ آیتم سفارشی",callback_data="sec|سایر")],
-      [InlineKeyboardButton("⬅️ بازگشت به مرحله قبل",callback_data="back_field"),InlineKeyboardButton("➡️ رفتن به مرحله بعد",callback_data="choose_section")],[InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
+      [InlineKeyboardButton("🔩 آرماتور و قطعات مدفون",callback_data="sec|آرماتور")],
+      [InlineKeyboardButton("➕ عضو / آیتم سفارشی",callback_data="sec|سایر")],
+      [InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back_field"),InlineKeyboardButton("➡️ ادامه ورود",callback_data="choose_section")],[InlineKeyboardButton("🏠 منوی اصلی",callback_data="home"),InlineKeyboardButton("🔄 بازنشانی فرآیند",callback_data="restart")]
     ])
 
 def type_menu(section):
@@ -74,20 +74,20 @@ def type_menu(section):
 
 def report_menu():
     return InlineKeyboardMarkup([
-      [InlineKeyboardButton("📤 خروجی نهایی",callback_data="exports"),InlineKeyboardButton("📋 خروجی قابل کپی",callback_data="copy_output")],
-      [InlineKeyboardButton("➕ افزودن/اصلاح",callback_data="continue_project"),InlineKeyboardButton("📋 جدول جامع",callback_data="table")],
-      [InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
+      [InlineKeyboardButton("📤 دریافت Excel / PDF",callback_data="exports"),InlineKeyboardButton("📋 گزارش متنی قابل کپی",callback_data="copy_output")],
+      [InlineKeyboardButton("✏️ افزودن یا ویرایش عضو",callback_data="continue_project"),InlineKeyboardButton("📋 گزارش جامع متره",callback_data="table")],
+      [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home"),InlineKeyboardButton("🔄 بازنشانی فرآیند",callback_data="restart")]
     ])
 
 
 def legacy_engineering_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📁 پروژه جدید", callback_data="new_project"), InlineKeyboardButton("📂 پروژه‌های من", callback_data="projects")],
-        [InlineKeyboardButton("🧱 فونداسیون", callback_data="section|فونداسیون"), InlineKeyboardButton("🏛 ستون‌ها", callback_data="section|ستون")],
-        [InlineKeyboardButton("➖ تیرها", callback_data="section|تیر"), InlineKeyboardButton("🏗 سقف‌ها", callback_data="section|سقف")],
+        [InlineKeyboardButton("🧱 فونداسیون", callback_data="section|فونداسیون"), InlineKeyboardButton("🏢 ستون‌ها", callback_data="section|ستون")],
+        [InlineKeyboardButton("📏 تیرها", callback_data="section|تیر"), InlineKeyboardButton("⬜ سقف‌ها و دال‌ها", callback_data="section|سقف")],
         [InlineKeyboardButton("🧱 دیوارها", callback_data="walls_menu"), InlineKeyboardButton("🪜 راه‌پله", callback_data="section|پله")],
         [InlineKeyboardButton("📊 خلاصه پروژه", callback_data="summary"), InlineKeyboardButton("📋 بازبینی", callback_data="review")],
-        [InlineKeyboardButton("⚙️ تنظیمات", callback_data="settings"), InlineKeyboardButton("❓ راهنما", callback_data="help")],
+        [InlineKeyboardButton("⚙️ تنظیمات", callback_data="settings"), InlineKeyboardButton("❓ راهنمای سامانه", callback_data="help")],
     ])
 
 def walls_menu():
@@ -107,10 +107,10 @@ def takeoff_menu():
 
 def settings_menu():
     return InlineKeyboardMarkup([
-      [InlineKeyboardButton("🌐 زبان",callback_data="language"),InlineKeyboardButton("📏 واحدها",callback_data="units")],
-      [InlineKeyboardButton("🧮 حالت متره",callback_data="calc_mode"),InlineKeyboardButton("📐 استاندارد/مرجع",callback_data="standards")],
-      [InlineKeyboardButton("🏗 مشخصات بتن",callback_data="concrete_settings"),InlineKeyboardButton("🔩 گرید میلگرد",callback_data="rebar_settings")],
-      [InlineKeyboardButton("📏 طول شاخه میلگرد",callback_data="stock_length")],
+      [InlineKeyboardButton("🌐 زبان",callback_data="language"),InlineKeyboardButton("📏 واحدهای اندازه‌گیری",callback_data="units")],
+      [InlineKeyboardButton("🧮 روش متره",callback_data="calc_mode"),InlineKeyboardButton("📐 استاندارد و مرجع",callback_data="standards")],
+      [InlineKeyboardButton("🏗 مشخصات بتن",callback_data="concrete_settings"),InlineKeyboardButton("🔩 مشخصات آرماتور",callback_data="rebar_settings")],
+      [InlineKeyboardButton("📏 طول شاخه استاندارد",callback_data="stock_length")],
       [InlineKeyboardButton("⬅️ بازگشت",callback_data="home")]
     ])
 
@@ -192,9 +192,9 @@ def input_keyboard(values=None, unit=""):
                 rows.append(row); row=[]
         if row: rows.append(row)
     rows.append([KeyboardButton("✏️ ورود دستی")])
-    rows.append([KeyboardButton("⬅️ مرحله قبل"), KeyboardButton("📋 ورودی‌ها")])
-    rows.append([KeyboardButton("❌ لغو فرآیند")])
-    rows.append([KeyboardButton("🏠 خانه"), KeyboardButton("📂 پروژه‌ها"), KeyboardButton("🧮 شروع برآورد")])
+    rows.append([KeyboardButton("⬅️ مرحله قبل"), KeyboardButton("📋 ورودی‌های ثبت‌شده")])
+    rows.append([KeyboardButton("↩️ انصراف از ورود")])
+    rows.append([KeyboardButton("🏠 خانه"), KeyboardButton("📂 پروژه‌ها"), KeyboardButton("🧮 برآورد جدید")])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True, one_time_keyboard=False, is_persistent=True,
                                input_field_placeholder="مقدار آماده را انتخاب کن یا ورود دستی بزن")
 
@@ -210,13 +210,13 @@ def field_menu(values=None, unit=""):
     rows.append([InlineKeyboardButton("✏️ ورود دستی",callback_data="manual")])
     rows.append([
         InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back_field"),
-        InlineKeyboardButton("📋 ورودی‌ها",callback_data="show_inputs")
+        InlineKeyboardButton("📋 ورودی‌های ثبت‌شده",callback_data="show_inputs")
     ])
     rows.append([
-        InlineKeyboardButton("❌ لغو فرآیند",callback_data="cancel_member"),
-        InlineKeyboardButton("🏠 منو",callback_data="home")
+        InlineKeyboardButton("↩️ انصراف از ورود",callback_data="cancel_member"),
+        InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")
     ])
-    rows.append([InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
+    rows.append([InlineKeyboardButton("🔄 بازنشانی فرآیند",callback_data="restart")])
     return InlineKeyboardMarkup(rows)
 
 def ask_text(name,fields,section,typ,values=None):
