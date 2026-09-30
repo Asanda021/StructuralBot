@@ -501,3 +501,37 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("از منوی زیر یک گزینه انتخاب کن.", reply_markup=main_menu())
 
+
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    if isinstance(context.error, BadRequest) and "Message is not modified" in str(context.error):
+        return
+    log.error("Unhandled bot error: %s", context.error, exc_info=context.error)
+
+
+def build_app():
+    if not TOKEN:
+        raise RuntimeError("BOT_TOKEN environment variable is not set")
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message))
+    app.add_error_handler(error_handler)
+    return app
+
+
+def main():
+    log.info("Starting StructuralBot")
+    db.init()
+    threading.Thread(target=health_server, daemon=True).start()
+    app = build_app()
+    log.info("Telegram application starting")
+    app.run_polling(drop_pending_updates=True)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        log.exception("FATAL STARTUP ERROR")
+        raise
