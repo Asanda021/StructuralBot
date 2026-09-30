@@ -168,7 +168,7 @@ from handlers.foundation import (
 # ---------------------------------------------------------
 
 from handlers.columns import (
-    columns_callback,
+    column_callback,
     receive_column_manual_input,
 )
 
@@ -495,7 +495,7 @@ async def column_router(
         data.startswith("column")
         or data.startswith("columns")
     ):
-        await columns_callback(
+        await column_callback(
             update,
             context,
         )
