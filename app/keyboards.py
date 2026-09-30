@@ -7,10 +7,16 @@ def main_menu():
       [InlineKeyboardButton("💰 قیمت‌گذاری",callback_data="pricing"),InlineKeyboardButton("⚙️ تنظیمات",callback_data="settings"),InlineKeyboardButton("❓ راهنما",callback_data="help")]
     ])
 
+def calc_mode_menu():
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🧮 شروع محاسبه",callback_data="calc_mode")], [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]])
+
+def persistent_menu():
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]])
+
 def back_home(extra=None):
     rows=[]
     if extra: rows.append(extra)
-    rows.append([InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back"),InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")])
+    rows.append([InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back"),InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")])
     return InlineKeyboardMarkup(rows)
 
 def section_menu():
@@ -20,7 +26,7 @@ def section_menu():
       [InlineKeyboardButton("🧱 دیوار",callback_data="sec|دیوار"),InlineKeyboardButton("🪜 پله",callback_data="sec|پله")],
       [InlineKeyboardButton("🔩 آرماتور/مدفون",callback_data="sec|آرماتور")],
       [InlineKeyboardButton("➕ آیتم سفارشی",callback_data="sec|سایر")],
-      [InlineKeyboardButton("🏁 پایان متره",callback_data="finish_takeoff"),InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+      [InlineKeyboardButton("🏁 پایان متره",callback_data="finish_takeoff")],[InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
     ])
 
 def type_menu(section):
@@ -45,11 +51,11 @@ def review_menu():
     return InlineKeyboardMarkup([
       [InlineKeyboardButton("✏️ اصلاح/حذف",callback_data="edit_members"),InlineKeyboardButton("➕ افزودن",callback_data="choose_section")],
       [InlineKeyboardButton("✅ تأیید نهایی",callback_data="confirm_project")],
-      [InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back"),InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+      [InlineKeyboardButton("⬅️ مرحله قبل",callback_data="back"),InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
     ])
 
 def report_menu():
     return InlineKeyboardMarkup([
       [InlineKeyboardButton("➕ افزودن/اصلاح",callback_data="continue_project"),InlineKeyboardButton("📋 جدول جامع",callback_data="table")],
-      [InlineKeyboardButton("📊 Excel + PDF",callback_data="exports"),InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+      [InlineKeyboardButton("📊 Excel + PDF",callback_data="exports")],[InlineKeyboardButton("🏠 منو",callback_data="home"),InlineKeyboardButton("🔄 شروع مجدد",callback_data="restart")]
     ])
