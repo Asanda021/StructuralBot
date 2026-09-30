@@ -5,7 +5,6 @@ def main_menu():
         [InlineKeyboardButton("🏗 پروژه جدید", callback_data="new_project"), InlineKeyboardButton("📂 پروژه‌ها", callback_data="projects"), InlineKeyboardButton("📊 آخرین برآورد", callback_data="reports")],
         [InlineKeyboardButton("🧱 مقادیر بتن", callback_data="takeoff_concrete"), InlineKeyboardButton("🪵 مقادیر قالب", callback_data="takeoff_formwork"), InlineKeyboardButton("🔩 مقادیر میلگرد", callback_data="takeoff_rebar")],
         [InlineKeyboardButton("💰 برآورد ریالی", callback_data="pricing"), InlineKeyboardButton("📄 گزارش و خروجی", callback_data="exports"), InlineKeyboardButton("⚙️ تنظیمات", callback_data="settings")],
-        [InlineKeyboardButton("❓ راهنما", callback_data="help")],
     ])
 
 def cancel_menu():
