@@ -370,10 +370,17 @@ async def callback(update,context):
         await ask_next(q,context); return
     if data.startswith("delete|"):
         idx=int(data.split("|")[1]); context.user_data["members"].pop(idx); await review(q,context); return
+    if data.startswith("copy|"):
+        idx=int(data.split("|")[1]); src=context.user_data.get("members",[])[idx]
+        import copy
+        newm=copy.deepcopy(src)
+        newm["member"]=newm.get("member","عضو")+" - کپی"
+        context.user_data["members"].insert(idx+1,newm)
+        await review(q,context); return
     if data=="edit_members":
         rows=[]
         for i,m in enumerate(context.user_data.get("members",[])):
-            rows.append([InlineKeyboardButton(f"✏️ {i+1}. {m['member']}",callback_data=f"edit|{i}"),InlineKeyboardButton("❌",callback_data=f"delete|{i}")])
+            rows.append([InlineKeyboardButton(f"✏️ {i+1}. {m['member']}",callback_data=f"edit|{i}"),InlineKeyboardButton("📑",callback_data=f"copy|{i}"),InlineKeyboardButton("❌",callback_data=f"delete|{i}")])
         rows.append([InlineKeyboardButton("⬅️ بازبینی",callback_data="finish_takeoff")])
         await q.edit_message_text("✏️ <b>اصلاح یا حذف عضو</b>",parse_mode="HTML",reply_markup=InlineKeyboardMarkup(rows)); return
     if data=="finish_takeoff": await review(q,context); return
