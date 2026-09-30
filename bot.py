@@ -188,7 +188,7 @@ from handlers.beams import (
 # ---------------------------------------------------------
 
 from handlers.slabs import (
-    slabs_callback,
+    slab_callback,
     receive_slab_manual_input,
 )
 
@@ -554,7 +554,7 @@ async def slab_router(
         or data.startswith("slabs")
         or data.startswith("roof")
     ):
-        await slabs_callback(
+        await slab_callback(
             update,
             context,
         )
