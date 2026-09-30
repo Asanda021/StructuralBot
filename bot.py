@@ -7,7 +7,6 @@ from app.db import Database
 from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, repeated_bar_rebar, format_estimate
 from app.exporter import create_excel, create_pdf
 from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu
-from app.miniapp_server import MiniAppHandler
 
 TOKEN=os.getenv("BOT_TOKEN")
 DB_PATH=os.getenv("DATABASE_PATH","/tmp/structuralbot.db")
@@ -15,21 +14,22 @@ PORT=int(os.getenv("PORT","10000"))
 logging.basicConfig(level=os.getenv("LOG_LEVEL","INFO"),format="%(asctime)s | StructuralBot | %(levelname)s | %(message)s")
 log=logging.getLogger("StructuralBot"); db=Database(DB_PATH)
 
-class HealthHandler(MiniAppHandler):
+class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path in ("/","/health"):
-            body=b"StructuralBot OK"
+        if self.path in ("/", "/health"):
+            body = b"StructuralBot OK"
             self.send_response(200)
-            self.send_header("Content-Type","text/plain")
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
             return
-        return super().do_GET()
-    def log_message(self,*_): pass
+        self.send_response(404)
+        self.end_headers()
+    def log_message(self, *_): pass
 def health_server():
     ThreadingHTTPServer(("0.0.0.0", PORT), HealthHandler).serve_forever()
 
-MINIAPP_URL = os.getenv("MINIAPP_URL", "https://structuralbot.onrender.com/miniapp")
 
 def fmt(v):
     return f"{float(v):,.3f}".rstrip("0").rstrip(".")
