@@ -1,64 +1,69 @@
 """
-StructuralBot domain models.
+StructuralBot - Core Models
 
-This module defines the standard data models used across
-projects, floors, structural members, materials,
-reinforcement, calculations and calculation results.
+Central domain models for StructuralBot.
 
-The models are intentionally independent from:
-- Telegram
-- Database implementation
-- Design codes
-- Localization
-- UI
-
-This keeps the calculation engine portable and maintainable.
+Design principles:
+- Domain models contain data, not engineering calculations.
+- Core models are independent from Telegram, AI, billing and reports.
+- Engineering traceability is preserved through project/member/calculation
+  identifiers and revisions.
+- Units, structure type, member type and design code remain independent.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 
-# ============================================================
-# ENUMS
-# ============================================================
-
+# =====================================================================
+# COMMON ENUMS
+# =====================================================================
 
 class UnitSystem(str, Enum):
-    SI = "SI"
-    IMPERIAL = "Imperial"
+    METRIC = "metric"
+    SI = "si"
 
 
 class StructureType(str, Enum):
     CONCRETE = "concrete"
     STEEL = "steel"
     COMPOSITE = "composite"
+    MASONRY = "masonry"
+    TIMBER = "timber"
+    OTHER = "other"
 
 
 class MemberType(str, Enum):
-    FOUNDATION = "foundation"
-    COLUMN = "column"
-    BEAM = "beam"
+    FOUNDATION_ISOLATED = "foundation_iso"
+    FOUNDATION_STRIP = "foundation_strip"
+    FOUNDATION_RAFT = "foundation_raft"
+
+    COLUMN_RECT = "column_rect"
+    COLUMN_ROUND = "column_round"
+
+    BEAM_MAIN = "beam_main"
+    BEAM_SECONDARY = "beam_secondary"
+    TIE_BEAM = "tie_beam"
+
     SLAB = "slab"
-    STAIR = "stair"
+    ROOF_SLAB = "roof_slab"
     WALL = "wall"
-    OTHER = "other"
+    STAIR = "stair"
 
 
 class FoundationType(str, Enum):
     ISOLATED = "isolated"
     STRIP = "strip"
     RAFT = "raft"
-    COMBINED = "combined"
-    OTHER = "other"
 
 
 class ColumnType(str, Enum):
     RECTANGULAR = "rectangular"
-    ROUND = "round"
+    CIRCULAR = "circular"
 
 
 class BeamType(str, Enum):
@@ -68,105 +73,122 @@ class BeamType(str, Enum):
 
 
 class SlabType(str, Enum):
-    SOLID = "solid"
-    JOIST_BLOCK = "joist_block"
-    JOIST_POLYSTYRENE = "joist_polystyrene"
-    WAFFLE = "waffle"
-    FLAT = "flat"
     ONE_WAY = "one_way"
     TWO_WAY = "two_way"
-    VOIDED = "voided"
-    OTHER = "other"
+    FLAT = "flat"
+    ROOF = "roof"
 
 
 class ReinforcementType(str, Enum):
     LONGITUDINAL = "longitudinal"
     TRANSVERSE = "transverse"
-    TOP = "top"
-    BOTTOM = "bottom"
-    DISTRIBUTION = "distribution"
-    TEMPERATURE = "temperature"
-    NEGATIVE = "negative"
-    POSITIVE = "positive"
     STIRRUP = "stirrup"
     TIE = "tie"
-    SHEAR = "shear"
+    MESH = "mesh"
+    DISTRIBUTION = "distribution"
+    TEMPERATURE = "temperature"
+    TOP = "top"
+    BOTTOM = "bottom"
+    SIDE = "side"
     OTHER = "other"
 
 
 class SpliceType(str, Enum):
     LAP = "lap"
-    COUPLER = "coupler"
-    OTHER = "other"
+    MECHANICAL = "mechanical"
+    WELDED = "welded"
+    NONE = "none"
 
 
 class CalculationStatus(str, Enum):
-    PENDING = "pending"
-    SUCCESS = "success"
-    WARNING = "warning"
+    DRAFT = "draft"
+    VALIDATED = "validated"
+    CALCULATED = "calculated"
+    REVIEWED = "reviewed"
+    APPROVED = "approved"
     FAILED = "failed"
 
 
-# ============================================================
-# MATERIAL MODELS
-# ============================================================
+# =====================================================================
+# HELPERS
+# =====================================================================
+
+def utc_now() -> datetime:
+    """Return a timezone-aware UTC timestamp."""
+    return datetime.now(timezone.utc)
 
 
-@dataclass
+def enum_value(value: Any) -> Any:
+    """Return enum value when applicable."""
+    if isinstance(value, Enum):
+        return value.value
+    return value
+
+
+def _serialize(value: Any) -> Any:
+    """Recursively convert domain objects into JSON-friendly structures."""
+    if isinstance(value, Enum):
+        return value.value
+
+    if isinstance(value, datetime):
+        return value.isoformat()
+
+    if hasattr(value, "to_dict") and callable(value.to_dict):
+        return value.to_dict()
+
+    if isinstance(value, Mapping):
+        return {
+            str(key): _serialize(item)
+            for key, item in value.items()
+        }
+
+    if isinstance(value, (list, tuple, set)):
+        return [_serialize(item) for item in value]
+
+    return value
+
+
+# =====================================================================
+# MATERIALS
+# =====================================================================
+
+@dataclass(slots=True)
 class ConcreteMaterial:
-    """
-    Concrete material properties.
+    """Concrete material definition."""
 
-    Strength values are stored in MPa in the SI system.
-    """
-
-    grade: str
-    fck: float
-    density: float = 2400.0
-    unit: str = "MPa"
+    grade: str = "C25"
+    fc_mpa: float = 25.0
+    density_kg_m3: float = 2400.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "grade": self.grade,
-            "fck": self.fck,
-            "density": self.density,
-            "unit": self.unit,
+            "fc_mpa": self.fc_mpa,
+            "density_kg_m3": self.density_kg_m3,
         }
 
 
-@dataclass
+@dataclass(slots=True)
 class SteelMaterial:
-    """
-    Reinforcing steel material properties.
+    """Reinforcing steel definition."""
 
-    fy:
-        Yield strength in MPa.
-
-    fu:
-        Ultimate strength in MPa.
-    """
-
-    grade: str
-    fy: float
-    fu: Optional[float] = None
-    density: float = 7850.0
-    unit: str = "MPa"
+    grade: str = "A3"
+    fy_mpa: float = 400.0
+    fu_mpa: Optional[float] = 600.0
+    density_kg_m3: float = 7850.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "grade": self.grade,
-            "fy": self.fy,
-            "fu": self.fu,
-            "density": self.density,
-            "unit": self.unit,
+            "fy_mpa": self.fy_mpa,
+            "fu_mpa": self.fu_mpa,
+            "density_kg_m3": self.density_kg_m3,
         }
 
 
-@dataclass
+@dataclass(slots=True)
 class MaterialSet:
-    """
-    Complete material definition for a structural member.
-    """
+    """Collection of materials used by a structural calculation."""
 
     concrete: Optional[ConcreteMaterial] = None
     reinforcement: Optional[SteelMaterial] = None
@@ -174,716 +196,677 @@ class MaterialSet:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "concrete": (
-                self.concrete.to_dict()
-                if self.concrete
-                else None
-            ),
-            "reinforcement": (
-                self.reinforcement.to_dict()
-                if self.reinforcement
-                else None
-            ),
-            "structural_steel": (
-                self.structural_steel.to_dict()
-                if self.structural_steel
-                else None
-            ),
+            "concrete": _serialize(self.concrete),
+            "reinforcement": _serialize(self.reinforcement),
+            "structural_steel": _serialize(self.structural_steel),
         }
 
 
-# ============================================================
-# PROJECT MODELS
-# ============================================================
+# =====================================================================
+# PROJECT / FLOOR
+# =====================================================================
 
-
-@dataclass
+@dataclass(slots=True)
 class Project:
-    """
-    Main structural project model.
-    """
+    """Top-level engineering project."""
 
-    id: Optional[int]
-    user_id: int
+    project_id: str
     name: str
-
-    description: str = ""
 
     structure_type: StructureType = StructureType.CONCRETE
+    unit_system: UnitSystem = UnitSystem.METRIC
 
-    design_code: str = ""
-    code_edition: str = ""
+    design_code: Optional[str] = None
+    code_edition: Optional[str] = None
 
-    unit_system: UnitSystem = UnitSystem.SI
+    revision: int = 1
 
-    status: str = "active"
+    description: str = ""
+    owner_id: Optional[str] = None
 
-    floors: List["Floor"] = field(default_factory=list)
-    members: List["StructuralMember"] = field(default_factory=list)
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
 
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    def add_floor(self, floor: "Floor") -> None:
-        self.floors.append(floor)
-
-    def add_member(self, member: "StructuralMember") -> None:
-        self.members.append(member)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "id": self.id,
-            "user_id": self.user_id,
-            "name": self.name,
-            "description": self.description,
-            "structure_type": self.structure_type.value,
-            "design_code": self.design_code,
-            "code_edition": self.code_edition,
-            "unit_system": self.unit_system.value,
-            "status": self.status,
-            "floors": [
-                floor.to_dict()
-                for floor in self.floors
-            ],
-            "members": [
-                member.to_dict()
-                for member in self.members
-            ],
-            "metadata": self.metadata,
-        }
-
-
-@dataclass
-class Floor:
-    """
-    Building floor model.
-    """
-
-    id: Optional[int]
-    project_id: int
-
-    name: str
-    floor_number: int
-
-    height: Optional[float] = None
-
-    members: List["StructuralMember"] = field(default_factory=list)
+    status: CalculationStatus = CalculationStatus.DRAFT
 
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def add_member(self, member: "StructuralMember") -> None:
-        self.members.append(member)
+    def touch(self) -> None:
+        self.updated_at = utc_now()
+
+    def next_revision(self) -> int:
+        self.revision += 1
+        self.touch()
+        return self.revision
+
+    @property
+    def revision_id(self) -> str:
+        return f"{self.project_id}-R{self.revision:02d}"
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "id": self.id,
+        return _serialize({
             "project_id": self.project_id,
             "name": self.name,
-            "floor_number": self.floor_number,
-            "height": self.height,
-            "members": [
-                member.to_dict()
-                for member in self.members
-            ],
+            "structure_type": self.structure_type,
+            "unit_system": self.unit_system,
+            "design_code": self.design_code,
+            "code_edition": self.code_edition,
+            "revision": self.revision,
+            "revision_id": self.revision_id,
+            "description": self.description,
+            "owner_id": self.owner_id,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "status": self.status,
             "metadata": self.metadata,
-        }
+        })
 
 
-# ============================================================
-# GEOMETRY MODELS
-# ============================================================
+@dataclass(slots=True)
+class Floor:
+    """Project floor/storey."""
+
+    floor_id: str
+    project_id: str
+
+    name: str
+    level: int = 0
+    elevation_m: float = 0.0
+
+    revision: int = 1
+
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def next_revision(self) -> int:
+        self.revision += 1
+        return self.revision
+
+    @property
+    def revision_id(self) -> str:
+        return f"{self.floor_id}-R{self.revision:02d}"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return _serialize({
+            "floor_id": self.floor_id,
+            "project_id": self.project_id,
+            "name": self.name,
+            "level": self.level,
+            "elevation_m": self.elevation_m,
+            "revision": self.revision,
+            "revision_id": self.revision_id,
+            "metadata": self.metadata,
+        })
 
 
-@dataclass
+# =====================================================================
+# GEOMETRY
+# =====================================================================
+
+@dataclass(slots=True)
 class RectangularGeometry:
-    """
-    Rectangular section geometry.
-
-    All dimensions are expressed in the selected unit system.
-    """
-
-    width: float
-    height: float
+    width_m: float
+    depth_m: float
+    height_m: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "type": "rectangular",
-            "width": self.width,
-            "height": self.height,
+            "width_m": self.width_m,
+            "depth_m": self.depth_m,
+            "height_m": self.height_m,
         }
 
 
-@dataclass
+@dataclass(slots=True)
 class CircularGeometry:
-    """
-    Circular section geometry.
-    """
-
-    diameter: float
+    diameter_m: float
+    height_m: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "type": "circular",
-            "diameter": self.diameter,
+            "diameter_m": self.diameter_m,
+            "height_m": self.height_m,
         }
 
 
-@dataclass
+@dataclass(slots=True)
 class SlabGeometry:
-    """
-    Generic slab geometry.
-    """
+    length_m: float
+    width_m: float
+    thickness_m: float
 
-    length: float
-    width: float
-    thickness: float
-
-    rib_height: Optional[float] = None
-    rib_width: Optional[float] = None
-    rib_spacing: Optional[float] = None
-
-    opening_area: float = 0.0
+    support_type: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "type": "slab",
-            "length": self.length,
-            "width": self.width,
-            "thickness": self.thickness,
-            "rib_height": self.rib_height,
-            "rib_width": self.rib_width,
-            "rib_spacing": self.rib_spacing,
-            "opening_area": self.opening_area,
+            "length_m": self.length_m,
+            "width_m": self.width_m,
+            "thickness_m": self.thickness_m,
+            "support_type": self.support_type,
         }
 
 
-# ============================================================
+# =====================================================================
 # STRUCTURAL MEMBER
-# ============================================================
+# =====================================================================
 
-
-@dataclass
+@dataclass(slots=True)
 class StructuralMember:
     """
     Generic structural member.
 
-    Specific member types such as beams, columns,
-    foundations and slabs use this model with
-    specialized geometry/input dictionaries.
-
-    The calculation engine should not depend on Telegram
-    or database structures.
+    This model deliberately does not contain engineering formulas.
+    It is the common data contract between handlers, core calculations,
+    code adapters, reinforcement and reporting.
     """
 
-    id: Optional[int]
-    project_id: int
-
+    member_id: str
+    project_id: str
     member_type: MemberType
 
-    name: str
+    name: str = ""
 
-    floor_id: Optional[int] = None
+    floor_id: Optional[str] = None
+    mark: Optional[str] = None
 
-    geometry: Dict[str, Any] = field(default_factory=dict)
-    material: MaterialSet = field(
-        default_factory=MaterialSet
-    )
+    structure_type: StructureType = StructureType.CONCRETE
 
-    inputs: Dict[str, Any] = field(default_factory=dict)
+    geometry: Optional[Any] = None
+    materials: Optional[MaterialSet] = None
 
-    results: Dict[str, Any] = field(default_factory=dict)
+    cover_mm: Optional[float] = None
+
+    revision: int = 1
+    status: CalculationStatus = CalculationStatus.DRAFT
 
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def set_input(self, key: str, value: Any) -> None:
-        self.inputs[key] = value
+    def next_revision(self) -> int:
+        self.revision += 1
+        return self.revision
 
-    def get_input(
-        self,
-        key: str,
-        default: Any = None,
-    ) -> Any:
-        return self.inputs.get(key, default)
+    @property
+    def revision_id(self) -> str:
+        return f"{self.member_id}-R{self.revision:02d}"
 
-    def set_result(self, key: str, value: Any) -> None:
-        self.results[key] = value
-
-    def get_result(
-        self,
-        key: str,
-        default: Any = None,
-    ) -> Any:
-        return self.results.get(key, default)
+    @property
+    def member_mark(self) -> str:
+        return self.mark or self.member_id
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "id": self.id,
+        return _serialize({
+            "member_id": self.member_id,
             "project_id": self.project_id,
-            "floor_id": self.floor_id,
-            "member_type": self.member_type.value,
+            "member_type": self.member_type,
             "name": self.name,
+            "floor_id": self.floor_id,
+            "mark": self.mark,
+            "member_mark": self.member_mark,
+            "structure_type": self.structure_type,
             "geometry": self.geometry,
-            "material": self.material.to_dict(),
-            "inputs": self.inputs,
-            "results": self.results,
+            "materials": self.materials,
+            "cover_mm": self.cover_mm,
+            "revision": self.revision,
+            "revision_id": self.revision_id,
+            "status": self.status,
             "metadata": self.metadata,
-        }
+        })
 
 
-# ============================================================
-# REINFORCEMENT MODELS
-# ============================================================
+# =====================================================================
+# REBAR SHAPE / REINFORCEMENT
+# =====================================================================
 
-
-@dataclass
+@dataclass(slots=True)
 class RebarShape:
-    """
-    Parametric reinforcement shape.
+    """Geometric description of a reinforcing bar shape."""
 
-    dimensions:
-        Named dimensions such as A, B, C, etc.
+    shape_code: str = "STRAIGHT"
 
-    The actual drawing engine can later use this
-    parametric definition to generate a visual shape.
-    """
+    dimensions_mm: Dict[str, float] = field(default_factory=dict)
 
-    shape_code: str
+    hook_start: Optional[str] = None
+    hook_end: Optional[str] = None
 
-    dimensions: Dict[str, float] = field(
-        default_factory=dict
-    )
+    bend_angles_deg: List[float] = field(default_factory=list)
 
-    hooks: Dict[str, Any] = field(
-        default_factory=dict
-    )
-
-    notes: str = ""
+    description: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        return _serialize({
             "shape_code": self.shape_code,
-            "dimensions": self.dimensions,
-            "hooks": self.hooks,
-            "notes": self.notes,
-        }
+            "dimensions_mm": self.dimensions_mm,
+            "hook_start": self.hook_start,
+            "hook_end": self.hook_end,
+            "bend_angles_deg": self.bend_angles_deg,
+            "description": self.description,
+        })
 
 
-@dataclass
+@dataclass(slots=True)
 class ReinforcementBar:
     """
-    A real reinforcement bar definition.
+    Engineering reinforcement item.
 
-    Important:
-    length represents the actual cut piece length,
-    not merely a theoretical total reinforcement length.
+    This object is intentionally richer than a simple diameter/quantity
+    record so BBS, Cut List and reports can preserve traceability.
     """
 
-    bar_mark: str
+    bar_id: str
 
-    diameter: float
+    member_id: str
+    project_id: str
+
+    diameter_mm: float
     quantity: int
 
-    length: float
+    length_m: float
 
-    bar_type: ReinforcementType
+    reinforcement_type: ReinforcementType = ReinforcementType.LONGITUDINAL
 
-    grade: str = ""
+    grade: Optional[str] = None
 
-    location: str = ""
+    spacing_mm: Optional[float] = None
+
+    role: Optional[str] = None
+    region: Optional[str] = None
 
     shape: Optional[RebarShape] = None
 
-    total_length: Optional[float] = None
-    weight: Optional[float] = None
+    development_length_m: float = 0.0
+    lap_length_m: float = 0.0
 
-    member_id: Optional[int] = None
-    floor_id: Optional[int] = None
+    splice_type: SpliceType = SpliceType.NONE
+
+    bar_mark: Optional[str] = None
+
+    floor_id: Optional[str] = None
+
+    source_calculation_id: Optional[str] = None
+    source_revision: Optional[int] = None
+
+    notes: str = ""
 
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def calculate_total_length(self) -> float:
-        self.total_length = (
-            self.length * self.quantity
-        )
-        return self.total_length
+    @property
+    def mark(self) -> str:
+        return self.bar_mark or self.bar_id
+
+    @property
+    def theoretical_weight_kg(self) -> float:
+        """
+        Approximate steel weight using the standard mass approximation:
+
+            kg/m ≈ d² / 162
+
+        This is a physical property helper, not a design rule.
+        """
+        return (self.diameter_mm ** 2 / 162.0) * self.length_m * self.quantity
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "bar_mark": self.bar_mark,
-            "diameter": self.diameter,
-            "quantity": self.quantity,
-            "length": self.length,
-            "total_length": self.total_length,
-            "weight": self.weight,
-            "bar_type": self.bar_type.value,
-            "grade": self.grade,
-            "location": self.location,
-            "shape": (
-                self.shape.to_dict()
-                if self.shape
-                else None
-            ),
+        return _serialize({
+            "bar_id": self.bar_id,
             "member_id": self.member_id,
+            "project_id": self.project_id,
+            "diameter_mm": self.diameter_mm,
+            "quantity": self.quantity,
+            "length_m": self.length_m,
+            "reinforcement_type": self.reinforcement_type,
+            "grade": self.grade,
+            "spacing_mm": self.spacing_mm,
+            "role": self.role,
+            "region": self.region,
+            "shape": self.shape,
+            "development_length_m": self.development_length_m,
+            "lap_length_m": self.lap_length_m,
+            "splice_type": self.splice_type,
+            "bar_mark": self.mark,
             "floor_id": self.floor_id,
+            "source_calculation_id": self.source_calculation_id,
+            "source_revision": self.source_revision,
+            "theoretical_weight_kg": self.theoretical_weight_kg,
+            "notes": self.notes,
             "metadata": self.metadata,
-        }
+        })
 
 
-# ============================================================
-# SPLICE MODELS
-# ============================================================
-
-
-@dataclass
+@dataclass(slots=True)
 class Splice:
-    """
-    Reinforcement splice.
+    """Reinforcement splice information."""
 
-    The actual splice length must be calculated by
-    the selected design code and should never be
-    hard-coded in this model.
-    """
+    splice_id: str
+
+    member_id: str
+    bar_id: str
 
     splice_type: SpliceType
 
-    diameter: float
+    position_m: Optional[float] = None
+    length_m: Optional[float] = None
 
-    quantity: int
+    region: Optional[str] = None
 
-    location: str = ""
+    source_calculation_id: Optional[str] = None
 
-    length: Optional[float] = None
-
-    member_id: Optional[int] = None
-    floor_id: Optional[int] = None
+    notes: str = ""
 
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "splice_type": self.splice_type.value,
-            "diameter": self.diameter,
-            "quantity": self.quantity,
-            "location": self.location,
-            "length": self.length,
+        return _serialize({
+            "splice_id": self.splice_id,
             "member_id": self.member_id,
-            "floor_id": self.floor_id,
+            "bar_id": self.bar_id,
+            "splice_type": self.splice_type,
+            "position_m": self.position_m,
+            "length_m": self.length_m,
+            "region": self.region,
+            "source_calculation_id": self.source_calculation_id,
+            "notes": self.notes,
             "metadata": self.metadata,
-        }
+        })
 
 
-# ============================================================
-# CALCULATION RESULT MODELS
-# ============================================================
+# =====================================================================
+# ENGINEERING CHECKS / CALCULATION RESULTS
+# =====================================================================
 
-
-@dataclass
+@dataclass(slots=True)
 class CheckResult:
-    """
-    Individual engineering check.
+    """Result of one engineering/code check."""
 
-    utilization:
-        Demand/capacity ratio when applicable.
-
-    passed:
-        True / False / None when a binary pass/fail
-        result is not applicable.
-    """
+    check_id: str
 
     name: str
 
-    passed: Optional[bool]
+    passed: bool
+
+    status: str = "ok"
 
     value: Optional[float] = None
-    capacity: Optional[float] = None
-    utilization: Optional[float] = None
+    limit: Optional[float] = None
+    unit: Optional[str] = None
 
-    unit: str = ""
+    clause: Optional[str] = None
+    code: Optional[str] = None
+    edition: Optional[str] = None
 
     message: str = ""
 
-    code_reference: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        return _serialize({
+            "check_id": self.check_id,
             "name": self.name,
             "passed": self.passed,
+            "status": self.status,
             "value": self.value,
-            "capacity": self.capacity,
-            "utilization": self.utilization,
+            "limit": self.limit,
             "unit": self.unit,
+            "clause": self.clause,
+            "code": self.code,
+            "edition": self.edition,
             "message": self.message,
-            "code_reference": self.code_reference,
-        }
+            "metadata": self.metadata,
+        })
 
 
-@dataclass
+@dataclass(slots=True)
 class CalculationResult:
     """
-    Standard output returned by the calculation engine.
+    Unified engineering calculation result.
 
-    This object is shared by:
-    - Telegram
-    - PDF
-    - Excel
-    - API
-    - AI assistant
+    All downstream modules should consume this contract rather than
+    depending on a particular calculation implementation.
     """
 
-    calculation_type: str
+    calculation_id: str
 
-    status: CalculationStatus
+    project_id: str
+    member_id: str
 
-    member_id: Optional[int] = None
+    member_type: MemberType
 
-    summary: Dict[str, Any] = field(
-        default_factory=dict
-    )
+    status: CalculationStatus = CalculationStatus.CALCULATED
 
-    checks: List[CheckResult] = field(
-        default_factory=list
-    )
+    revision: int = 1
 
-    reinforcement: List[ReinforcementBar] = field(
-        default_factory=list
-    )
+    code: Optional[str] = None
+    code_edition: Optional[str] = None
 
-    splices: List[Splice] = field(
-        default_factory=list
-    )
+    inputs: Dict[str, Any] = field(default_factory=dict)
 
-    quantities: Dict[str, Any] = field(
-        default_factory=dict
-    )
+    values: Dict[str, Any] = field(default_factory=dict)
 
-    warnings: List[str] = field(
-        default_factory=list
-    )
+    checks: List[CheckResult] = field(default_factory=list)
 
-    errors: List[str] = field(
-        default_factory=list
-    )
+    warnings: List[str] = field(default_factory=list)
+    errors: List[str] = field(default_factory=list)
 
-    code: str = ""
-    code_edition: str = ""
+    reinforcement: List[ReinforcementBar] = field(default_factory=list)
 
-    calculation_details: Dict[str, Any] = field(
-        default_factory=dict
-    )
+    created_at: datetime = field(default_factory=utc_now)
 
-    metadata: Dict[str, Any] = field(
-        default_factory=dict
-    )
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def add_check(
-        self,
-        check: CheckResult,
-    ) -> None:
+    @property
+    def revision_id(self) -> str:
+        return f"{self.calculation_id}-R{self.revision:02d}"
+
+    @property
+    def passed(self) -> bool:
+        return bool(self.errors == []) and all(
+            check.passed for check in self.checks
+        )
+
+    def add_check(self, check: CheckResult) -> None:
         self.checks.append(check)
 
-    def add_reinforcement(
-        self,
-        bar: ReinforcementBar,
-    ) -> None:
-        self.reinforcement.append(bar)
+    def add_warning(self, message: str) -> None:
+        if message and message not in self.warnings:
+            self.warnings.append(message)
 
-    def add_splice(
-        self,
-        splice: Splice,
-    ) -> None:
-        self.splices.append(splice)
-
-    def add_warning(
-        self,
-        message: str,
-    ) -> None:
-        self.warnings.append(message)
-
-    def add_error(
-        self,
-        message: str,
-    ) -> None:
-        self.errors.append(message)
+    def add_error(self, message: str) -> None:
+        if message and message not in self.errors:
+            self.errors.append(message)
         self.status = CalculationStatus.FAILED
 
+    def add_reinforcement(self, bar: ReinforcementBar) -> None:
+        self.reinforcement.append(bar)
+
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "calculation_type": self.calculation_type,
-            "status": self.status.value,
+        return _serialize({
+            "calculation_id": self.calculation_id,
+            "project_id": self.project_id,
             "member_id": self.member_id,
-            "summary": self.summary,
-            "checks": [
-                check.to_dict()
-                for check in self.checks
-            ],
-            "reinforcement": [
-                bar.to_dict()
-                for bar in self.reinforcement
-            ],
-            "splices": [
-                splice.to_dict()
-                for splice in self.splices
-            ],
-            "quantities": self.quantities,
-            "warnings": self.warnings,
-            "errors": self.errors,
+            "member_type": self.member_type,
+            "status": self.status,
+            "revision": self.revision,
+            "revision_id": self.revision_id,
             "code": self.code,
             "code_edition": self.code_edition,
-            "calculation_details": self.calculation_details,
+            "inputs": self.inputs,
+            "values": self.values,
+            "checks": self.checks,
+            "warnings": self.warnings,
+            "errors": self.errors,
+            "reinforcement": self.reinforcement,
+            "created_at": self.created_at,
             "metadata": self.metadata,
-        }
+        })
 
 
-# ============================================================
-# CUT LIST MODELS
-# ============================================================
+# =====================================================================
+# BBS / CUT LIST
+# =====================================================================
 
-
-@dataclass
+@dataclass(slots=True)
 class CutPiece:
     """
-    One actual cut piece of reinforcement.
+    One physical cutting piece.
+
+    Important:
+    A quantity of 10 means ten physical pieces, not one piece with
+    quantity=10 for optimization purposes.
     """
+
+    piece_id: str
 
     bar_mark: str
 
-    diameter: float
-
-    length: float
+    diameter_mm: float
+    length_m: float
 
     quantity: int = 1
 
-    shape_code: str = ""
+    member_id: Optional[str] = None
+    project_id: Optional[str] = None
 
-    shape_data: Dict[str, Any] = field(
-        default_factory=dict
-    )
+    floor_id: Optional[str] = None
 
-    member_id: Optional[int] = None
-    floor_id: Optional[int] = None
+    source_calculation_id: Optional[str] = None
+    source_bbs_id: Optional[str] = None
+
+    shape_code: Optional[str] = None
+
+    region: Optional[str] = None
+
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        return _serialize({
+            "piece_id": self.piece_id,
             "bar_mark": self.bar_mark,
-            "diameter": self.diameter,
-            "length": self.length,
+            "diameter_mm": self.diameter_mm,
+            "length_m": self.length_m,
             "quantity": self.quantity,
-            "shape_code": self.shape_code,
-            "shape_data": self.shape_data,
             "member_id": self.member_id,
+            "project_id": self.project_id,
             "floor_id": self.floor_id,
-        }
+            "source_calculation_id": self.source_calculation_id,
+            "source_bbs_id": self.source_bbs_id,
+            "shape_code": self.shape_code,
+            "region": self.region,
+            "metadata": self.metadata,
+        })
 
 
-@dataclass
+@dataclass(slots=True)
 class StockBar:
-    """
-    One stock reinforcement bar, normally 12 m.
+    """Physical stock bar used by the Cut List optimizer."""
 
-    The cutting optimizer will place actual cut pieces
-    into stock bars.
-    """
+    stock_id: str
 
-    diameter: float
+    diameter_mm: float
+    length_m: float
 
-    stock_length: float = 12.0
+    pieces: List[CutPiece] = field(default_factory=list)
 
-    pieces: List[CutPiece] = field(
-        default_factory=list
-    )
+    def used_length_m(self) -> float:
+        return sum(piece.length_m for piece in self.pieces)
 
-    used_length: float = 0.0
-    waste: float = 0.0
+    def remaining_length_m(self) -> float:
+        return max(0.0, self.length_m - self.used_length_m())
 
-    def add_piece(
-        self,
-        piece: CutPiece,
-    ) -> bool:
+    def add_piece(self, piece: CutPiece) -> bool:
         """
-        Add a piece if it fits into the remaining
-        stock-bar length.
+        Add one physical piece if it fits.
+
+        Quantity is deliberately ignored here; callers should expand
+        quantities into physical pieces before optimization.
         """
-
-        if (
-            self.used_length
-            + piece.length
-            > self.stock_length
-        ):
-            return False
-
-        self.pieces.append(piece)
-        self.used_length += (
-            piece.length * piece.quantity
-        )
-
-        self.waste = (
-            self.stock_length
-            - self.used_length
-        )
-
-        return True
+        if piece.length_m <= self.remaining_length_m() + 1e-9:
+            self.pieces.append(piece)
+            return True
+        return False
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "diameter": self.diameter,
-            "stock_length": self.stock_length,
-            "pieces": [
-                piece.to_dict()
-                for piece in self.pieces
-            ],
-            "used_length": self.used_length,
-            "waste": self.waste,
-        }
+        return _serialize({
+            "stock_id": self.stock_id,
+            "diameter_mm": self.diameter_mm,
+            "length_m": self.length_m,
+            "pieces": self.pieces,
+            "used_length_m": self.used_length_m(),
+            "remaining_length_m": self.remaining_length_m(),
+        })
 
 
-@dataclass
+@dataclass(slots=True)
 class CutListResult:
-    """
-    Complete Cut List result.
-    """
+    """Complete optimized cutting result."""
 
-    stock_length: float = 12.0
+    project_id: Optional[str] = None
 
-    stock_bars: List[StockBar] = field(
-        default_factory=list
-    )
+    stock_length_m: float = 12.0
 
-    total_stock_bars: int = 0
-    total_used_length: float = 0.0
-    total_waste: float = 0.0
-    waste_percentage: float = 0.0
+    stock_bars: List[StockBar] = field(default_factory=list)
 
-    by_diameter: Dict[str, Any] = field(
-        default_factory=dict
-    )
+    unallocated_pieces: List[CutPiece] = field(default_factory=list)
+
+    total_stock_length_m: float = 0.0
+    total_required_length_m: float = 0.0
+    total_waste_length_m: float = 0.0
+
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def calculate_totals(self) -> None:
+        self.total_stock_length_m = sum(
+            stock.length_m for stock in self.stock_bars
+        )
+
+        self.total_required_length_m = sum(
+            piece.length_m
+            for stock in self.stock_bars
+            for piece in stock.pieces
+        )
+
+        self.total_waste_length_m = max(
+            0.0,
+            self.total_stock_length_m - self.total_required_length_m,
+        )
+
+    @property
+    def waste_percentage(self) -> float:
+        if self.total_stock_length_m <= 0:
+            return 0.0
+
+        return (
+            self.total_waste_length_m
+            / self.total_stock_length_m
+            * 100.0
+        )
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "stock_length": self.stock_length,
-            "stock_bars": [
-                stock.to_dict()
-                for stock in self.stock_bars
-            ],
-            "total_stock_bars": self.total_stock_bars,
-            "total_used_length": self.total_used_length,
-            "total_waste": self.total_waste,
+        self.calculate_totals()
+
+        return _serialize({
+            "project_id": self.project_id,
+            "stock_length_m": self.stock_length_m,
+            "stock_bars": self.stock_bars,
+            "unallocated_pieces": self.unallocated_pieces,
+            "total_stock_length_m": self.total_stock_length_m,
+            "total_required_length_m": self.total_required_length_m,
+            "total_waste_length_m": self.total_waste_length_m,
             "waste_percentage": self.waste_percentage,
-            "by_diameter": self.by_diameter,
-        }
+            "metadata": self.metadata,
+        })
 
 
-# ============================================================
-# QUANTITY TAKEOFF
-# ============================================================
+# =====================================================================
+# MATERIAL QUANTITIES
+# =====================================================================
 
-
-@dataclass
+@dataclass(slots=True)
 class MaterialQuantity:
-    """
-    Basic project material quantity.
+    """One material quantity item."""
 
-    This is intentionally a quantity model,
-    not a full commercial BOQ/estimating model.
-    """
+    item_id: str
+
+    project_id: str
 
     material_type: str
 
@@ -891,118 +874,267 @@ class MaterialQuantity:
 
     unit: str
 
-    member_id: Optional[int] = None
+    member_id: Optional[str] = None
+    floor_id: Optional[str] = None
 
-    floor_id: Optional[int] = None
+    description: str = ""
 
-    details: Dict[str, Any] = field(
-        default_factory=dict
-    )
+    source_calculation_id: Optional[str] = None
+    source_bbs_id: Optional[str] = None
+    source_cutlist_id: Optional[str] = None
+
+    revision: int = 1
+
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        return _serialize({
+            "item_id": self.item_id,
+            "project_id": self.project_id,
             "material_type": self.material_type,
             "quantity": self.quantity,
             "unit": self.unit,
             "member_id": self.member_id,
             "floor_id": self.floor_id,
-            "details": self.details,
-        }
+            "description": self.description,
+            "source_calculation_id": self.source_calculation_id,
+            "source_bbs_id": self.source_bbs_id,
+            "source_cutlist_id": self.source_cutlist_id,
+            "revision": self.revision,
+            "metadata": self.metadata,
+        })
 
 
-# ============================================================
+# =====================================================================
 # USER SETTINGS
-# ============================================================
+# =====================================================================
 
-
-@dataclass
+@dataclass(slots=True)
 class UserSettings:
-    """
-    User-level preferences.
+    """User-level application settings."""
 
-    Project-specific engineering settings belong to Project,
-    not here.
-    """
+    user_id: str
 
     language: str = "fa"
+    unit_system: UnitSystem = UnitSystem.METRIC
 
-    unit_system: UnitSystem = UnitSystem.SI
+    default_structure_type: StructureType = StructureType.CONCRETE
 
-    profession: str = ""
+    default_design_code: Optional[str] = None
+    default_code_edition: Optional[str] = None
 
-    metadata: Dict[str, Any] = field(
-        default_factory=dict
-    )
+    profession: Optional[str] = None
+
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        return _serialize({
+            "user_id": self.user_id,
             "language": self.language,
-            "unit_system": self.unit_system.value,
+            "unit_system": self.unit_system,
+            "default_structure_type": self.default_structure_type,
+            "default_design_code": self.default_design_code,
+            "default_code_edition": self.default_code_edition,
             "profession": self.profession,
             "metadata": self.metadata,
-        }
+        })
 
 
-# ============================================================
+# =====================================================================
 # ENGINEERING CONTEXT
-# ============================================================
+# =====================================================================
 
-
-@dataclass
+@dataclass(slots=True)
 class EngineeringContext:
     """
-    Runtime context passed to calculation modules.
+    Runtime engineering context shared between calculation modules.
 
-    This is the bridge between project settings,
-    selected design code and the calculation engine.
-
-    It deliberately contains no Telegram-specific data.
+    It carries configuration and traceability information, but does not
+    perform engineering calculations.
     """
 
-    language: str
+    project: Optional[Project] = None
+    floor: Optional[Floor] = None
+    member: Optional[StructuralMember] = None
 
-    structure_type: StructureType
+    structure_type: Optional[StructureType] = None
 
-    design_code: str
+    design_code: Optional[str] = None
+    code_edition: Optional[str] = None
 
-    code_edition: str
+    unit_system: UnitSystem = UnitSystem.METRIC
 
-    unit_system: UnitSystem
+    revision: int = 1
 
-    project_id: Optional[int] = None
+    calculation_id: Optional[str] = None
 
-    member_id: Optional[int] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
-    metadata: Dict[str, Any] = field(
-        default_factory=dict
-    )
+    def resolve_structure_type(self) -> Optional[StructureType]:
+        """
+        Resolve structure type explicitly.
+
+        Priority:
+        1. Explicit context
+        2. Member
+        3. Project
+
+        No silent fallback to concrete is performed.
+        """
+        if self.structure_type is not None:
+            return self.structure_type
+
+        if self.member is not None:
+            return self.member.structure_type
+
+        if self.project is not None:
+            return self.project.structure_type
+
+        return None
+
+    def resolve_code(self) -> Optional[str]:
+        if self.design_code:
+            return self.design_code
+
+        if self.project is not None:
+            return self.project.design_code
+
+        return None
+
+    def resolve_code_edition(self) -> Optional[str]:
+        if self.code_edition:
+            return self.code_edition
+
+        if self.project is not None:
+            return self.project.code_edition
+
+        return None
+
+    def next_revision(self) -> int:
+        self.revision += 1
+        return self.revision
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "language": self.language,
-            "structure_type": self.structure_type.value,
-            "design_code": self.design_code,
-            "code_edition": self.code_edition,
-            "unit_system": self.unit_system.value,
-            "project_id": self.project_id,
-            "member_id": self.member_id,
+        return _serialize({
+            "project": self.project,
+            "floor": self.floor,
+            "member": self.member,
+            "structure_type": self.resolve_structure_type(),
+            "design_code": self.resolve_code(),
+            "code_edition": self.resolve_code_edition(),
+            "unit_system": self.unit_system,
+            "revision": self.revision,
+            "calculation_id": self.calculation_id,
             "metadata": self.metadata,
-        }
+        })
 
 
-# ============================================================
-# SERIALIZATION HELPERS
-# ============================================================
+# =====================================================================
+# TRACEABILITY HELPERS
+# =====================================================================
 
-
-def enum_value(value: Any) -> Any:
+@dataclass(slots=True)
+class EngineeringTrace:
     """
-    Convert an Enum to its raw value.
+    Traceability record connecting an engineering output to its source.
 
-    Useful for generic serializers and database adapters.
+    This is intentionally lightweight so it can be embedded into
+    metadata of calculations, reinforcement, BBS, Cut List and reports.
     """
 
-    if isinstance(value, Enum):
-        return value.value
+    project_id: str
 
-    return value
+    project_revision: int
+
+    member_id: Optional[str] = None
+    member_revision: Optional[int] = None
+
+    calculation_id: Optional[str] = None
+    calculation_revision: Optional[int] = None
+
+    bar_id: Optional[str] = None
+    bar_mark: Optional[str] = None
+
+    bbs_id: Optional[str] = None
+    cutlist_id: Optional[str] = None
+
+    report_id: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return _serialize({
+            "project_id": self.project_id,
+            "project_revision": self.project_revision,
+            "member_id": self.member_id,
+            "member_revision": self.member_revision,
+            "calculation_id": self.calculation_id,
+            "calculation_revision": self.calculation_revision,
+            "bar_id": self.bar_id,
+            "bar_mark": self.bar_mark,
+            "bbs_id": self.bbs_id,
+            "cutlist_id": self.cutlist_id,
+            "report_id": self.report_id,
+        })
+
+
+# =====================================================================
+# PUBLIC EXPORTS
+# =====================================================================
+
+__all__ = [
+    # Enums
+    "UnitSystem",
+    "StructureType",
+    "MemberType",
+    "FoundationType",
+    "ColumnType",
+    "BeamType",
+    "SlabType",
+    "ReinforcementType",
+    "SpliceType",
+    "CalculationStatus",
+
+    # Helpers
+    "utc_now",
+    "enum_value",
+
+    # Materials
+    "ConcreteMaterial",
+    "SteelMaterial",
+    "MaterialSet",
+
+    # Project
+    "Project",
+    "Floor",
+
+    # Geometry
+    "RectangularGeometry",
+    "CircularGeometry",
+    "SlabGeometry",
+
+    # Structural members
+    "StructuralMember",
+
+    # Reinforcement
+    "RebarShape",
+    "ReinforcementBar",
+    "Splice",
+
+    # Calculation
+    "CheckResult",
+    "CalculationResult",
+
+    # Cut List
+    "CutPiece",
+    "StockBar",
+    "CutListResult",
+
+    # Quantities
+    "MaterialQuantity",
+
+    # Settings/context
+    "UserSettings",
+    "EngineeringContext",
+
+    # Traceability
+    "EngineeringTrace",
+]
