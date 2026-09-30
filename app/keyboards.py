@@ -2,32 +2,34 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 def main_menu():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🏗 پروژه‌های من", callback_data="projects"),
-         InlineKeyboardButton("📐 محاسبات سازه", callback_data="calc")],
-        [InlineKeyboardButton("🧮 برآورد مصالح", callback_data="quantity"),
-         InlineKeyboardButton("🔩 میلگرد / BBS", callback_data="rebar")],
-        [InlineKeyboardButton("📊 گزارش آخرین محاسبه", callback_data="reports"),
-         InlineKeyboardButton("📚 آیین‌نامه‌ها", callback_data="codes")],
-        [InlineKeyboardButton("🤖 دستیار هوشمند", callback_data="ai"),
-         InlineKeyboardButton("👤 حساب کاربری", callback_data="account")],
-        [InlineKeyboardButton("⚙️ تنظیمات", callback_data="settings")],
+        [InlineKeyboardButton("🏗 پروژه جدید", callback_data="new_project"),
+         InlineKeyboardButton("📂 پروژه‌های من", callback_data="projects")],
+        [InlineKeyboardButton("🧱 متره بتن", callback_data="takeoff_concrete"),
+         InlineKeyboardButton("🔩 متره میلگرد", callback_data="takeoff_rebar")],
+        [InlineKeyboardButton("🪵 متره قالب‌بندی", callback_data="takeoff_formwork"),
+         InlineKeyboardButton("💰 برآورد ریالی", callback_data="pricing")],
+        [InlineKeyboardButton("📊 گزارش پروژه", callback_data="reports"),
+         InlineKeyboardButton("📄 خروجی", callback_data="exports")],
+        [InlineKeyboardButton("⚙️ تنظیمات", callback_data="settings"),
+         InlineKeyboardButton("❓ راهنما", callback_data="help")],
     ])
 
-def calc_menu():
+def project_menu():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🧱 پی", callback_data="foundation"),
-         InlineKeyboardButton("🏢 ستون", callback_data="column")],
-        [InlineKeyboardButton("📏 تیر", callback_data="beam"),
-         InlineKeyboardButton("⬜ سقف", callback_data="slab")],
+        [InlineKeyboardButton("🏗 شروع متره ساختمان بتنی", callback_data="new_project")],
+        [InlineKeyboardButton("📂 پروژه‌های من", callback_data="projects")],
         [InlineKeyboardButton("⬅️ منوی اصلی", callback_data="home")],
     ])
 
-def rebar_menu():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔄 معادل‌سازی قطر", callback_data="rebar_eq")],
-        [InlineKeyboardButton("📋 BBS / Cut List", callback_data="bbs")],
-        [InlineKeyboardButton("⬅️ منوی اصلی", callback_data="home")],
-    ])
+def cancel_menu():
+    return InlineKeyboardMarkup([[InlineKeyboardButton("❌ لغو", callback_data="home")]])
 
-def back_menu():
+def back_home():
     return InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ منوی اصلی", callback_data="home")]])
+
+def report_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✏️ ویرایش پروژه", callback_data="edit_project")],
+        [InlineKeyboardButton("🔄 محاسبه مجدد", callback_data="recalc_project")],
+        [InlineKeyboardButton("🏠 منوی اصلی", callback_data="home")],
+    ])
