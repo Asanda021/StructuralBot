@@ -451,7 +451,7 @@ def calc_member(section,typ,v):
         if typ=="بتن مگر":
             n,L,W,T=v; return [{"name":"بتن مگر","value":n*L*W*T,"unit":"m³"},{"name":"مساحت مگر","value":n*L*W,"unit":"m²"}]
         if typ=="شناژ":
-            n,L,W,H,bars,d,sd,ss,slen,en,elen,ed=v
+            n,L,W,H,bars,d,sd,ss,slen,en,elen,ed=v[:12]
             comps=[{"name":"بتن شناژ","value":n*L*W*H,"unit":"m³"}]
             if bars and d: comps += rcomps("میلگرد طولی",repeated_bar_rebar(n*bars,L,d))
             if sd and ss and slen:
@@ -459,9 +459,10 @@ def calc_member(section,typ,v):
                 comps += rcomps("خاموت شناژ",repeated_bar_rebar(cnt,slen,sd),f"تعداد خاموت از طول و فاصله نقشه؛ طول قطعه از دیتیل")
             if en and elen and ed:
                 comps += rcomps("میلگرد انتظار شناژ",repeated_bar_rebar(n*en,elen,ed))
+            comps += foundation_extra_components(typ,n,L,W,H,v[12:])
             return comps
         if typ=="پی نواری":
-            n,L,W,T,ld,ls,wd,ws,rcount,rlen,rd,ecount,elen,ed,secount,selen,sed,pc,pL,pW,pD=v
+            n,L,W,T,ld,ls,wd,ws,rcount,rlen,rd,ecount,elen,ed,secount,selen,sed,pc,pL,pW,pD=v[:21]
             comps=[{"name":"بتن فونداسیون","value":n*L*W*T,"unit":"m³"},{"name":"مساحت فونداسیون","value":n*L*W,"unit":"m²"}]
             if ld and ls:
                 comps += rcomps("میلگرد طولی",grid_direction_rebar(L,W,ld,ls,"X",n))
@@ -475,9 +476,10 @@ def calc_member(section,typ,v):
                 comps += rcomps("انتظار راه‌پله",repeated_bar_rebar(n*secount,selen,sed))
             if pc and pL and pW and pD:
                 comps.append({"name":"چاله آسانسور","value":n*pc*pL*pW*pD,"unit":"m³","note":f"{pc:g} عدد | {pL:g}×{pW:g}m | عمق {pD:g}m"})
+            comps += foundation_extra_components(typ,n,L,W,T,v[21:])
             return comps
 
-        n,L,W,T,bd,bs,td,ts,rcount,rlen,rd,ecount,elen,ed,pc,pL,pW,pD=v
+        n,L,W,T,bd,bs,td,ts,rcount,rlen,rd,ecount,elen,ed,pc,pL,pW,pD=v[:18]
         comps=[{"name":"بتن فونداسیون","value":n*L*W*T,"unit":"m³"},{"name":"مساحت فونداسیون","value":n*L*W,"unit":"m²"}]
         if typ=="پی رادیه":
             if bd and bs:
@@ -499,6 +501,7 @@ def calc_member(section,typ,v):
             comps += rcomps("میلگرد انتظار ستون",repeated_bar_rebar(n*ecount,elen,ed))
         if pc and pL and pW and pD:
             comps.append({"name":"چاله آسانسور","value":n*pc*pL*pW*pD,"unit":"m³","note":f"{pc:g} عدد | {pL:g}×{pW:g}m | عمق {pD:g}m"})
+        comps += foundation_extra_components(typ,n,L,W,T,v[18:])
         return comps
 
     if section=="ستون":
