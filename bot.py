@@ -698,6 +698,9 @@ async def callback(update,context):
             await q.edit_message_text("❌ عضو جاری پیدا نشد.",reply_markup=section_menu()); return
         m=ms[idx]; result=estimate_members([m])
         concrete=result.get("concrete_total_m3",0)
+
+        # Mobile-safe procurement table: avoid wide monospaced columns because
+        # Persian/Arabic RTL text makes fixed-width tables visually unstable.
         groups={}
         for comp in m.get("components",[]):
             if comp.get("category")!="میلگرد": continue
@@ -705,29 +708,72 @@ async def callback(update,context):
             dia=comp.get("diameter_mm")
             if dia is None: continue
             base=name.split(" - ")[0]
-            g=groups.setdefault((base,float(dia)),{"pieces":0,"length":0.0,"weight":0.0,"branches":0,"buy_weight":0.0})
-            if name.endswith(" - تعداد قطعه"): g["pieces"]+=int(comp.get("value",0))
-            elif name.endswith(" - طول اجرا"): g["length"]+=float(comp.get("value",0))
-            elif name.endswith(" - وزن اجرا"): g["weight"]+=float(comp.get("value",0))
+            g=groups.setdefault((base,float(dia)),{
+                "pieces":0,"length":0.0,"weight":0.0,"branches":0,
+                "buy_weight":0.0,"stock":12.0,"cut_lengths":[]
+            })
+            if name.endswith(" - تعداد قطعه"):
+                g["pieces"]+=int(comp.get("value",0))
+            elif name.endswith(" - طول اجرا"):
+                g["length"]+=float(comp.get("value",0))
+                g["cut_lengths"] += [float(x) for x in comp.get("cut_lengths_m",[]) if x is not None]
+            elif name.endswith(" - وزن اجرا"):
+                g["weight"]+=float(comp.get("value",0))
             elif name.endswith(" - شاخه خرید"):
                 g["branches"]+=int(comp.get("value",0))
                 g["buy_weight"]+=float(comp.get("procurement_weight_kg",0))
-        rows=["نوع میلگرد | قطر | تعداد | شاخه | طول اجرا | وزن اجرا | وزن خرید","-"*76]
+                note=str(comp.get("note",""))
+                if "شاخه " in note and "m" in note:
+                    try: g["stock"]=float(note.split("شاخه ",1)[1].split("m",1)[0])
+                    except Exception: pass
+
         tw=tb=tl=tp=0
-        for (base,dia),g in groups.items():
-            rows.append(f"{base[:20]:<20} | Φ{dia:g} | {g['pieces']:>5} | {g['branches']:>5} | {g['length']:>7.2f}m | {g['weight']:>7.2f}kg | {g['buy_weight']:>7.2f}kg")
+        table=["<b>نوع میلگرد</b>  |  <b>قطر</b>  |  <b>قطعه</b>  |  <b>شاخه</b>  |  <b>طول</b>  |  <b>وزن</b>"]
+        table.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        for n,(key,g) in enumerate(groups.items(),1):
+            base,dia=key
+            avg=(g["length"]/g["pieces"]) if g["pieces"] else 0
+            length_each=f"{avg:.2f}"
+            if g["cut_lengths"]:
+                unique=sorted(set(round(x,3) for x in g["cut_lengths"]))
+                length_each=", ".join(f"{x:g}" for x in unique[:3])
+                if len(unique)>3: length_each+="…"
+            table.append(
+                f"<b>{n}. {base}</b> | Φ{dia:g} | {g['pieces']} | {g['branches']} | "
+                f"{g['length']:.2f}m | {g['weight']:.2f}kg"
+            )
+            table.append(
+                f"   ↳ طول هر قطعه: {length_each}m  •  شاخه استاندارد: {g['stock']:g}m  •  وزن خرید: {g['buy_weight']:.2f}kg"
+            )
             tp+=g["pieces"]; tb+=g["branches"]; tl+=g["length"]; tw+=g["weight"]
+
         if groups:
-            rows.append("-"*76)
-            rows.append(f"{'جمع':<20} | — | {tp:>5} | {tb:>5} | {tl:>7.2f}m | {tw:>7.2f}kg | —")
+            table.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            table.append(f"<b>جمع</b> | — | {tp} | {tb} | {tl:.2f}m | {tw:.2f}kg")
+            table_text="\n".join(table)
         else:
-            rows.append("میلگردی ثبت نشده است.")
-        lines=[f"🧮 <b>محاسبات نهایی عضو</b>","",f"عضو: <b>{m['member']}</b>",
-               f"بتن: <b>{fmt(concrete)} m³</b>",f"وزن میلگرد اجرا: <b>{fmt(tw)} kg</b>",f"شاخه خرید: <b>{tb}</b>","",
-               "📋 <b>جدول نهایی میلگرد</b>","<pre>"+"\n".join(rows)+"</pre>"]
+            table_text="میلگردی برای این عضو ثبت نشده است."
+
+        other=[]
         for comp in m.get("components",[]):
-            if comp.get("category")!="میلگرد":
-                lines.append(f"• {comp['name']}: {fmt(comp['value'])} {comp['unit']}")
+            if comp.get("category")=="میلگرد": continue
+            other.append(f"• {comp['name']}: <b>{fmt(comp['value'])}</b> {comp['unit']}")
+
+        lines=[
+            "🧮 <b>محاسبات نهایی عضو</b>",
+            "",
+            f"🏷 <b>عضو:</b> {m['member']}",
+            f"🧱 <b>بتن:</b> {fmt(concrete)} m³",
+            "",
+            "📋 <b>جدول تفصیلی میلگرد و خرید</b>",
+            table_text,
+            "",
+            f"⚖️ <b>جمع وزن اجرای میلگرد:</b> {fmt(tw)} kg",
+            f"📦 <b>جمع شاخه خرید:</b> {tb} شاخه",
+            "",
+            "📦 <b>سایر اقلام متره:</b>",
+            *(other or ["• موردی ثبت نشده است."])
+        ]
         await q.edit_message_text("\n".join(lines),parse_mode="HTML",reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("✅ تأیید نهایی عضو",callback_data="member_confirm")],
             [InlineKeyboardButton("✏️ اصلاح عضو",callback_data="member_edit")],
