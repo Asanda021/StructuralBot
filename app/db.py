@@ -32,6 +32,14 @@ class Database:
             c.execute("INSERT INTO project_estimates(project_id,inputs_json,result_json) VALUES(?,?,?)",(project_id,json.dumps(inputs,ensure_ascii=False),json.dumps(result,ensure_ascii=False)))
             c.execute("UPDATE projects SET updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?",(project_id,user_id))
             c.execute("INSERT INTO calculations(user_id,project_id,title,result) VALUES(?,?,?,?)",(user_id,project_id,"متره ساختمان بتنی",report))
+    def update_latest_estimate_result(self,user_id,project_id,result):
+        with self.connect() as c:
+            row=c.execute("SELECT id FROM project_estimates WHERE project_id=? ORDER BY id DESC LIMIT 1",(project_id,)).fetchone()
+            if not row:
+                return False
+            c.execute("UPDATE project_estimates SET result_json=? WHERE id=?",(json.dumps(result,ensure_ascii=False),row[0]))
+            return True
+
     def project_estimate(self,user_id,project_id):
         with self.connect() as c:
             row=c.execute("SELECT pe.project_id,p.name,pe.inputs_json,pe.result_json FROM project_estimates pe JOIN projects p ON p.id=pe.project_id WHERE p.user_id=? AND p.id=? ORDER BY pe.id DESC LIMIT 1",(user_id,project_id)).fetchone()
