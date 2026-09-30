@@ -1,28 +1,89 @@
 from collections import defaultdict
+import math
 
 def _num(v):
     value=float(v)
     if value < 0: raise ValueError("مقدار نمی‌تواند منفی باشد")
     return value
 
-def calculate_rebar_weight(diameter_mm,length_m,count=1):
-    d,l,c=_num(diameter_mm),_num(length_m),_num(count)
-    return (d*d/162.0)*l*c
+def rebar_weight(diameter_mm, length_m):
+    d=_num(diameter_mm); l=_num(length_m)
+    return d*d/162.0*l
+
+def rebar_summary(diameter_mm, total_length_m, stock_length_m=12.0):
+    d=_num(diameter_mm); total=_num(total_length_m); stock=_num(stock_length_m)
+    branches=math.ceil(total/stock) if total else 0
+    return {"diameter_mm":d,"length_m":total,"weight_kg":rebar_weight(d,total),
+            "stock_length_m":stock,"branches":branches,
+            "procurement_weight_kg":rebar_weight(d,branches*stock)}
+
+def grid_rebar(area_l, area_w, diameter_mm, spacing_cm, stock_length_m=12.0):
+    L=_num(area_l); W=_num(area_w); s=_num(spacing_cm)/100
+    if s<=0: raise ValueError("فاصله میلگرد باید بزرگ‌تر از صفر باشد")
+    nW=math.ceil(W/s)+1
+    nL=math.ceil(L/s)+1
+    total_len=nW*L+nL*W
+    r=rebar_summary(diameter_mm,total_len,stock_length_m)
+    r.update({"count_bars":nW+nL,"bars_each_direction":[nW,nL]})
+    return r
+
+SLAB_TYPES={
+ "تیرچه تک":{"concrete_coeff":0.18,"joist_factor":1},
+ "تیرچه دوبل":{"concrete_coeff":0.23,"joist_factor":2},
+ "وافل":{"concrete_coeff":0.0,"joist_factor":0},
+ "دال بتنی":{"concrete_coeff":None,"joist_factor":0},
+ "دال تخت":{"concrete_coeff":None,"joist_factor":0},
+}
+
+def calculate_slab(data):
+    area=_num(data["length"])*_num(data["width"])
+    typ=data["slab_type"]; coeff=data.get("concrete_coeff")
+    if coeff is None: coeff=_num(data.get("thickness",0))
+    concrete=area*float(coeff)
+    result={"area_m2":area,"concrete_m3":concrete,"concrete_coeff":float(coeff)}
+    if typ.startswith("تیرچه"):
+        spacing=_num(data.get("joist_spacing_cm",50))/100
+        n=math.ceil(_num(data["width"])/spacing)+1
+        joist_len=_num(data.get("joist_length_m",data["length"]))
+        joist_count=n
+        result["joist_count"]=joist_count
+        result["joist_total_length_m"]=joist_count*joist_len
+        block_len=_num(data.get("block_length_m",0.33))
+        blocks_per_line=math.ceil(joist_len/block_len) if block_len else 0
+        result["foam_blocks"]=joist_count*blocks_per_line
+    if data.get("thermal_dia") and data.get("thermal_spacing_cm"):
+        result["thermal"]=grid_rebar(data["length"],data["width"],data["thermal_dia"],data["thermal_spacing_cm"])
+    if data.get("negative_dia") and data.get("negative_spacing_cm"):
+        # negative bars are normally strip/detail dependent; this is a configurable takeoff rule.
+        result["negative"]=grid_rebar(data["length"],data.get("negative_strip_width_m",1.0),
+                                       data["negative_dia"],data["negative_spacing_cm"])
+    return result
+
+def estimate_members(members):
+    rows=[]; totals=defaultdict(float)
+    for i,m in enumerate(members,1):
+        base={"row":i,"section":m.get("section","سایر"),"member":m.get("member",""),
+              "type":m.get("type",""),"quantity":m.get("quantity",1)}
+        for c in m.get("components",[]):
+            row={**base,"name":c["name"],"value":round(float(c["value"]),4),"unit":c["unit"],
+                 "note":c.get("note","")}
+            rows.append(row); totals[c["unit"]]+=float(c["value"])
+    return {"version":"takeoff-3.0","method":"drawing_driven_member_takeoff",
+            "members":members,"items":rows,"totals_by_unit":dict(totals),
+            "item_count":len(rows),"member_count":len(members),
+            "assumptions":["اعداد تیپ فقط پیش‌فرض قابل ویرایش هستند.","مقادیر اجرایی و خرید میلگرد جداگانه نمایش داده می‌شوند.",
+                           "ضرایب بتن سقف بر اساس سیستم انتخاب‌شده ثبت می‌شوند.",
+                           "این ابزار متره است و جایگزین طراحی یا کنترل نقشه مصوب نیست."]}
 
 def estimate_items(items):
-    rows=[]; totals=defaultdict(float)
-    for i,raw in enumerate(items,1):
-        q=_num(raw.get("quantity",0)); unit=raw.get("unit","عدد")
-        row={"row":i,"section":raw.get("section","سایر"),"name":raw.get("name","آیتم بدون نام"),
-             "type":raw.get("type","custom"),"quantity":round(q,4),"unit":unit,"note":raw.get("note","")}
-        rows.append(row); totals[unit]+=q
-    return {"version":"takeoff-2.0","method":"item_based_takeoff","items":rows,
-            "totals_by_unit":dict(totals),"item_count":len(rows),
-            "assumptions":["هر ردیف بر اساس اطلاعات واردشده از نقشه ثبت شده است.",
-                           "آرماتور می‌تواند مستقیم بر حسب kg یا از قطر، طول و تعداد محاسبه شود.",
-                           "این سیستم متره است و جایگزین طراحی سازه، نقشه آرماتوربندی یا کنترل مهندسی نیست."]}
+    # Backward-compatible adapter
+    members=[{"section":x.get("section","سایر"),"member":x.get("name",""),"type":x.get("type",""),
+              "quantity":1,"components":[{"name":x.get("name","آیتم"),"value":x.get("quantity",0),
+              "unit":x.get("unit","عدد"),"note":x.get("note","")}]} for x in items]
+    return estimate_members(members)
 
 def estimate_building(data):
+    # Legacy compatibility
     required=["floors","area","foundation_count","footing_w","footing_l","footing_t","columns_per_floor",
               "column_w","column_d","floor_h","beam_length_per_floor","beam_w","beam_h","slab_t",
               "stair_area_per_floor","stair_t"]
@@ -38,19 +99,21 @@ def estimate_building(data):
               "تیر":floors*data["beam_length_per_floor"]*2*(data["beam_w"]+data["beam_h"]),
               "سقف":floors*data["area"],"راه‌پله":floors*data["stair_area_per_floor"]*2}
     rates={"فونداسیون":110.0,"ستون":140.0,"تیر":130.0,"سقف":80.0,"راه‌پله":100.0}; rates.update(data.get("rebar_rates",{}))
-    rebar={k:concrete[k]*rates[k] for k in concrete}; c=sum(concrete.values()); f=sum(formwork.values()); r=sum(rebar.values())
+    rebar={k:concrete[k]*rates[k] for k in concrete}
+    c=sum(concrete.values()); f=sum(formwork.values()); r=sum(rebar.values())
     return {"version":"legacy-1.0","method":"preliminary_quantities","floors":floors,"area_per_floor":data["area"],
-            "concrete":concrete,"formwork":formwork,"rebar":rebar,"totals":{"concrete_net":c,"formwork_net":f,"rebar_net":r},
-            "waste_pct":{"concrete":5.0,"rebar":3.0},"procurement":{"concrete":c*1.05,"rebar":r*1.03},"rebar_rates_kg_m3":rates}
+            "concrete":concrete,"formwork":formwork,"rebar":rebar,"totals":{"concrete_net":c,"formwork_net":f,"rebar_net":r}}
 
 def format_estimate(result):
-    if result.get("method")=="item_based_takeoff":
-        lines=["📋 <b>گزارش جامع متره ساختمان بتنی</b>","",f"تعداد ردیف‌ها: <b>{result['item_count']}</b>","","<pre>ردیف | بخش | آیتم | مقدار | واحد</pre>"]
-        for r in result["items"]:
-            lines.append(f"{r['row']} | {r['section']} | {r['name']} | {r['quantity']:,.3f} | {r['unit']}")
-        lines += ["","<b>جمع‌بندی</b>"]+[f"• {u}: <b>{v:,.3f}</b>" for u,v in result["totals_by_unit"].items()]
-        lines += ["","⚠️ مقادیر بر اساس داده‌های واردشده از نقشه تهیه شده‌اند؛ کنترل با نقشه‌های مصوب و مدارک آرماتوربندی ضروری است."]
-        return "\n".join(lines)
-    return "\n".join(["📊 <b>گزارش برآورد مقادیر ساختمان بتنی</b>",""]+
-        [x for title,key,unit in [("🧱 بتن","concrete","m³"),("🪵 قالب","formwork","m²"),("🔩 میلگرد","rebar","kg")]
-         for x in ([f"<b>{title}</b>"]+[f"• {n}: {v:,.2f} {unit}" for n,v in result[key].items()]+[""])])
+    lines=["📋 <b>گزارش جامع متره ساختمان بتنی</b>","",
+           f"اعضای متره‌شده: <b>{result.get('member_count',0)}</b>",
+           f"ردیف‌های مصالح: <b>{result.get('item_count',0)}</b>",""]
+    for m in result.get("members",[]):
+        lines.append(f"🏗 <b>{m.get('member','')}</b> | {m.get('section','')} | {m.get('type','')}")
+        for c in m.get("components",[]):
+            extra=f" — {c.get('note','')}" if c.get("note") else ""
+            lines.append(f"• {c['name']}: <b>{c['value']:,.2f}</b> {c['unit']}{extra}")
+    lines += ["","<b>جمع‌بندی</b>"]
+    for u,v in result.get("totals_by_unit",{}).items(): lines.append(f"• {u}: <b>{v:,.2f}</b>")
+    lines += ["","⚠️ کنترل نهایی با نقشه‌های مصوب و دیتیل‌های اجرایی ضروری است."]
+    return "\n".join(lines)
