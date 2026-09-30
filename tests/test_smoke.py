@@ -37,6 +37,7 @@ class StructuralBotSmokeTests(unittest.TestCase):
         query = SimpleNamespace(
             data="language:fa",
             answer=AsyncMock(),
+            edit_message_text=AsyncMock(),
             message=SimpleNamespace(edit_text=AsyncMock()),
         )
         update = SimpleNamespace(callback_query=query, effective_user=SimpleNamespace(id=1))
