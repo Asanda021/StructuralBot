@@ -64,7 +64,7 @@ def development_length_tension(diameter_mm, concrete_grade="C25", rebar_grade="A
     }
 
 def lap_splice_length_tension(diameter_mm, concrete_grade="C25", rebar_grade="A3",
-                              top_bar=False, splice_class="B", cb_over_db=1.0):
+                              top_bar=False, splice_class="B", cb_over_db=0.5):
     """Automatic tensile lap length; Type B is the default when the drawing
     only says that a long bar must be spliced."""
     ld=development_length_tension(
