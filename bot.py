@@ -7,6 +7,7 @@ from app.db import Database
 from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, repeated_bar_rebar, format_estimate
 from app.exporter import create_excel, create_pdf
 from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu
+from app.miniapp_server import MiniAppHandler
 
 TOKEN=os.getenv("BOT_TOKEN")
 DB_PATH=os.getenv("DATABASE_PATH","/tmp/structuralbot.db")
