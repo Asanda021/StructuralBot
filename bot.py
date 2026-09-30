@@ -6,6 +6,7 @@ from telegram.error import BadRequest
 from app.db import Database
 from app.engine import estimate_members, calculate_slab, rebar_summary, grid_rebar, multi_face_grid_rebar, repeated_bar_rebar, format_estimate
 from app.exporter import create_excel, create_pdf
+from ai.assistant import explain_takeoff
 from app.keyboards import main_menu, back_home, section_menu, type_menu, review_menu, report_menu, calc_mode_menu, persistent_menu, walls_menu, takeoff_menu, settings_menu, units_menu, standards_menu, concrete_settings_menu, rebar_settings_menu, rebar_equivalency_menu, language_menu
 
 TOKEN=os.getenv("BOT_TOKEN")
@@ -532,7 +533,21 @@ async def save_final(update,context):
     pid=context.user_data.get("project_id") or db.add_project(uid,context.user_data.get("project_name","پروژه"))
     db.save_estimate(uid,pid,{"members":ms},result,format_estimate(result))
     context.user_data["last_result"]=result
-    await update.effective_message.reply_text("✅ <b>متره نهایی ثبت شد</b>\n\n"+format_estimate(result),parse_mode="HTML",reply_markup=report_menu())
+
+    async def _background_ai():
+        explanation=await explain_takeoff(result, db.settings(uid).get("language","fa"))
+        if explanation:
+            result["ai_explanation"]=explanation
+            db.update_latest_estimate_result(uid,pid,result)
+            context.user_data["last_result"]=result
+
+    # AI runs behind the takeoff flow; it never changes quantities or design data.
+    context.application.create_task(_background_ai(), update=update)
+    await update.effective_message.reply_text(
+        "✅ <b>متره نهایی ثبت شد</b>\n\n"+format_estimate(result)+
+        "\n\n🧠 توضیحات هوشمند در پس‌زمینه در حال آماده‌سازی است.",
+        parse_mode="HTML",reply_markup=report_menu()
+    )
 
 async def callback(update,context):
     q=update.callback_query; data=q.data or ""; await q.answer()
@@ -634,7 +649,7 @@ async def callback(update,context):
         return
     if data=="restart":
         context.user_data.clear()
-        await q.edit_message_text("🔄 <b>شروع مجدد</b>\n\nتمام اطلاعات موقت این مرحله پاک شد. برای شروع دوباره، حالت محاسبه را فعال کن.",parse_mode="HTML",reply_markup=calc_mode_menu()); return
+        await q.edit_message_text("🔄 <b>شروع مجدد</b>\n\nابتدا زبان را انتخاب کن.",parse_mode="HTML",reply_markup=language_menu(initial=True)); return
     if data=="new_project":
         context.user_data.clear(); context.user_data["awaiting_project_name"]=True
         await q.edit_message_text("🏗 نام پروژه را بفرست.",reply_markup=back_home()); return
@@ -771,10 +786,12 @@ async def callback(update,context):
         await q.edit_message_text("📚 <b>بخش سازه</b>",parse_mode="HTML",reply_markup=section_menu()); return
     if data=="table":
         r=context.user_data.get("last_result") or (db.last_estimate(update.effective_user.id) or {}).get("result")
-        await q.edit_message_text(format_estimate(r) if r else "هنوز گزارشی ثبت نشده.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
+        extra=(f"\n\n🧠 <b>توضیح هوشمند</b>\n{r.get('ai_explanation')}" if r and r.get("ai_explanation") else "")
+        await q.edit_message_text((format_estimate(r)+extra) if r else "هنوز گزارشی ثبت نشده.",parse_mode="HTML",reply_markup=report_menu() if r else main_menu()); return
     if data=="reports":
         last=db.last_estimate(update.effective_user.id)
-        await q.edit_message_text(format_estimate(last["result"]) if last else "هنوز گزارشی ثبت نشده.",parse_mode="HTML",reply_markup=report_menu() if last else main_menu()); return
+        extra=(f"\n\n🧠 <b>توضیح هوشمند</b>\n{last['result'].get('ai_explanation')}" if last and last["result"].get("ai_explanation") else "")
+        await q.edit_message_text((format_estimate(last["result"])+extra) if last else "هنوز گزارشی ثبت نشده.",parse_mode="HTML",reply_markup=report_menu() if last else main_menu()); return
     if data=="projects":
         ps=db.projects(update.effective_user.id); rows=[[InlineKeyboardButton(p[1],callback_data=f"open|{p[0]}")] for p in ps]
         rows.append([InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")])
