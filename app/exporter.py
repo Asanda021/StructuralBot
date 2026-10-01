@@ -221,7 +221,7 @@ def create_pdf(result,project_name,path,lang=None):
     table.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("VALIGN",(0,0),(-1,-1),"TOP")]))
     story += [table,PageBreak(),Paragraph(L("rebar_type",lang),head)]
     rb=[[L("rebar_type",lang),L("dia",lang),L("pieces",lang),L("exec_len",lang),L("exec_weight",lang),L("stock_bars",lang),L("buy_len",lang),L("buy_weight",lang)]]
-    for base,dia,g in _rebar_type_rows(result):
+    for base,dia,g in _rebar_type_rows(result,lang):
         rb.append([item_label(base,lang),f"Φ{dia:g}",g["pieces"],f"{g['length']:.2f}",f"{g['weight']:.2f}",g["branches"],f"{g['buy_length']:.2f}",f"{g['buy_weight']:.2f}"])
     rb=[[Paragraph(_rtl_pdf_text(x),body) for x in row] for row in rb]
     rt=Table(rb,repeatRows=1,colWidths=[150,45,65,75,75,65,75,75])
