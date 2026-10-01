@@ -331,7 +331,7 @@ def ask_text(name,fields,section,typ,values=None,compound=None,context=None):
     label,unit=fields[0]
     current,total,bar,summary=progress_text(context) if context else (1,len(fields),"",[])
     if compound: ready="\n\n⚡ <b>ابعاد آماده:</b> "+" | ".join(x[0] for x in compound)
-    elif values: ready=f"\n\n⚡ <b>مقادیر آماده:</b> {' | '.join(str(v) for v in values)} {unit}"
+    elif values: ready=f"\n\n⚡ <b>آماده:</b> {' | '.join(str(v) for v in values)} {unit}"
     else: ready=""
     filled="\n📋 <b>ثبت‌شده:</b> "+" | ".join(summary) if summary else ""
     return f"🏗 <b>{name}</b>\n\n<b>مرحله {current} از {total}</b>  {bar}\n\n🎯 <b>{label}</b> ({unit}){ready}{filled}\n\nیکی از گزینه‌های آماده را بزن یا «✏️ ورود دستی» را انتخاب کن.\n⚠️ گزینه‌های آماده فقط میانبر ورود هستند؛ مقدار نهایی باید با نقشه کنترل شود."
