@@ -131,7 +131,7 @@ def create_excel(result,project_name,path,lang=None):
 
     rb=wb.create_sheet(L("rebar_type",lang)[:31])
     rb.append([L("rebar_type",lang),L("dia",lang),L("pieces",lang),L("exec_len",lang),L("exec_weight",lang),L("stock_bars",lang),L("buy_len",lang),L("buy_weight",lang)])
-    for base,dia,g in _rebar_type_rows(result):
+    for base,dia,g in _rebar_type_rows(result,lang):
         rb.append([item_label(base,lang),f"Φ{dia:g}",g["pieces"],g["length"],g["weight"],g["branches"],g["buy_length"],g["buy_weight"]])
     _style_sheet(rb)
 
