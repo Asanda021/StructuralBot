@@ -869,28 +869,44 @@ async def callback(update,context):
         await q.edit_message_text("🧮 <b>برآورد جدید</b>\n\nاز روی نقشه، بخش موردنظر را انتخاب کن.",parse_mode="HTML",reply_markup=section_menu()); return
     if data=="continue_project":
         uid=update.effective_user.id
-        saved=db.last_estimate(uid)
+        try:
+            saved=db.last_estimate(uid)
+        except Exception as e:
+            log.exception("continue estimate load failed: %s",e)
+            saved=None
         if not saved:
-            await q.edit_message_text("📂 <b>برآورد ذخیره‌شده‌ای پیدا نشد.</b>\n\nابتدا یک برآورد جدید شروع کن.",parse_mode="HTML",reply_markup=main_menu()); return
+            await q.edit_message_text(
+                "📂 <b>برآورد قابل ادامه پیدا نشد.</b>\n\n"
+                "اگر پروژه‌ای را قبلاً تا ثبت حداقل یک عضو جلو برده‌ای، از «📂 پروژه‌ها» همان پروژه را باز کن.",
+                parse_mode="HTML", reply_markup=main_menu()
+            ); return
         inputs=saved.get("inputs") or {}
         members=inputs.get("members",[]) if isinstance(inputs,dict) else []
+        if not isinstance(members,list):
+            members=[]
         context.user_data.clear()
-        context.user_data["project_id"]=saved["project_id"]
-        context.user_data["project_name"]=saved["project_name"]
-        context.user_data["members"]=members
-        context.user_data["last_result"]=saved.get("result") or None
-        await q.edit_message_text(
-            f"📂 <b>ادامه برآورد</b>\n\n"
-            f"🏗 پروژه: <b>{saved['project_name']}</b>\n"
-            f"👷 تعداد اعضای ذخیره‌شده: <b>{len(members)}</b>\n\n"
-            "می‌توانی عضو جدید اضافه کنی یا اعضای پروژه را از بازبینی اصلاح کنی.",
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("➕ افزودن عضو",callback_data="choose_section")],
-                [InlineKeyboardButton("📋 گزارش جامع متره",callback_data="table")],
-                [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
-            ])
-        ); return
+        context.user_data.update({
+            "project_id":saved.get("project_id"),
+            "project_name":saved.get("project_name") or "پروژه جدید",
+            "members":members,
+            "last_result":saved.get("result") or None,
+            "history":[]
+        })
+        # Continue must restore the saved project instead of opening a blank estimate.
+        if members:
+            await review(q,context)
+        else:
+            await q.edit_message_text(
+                f"📂 <b>ادامه برآورد</b>\n\n"
+                f"🏗 پروژه: <b>{context.user_data['project_name']}</b>\n\n"
+                "این پروژه ذخیره شده، اما هنوز عضوی برای بازبینی ندارد.",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("➕ افزودن عضو",callback_data="choose_section")],
+                    [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+                ])
+            )
+        return
     if data=="choose_section":
         if not context.user_data.get("project_name"):
             context.user_data["project_name"]="پروژه جدید"
