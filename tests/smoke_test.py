@@ -11,6 +11,7 @@ from app.engine import (
     repeated_bar_rebar,
 )
 from app.exporter import create_excel, create_pdf
+from app.i18n import L
 
 
 def main():
@@ -174,7 +175,7 @@ def main():
         qa_xlsx = create_excel(qa_result, "QA Test", os.path.join(d, "qa.xlsx"))
         from openpyxl import load_workbook
         book = load_workbook(qa_xlsx, read_only=True)
-        assert "QA Review" in book.sheetnames
+        assert L("qa","fa")[:31] in book.sheetnames
         book.close()
 
     with tempfile.TemporaryDirectory() as d:
