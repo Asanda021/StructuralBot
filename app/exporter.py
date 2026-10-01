@@ -249,9 +249,24 @@ def create_pdf(result,project_name,path,lang=None):
         [L("members",lang),L("concrete",lang),L("rebar_exec",lang),L("stock",lang),L("rebar_buy",lang)],
         [result.get("member_count",0),f"{result.get('concrete_total_m3',0):,.3f}",f"{total_rebar:,.2f}",total_bars,f"{total_buy:,.2f}"]
     ]
-    t=Table(summary,colWidths=[70,95,120,80,120])
-    t.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.5,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("ALIGN",(0,0),(-1,-1),"CENTER")]))
-    story += [t,Spacer(1,14),Paragraph(_rtl_pdf_text(L("detail",lang)),head)]
+    # ReportLab does not provide native RTL table layout. For Persian/Arabic,
+    # reverse the logical columns so the first field appears on the right.
+    if lang_code(lang) in ("fa","ar"):
+        summary=[list(reversed(row)) for row in summary]
+    summary=[[Paragraph(_rtl_pdf_text(str(x)),body) for x in row] for row in summary]
+    t=Table(summary,colWidths=[145,145,145,145,145],rowHeights=[30,34],hAlign="CENTER")
+    t.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,0),colors.lightgrey),
+        ("GRID",(0,0),(-1,-1),0.6,colors.grey),
+        ("FONTNAME",(0,0),(-1,-1),font),
+        ("ALIGN",(0,0),(-1,-1),"CENTER"),
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+        ("FONTSIZE",(0,0),(-1,-1),9.5),
+        ("TOPPADDING",(0,0),(-1,-1),6),
+        ("BOTTOMPADDING",(0,0),(-1,-1),6),
+    ]))
+    story += [Paragraph(_rtl_pdf_text("خلاصه گزارش جامع متره" if lang_code(lang)=="fa" else L("summary",lang)),head),
+              t,Spacer(1,14),Paragraph(_rtl_pdf_text(L("detail",lang)),head)]
     data=[[L("row_no",lang),L("section",lang),L("member",lang),L("item",lang),L("quantity",lang),L("unit",lang),L("notes",lang)]]+rows(result,lang)
     data=[[Paragraph(_rtl_pdf_text(x),body) for x in row] for row in data]
     table=Table(data,repeatRows=1,colWidths=[30,60,75,180,65,45,180])
