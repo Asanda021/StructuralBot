@@ -66,7 +66,7 @@ def type_menu(section):
     rows=[]; row=[]
     for t in types.get(section,["سفارشی"]):
         row.append(InlineKeyboardButton(t,callback_data=f"member|{section}|{t}"))
-        if len(row)==2: rows.append(row); row=[]
+        if len(row)==3: rows.append(row); row=[]
     if row: rows.append(row)
     rows.append([InlineKeyboardButton("⬅️ مرحله قبل",callback_data="choose_section")])
     return InlineKeyboardMarkup(rows)
