@@ -116,11 +116,13 @@ def _rebar_diameter_rows(result):
                     data.get("procurement_weight_kg",0)])
     return out
 
-def _style_sheet(ws):
+def _style_sheet(ws, lang="fa"):
+    rtl = lang_code(lang) in ("fa","ar")
+    ws.sheet_view.rightToLeft = rtl
     thin=Side(style="thin",color="B7B7B7")
     for row in ws.iter_rows():
         for cell in row:
-            cell.alignment=Alignment(vertical="top",wrap_text=True)
+            cell.alignment=Alignment(vertical="top",wrap_text=True,horizontal="right" if rtl else "left")
             cell.border=Border(bottom=thin)
     for cell in ws[1]:
         cell.font=Font(bold=True)
@@ -134,7 +136,7 @@ def _style_sheet(ws):
 def create_excel(result,project_name,path,lang=None):
     lang=lang_code(lang or result.get('project_settings',{}).get('language','fa'))
     wb=Workbook()
-    ws=wb.active; ws.title="Project Summary"
+    ws=wb.active; ws.title=L("summary",lang)[:31]
     ws.append([L("report",lang)]); ws.append([L("project",lang),project_name])
     ws.append([L("members",lang),result.get("member_count",0)])
     ws.append([L("concrete",lang),result.get("concrete_total_m3",0)])
@@ -147,12 +149,12 @@ def create_excel(result,project_name,path,lang=None):
     ps=result.get("project_settings",{})
     ws.append([L("standard",lang),ps.get("standard","")])
     ws.append([L("language",lang),ps.get("language","")])
-    _style_sheet(ws)
+    _style_sheet(ws,lang)
 
     detail=wb.create_sheet(L("detail",lang)[:31])
-    detail.append(["No.",L("section",lang),L("member",lang),L("item",lang),L("quantity",lang),L("unit",lang),L("notes",lang)])
+    detail.append([L("row_no",lang),L("section",lang),L("member",lang),L("item",lang),L("quantity",lang),L("unit",lang),L("notes",lang)])
     for row in rows(result,lang): detail.append(row)
-    _style_sheet(detail)
+    _style_sheet(detail,lang)
 
     bm_rows = _foundation_bar_mark_rows(result, lang)
     if bm_rows:
@@ -161,24 +163,24 @@ def create_excel(result,project_name,path,lang=None):
                    L("pieces",lang),L("cut_lengths",lang),L("exec_len",lang),L("exec_weight",lang),
                    L("stock_bars",lang),L("buy_len",lang)])
         for row in bm_rows: bm.append(row)
-        _style_sheet(bm)
+        _style_sheet(bm,lang)
 
     rb=wb.create_sheet(L("rebar_type",lang)[:31])
     rb.append([L("rebar_type",lang),L("dia",lang),L("pieces",lang),L("exec_len",lang),L("exec_weight",lang),L("stock_bars",lang),L("buy_len",lang),L("buy_weight",lang)])
     for base,dia,g in _rebar_type_rows(result,lang):
         rb.append([item_label(base,lang),f"Φ{dia:g}",g["pieces"],g["length"],g["weight"],g["branches"],g["buy_length"],g["buy_weight"]])
-    _style_sheet(rb)
+    _style_sheet(rb,lang)
 
     rd=wb.create_sheet(L("procurement",lang)[:31])
     rd.append([L("dia",lang),L("exec_len",lang),L("exec_weight",lang),L("stock_bars",lang),L("buy_len",lang),L("buy_weight",lang)])
     for row in _rebar_diameter_rows(result): rd.append(row)
-    _style_sheet(rd)
+    _style_sheet(rd,lang)
 
-    concrete=wb.create_sheet("Concrete")
+    concrete=wb.create_sheet(L("concrete",lang)[:31])
     concrete.append([L("project",lang),project_name])
     concrete.append([L("concrete",lang),result.get("concrete_total_m3",0)])
     concrete.append([L("members",lang),result.get("member_count",0)])
-    _style_sheet(concrete)
+    _style_sheet(concrete,lang)
 
     qa_ws=wb.create_sheet(L("qa",lang)[:31])
     qa_ws.append([L("status",lang),L("notes",lang)])
@@ -186,19 +188,19 @@ def create_excel(result,project_name,path,lang=None):
     if qa.get("ok"): qa_ws.append([L("ok",lang),L("ok",lang)])
     else:
         for warning in qa.get("warnings",[]): qa_ws.append([L("warning",lang),item_label(warning,lang)])
-    _style_sheet(qa_ws)
+    _style_sheet(qa_ws,lang)
 
     cl=wb.create_sheet(L("cut",lang)[:31])
-    cl.append([L("dia",lang),"Stock Length",L("pieces",lang),L("used",lang),L("waste",lang)])
+    cl.append([L("dia",lang),L("stock_length",lang),L("pieces",lang),L("used",lang),L("waste",lang)])
     for dia,data in result.get("cut_list",{}).items():
         cl.append([f"Φ{dia}",data.get("stock_bars",0),data.get("pieces_count",0),
                    data.get("used_length_m",0),data.get("waste_length_m",0)])
-    _style_sheet(cl)
+    _style_sheet(cl,lang)
 
     units=wb.create_sheet(L("unit_totals",lang)[:31])
     units.append([L("unit",lang),L("quantity",lang)])
     for k,v in result.get("totals_by_unit",{}).items(): units.append([k,v])
-    _style_sheet(units)
+    _style_sheet(units,lang)
 
     ai= result.get("ai_explanation")
     if ai:
@@ -248,12 +250,12 @@ def create_pdf(result,project_name,path,lang=None):
     ]
     t=Table(summary,colWidths=[70,95,120,80,120])
     t.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.5,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("ALIGN",(0,0),(-1,-1),"CENTER")]))
-    story += [t,Spacer(1,14),Paragraph(L("detail",lang),head)]
-    data=[["No.",L("section",lang),L("member",lang),L("item",lang),L("quantity",lang),L("unit",lang),L("notes",lang)]]+rows(result,lang)
+    story += [t,Spacer(1,14),Paragraph(_rtl_pdf_text(L("detail",lang)),head)]
+    data=[[L("row_no",lang),L("section",lang),L("member",lang),L("item",lang),L("quantity",lang),L("unit",lang),L("notes",lang)]]+rows(result,lang)
     data=[[Paragraph(_rtl_pdf_text(x),body) for x in row] for row in data]
     table=Table(data,repeatRows=1,colWidths=[30,60,75,180,65,45,180])
     table.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("VALIGN",(0,0),(-1,-1),"TOP")]))
-    story += [table,PageBreak(),Paragraph(L("rebar_type",lang),head)]
+    story += [table,PageBreak(),Paragraph(_rtl_pdf_text(L("rebar_type",lang)),head)]
     rb=[[L("rebar_type",lang),L("dia",lang),L("pieces",lang),L("exec_len",lang),L("exec_weight",lang),L("stock_bars",lang),L("buy_len",lang),L("buy_weight",lang)]]
     for base,dia,g in _rebar_type_rows(result,lang):
         rb.append([item_label(base,lang),f"Φ{dia:g}",g["pieces"],f"{g['length']:.2f}",f"{g['weight']:.2f}",g["branches"],f"{g['buy_length']:.2f}",f"{g['buy_weight']:.2f}"])
@@ -262,7 +264,7 @@ def create_pdf(result,project_name,path,lang=None):
     rt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("ALIGN",(1,1),(-1,-1),"CENTER")]))
     bm_rows = _foundation_bar_mark_rows(result, lang)
     if bm_rows:
-        story += [rt,PageBreak(),Paragraph(L("bar_mark",lang),head)]
+        story += [rt,PageBreak(),Paragraph(_rtl_pdf_text(L("bar_mark",lang)),head)]
         bm=[[L("bar_mark",lang),L("item",lang),L("dia",lang),L("spacing",lang),L("direction",lang),
              L("pieces",lang),L("cut_lengths",lang),L("exec_len",lang),L("exec_weight",lang),
              L("stock_bars",lang),L("buy_len",lang)]]
@@ -273,18 +275,18 @@ def create_pdf(result,project_name,path,lang=None):
                                  ("FONTNAME",(0,0),(-1,-1),font),("VALIGN",(0,0),(-1,-1),"TOP"),
                                  ("ALIGN",(2,1),(-1,-1),"CENTER")]))
         story.append(bmt)
-    story += [Spacer(1,14),Paragraph(L("procurement",lang),head)]
+    story += [Spacer(1,14),Paragraph(_rtl_pdf_text(L("procurement",lang)),head)]
     rd=[[L("dia",lang),L("exec_len",lang),L("exec_weight",lang),L("stock_bars",lang),L("buy_len",lang),L("buy_weight",lang)]]
     for row in _rebar_diameter_rows(result): rd.append([str(x) for x in row])
     rd=[[Paragraph(_rtl_pdf_text(x),body) for x in row] for row in rd]
     rdt=Table(rd,repeatRows=1)
     rdt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("ALIGN",(0,0),(-1,-1),"CENTER")]))
-    story += [rdt,Spacer(1,14),Paragraph(L("qa",lang),head)]
+    story += [rdt,Spacer(1,14),Paragraph(_rtl_pdf_text(L("qa",lang)),head)]
     qa=result.get("qa",{})
     story.append(Paragraph(f"{L('status',lang)}: "+(L('ok',lang) if qa.get("ok") else f"{L('check',lang)} ({len(qa.get('warnings',[]))})"),body))
-    for _w in qa.get("warnings",[])[:12]: story.append(Paragraph(_rtl_pdf_text(f"⚠ {L('check',lang)}"),body))
+    for _w in qa.get("warnings",[])[:12]: story.append(Paragraph(_rtl_pdf_text(f"⚠ {L('warning',lang)}: {item_label(_w,lang)}"),body))
     story.append(Spacer(1,8))
     if result.get("ai_explanation"):
-        story += [Paragraph(L("ai",lang),head),Paragraph(_rtl_pdf_text(result["ai_explanation"]),body),Spacer(1,8)]
+        story += [Paragraph(_rtl_pdf_text(L("ai",lang)),head),Paragraph(_rtl_pdf_text(result["ai_explanation"]),body),Spacer(1,8)]
     story.append(Paragraph(_rtl_pdf_text(L("final_note",lang)),body))
     doc.build(story); return path
