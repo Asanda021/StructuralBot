@@ -33,9 +33,10 @@ def language_menu(initial=False):
 
 def persistent_menu():
     return ReplyKeyboardMarkup([
-        [KeyboardButton("🏠 خانه"), KeyboardButton("📂 پروژه‌ها"), KeyboardButton("🧮 برآورد جدید")]
+        [KeyboardButton("🏠 خانه"), KeyboardButton("📂 پروژه‌ها"), KeyboardButton("🧮 برآورد جدید")],
+        [KeyboardButton("➕ ادامه برآورد")]
     ], resize_keyboard=True, one_time_keyboard=False, is_persistent=True,
-       input_field_placeholder="خانه | پروژه‌ها | شروع برآورد")
+       input_field_placeholder="خانه | پروژه‌ها | برآورد جدید | ادامه برآورد")
 
 def back_home(extra=None):
     rows=[]
