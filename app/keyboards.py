@@ -100,7 +100,7 @@ def walls_menu():
 def takeoff_menu():
     return InlineKeyboardMarkup([
       [InlineKeyboardButton("🧱 بتن",callback_data="takeoff|concrete"),InlineKeyboardButton("🔩 میلگرد",callback_data="takeoff|rebar")],
-      [InlineKeyboardButton("🪵 قالب‌بندی",callback_data="takeoff|formwork"),InlineKeyboardButton("🧱 مصالح",callback_data="takeoff|materials")],
+      [InlineKeyboardButton("🧱 مصالح",callback_data="takeoff|materials")],
       [InlineKeyboardButton("🏗 انتخاب اعضای سازه",callback_data="continue_project")],
       [InlineKeyboardButton("⬅️ بازگشت",callback_data="home")]
     ])
