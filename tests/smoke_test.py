@@ -160,6 +160,23 @@ def main():
     assert not oversize["ok"]
     assert any("۱۲m" in w for w in oversize["warnings"])
 
+    # Foundation Bar Mark schedules must appear in both exporters.
+    export_foundation = calculate_foundation_takeoff({
+        "foundation_type":"پی منفرد","count":2,"length":2.0,"width":1.8,"thickness":0.45,
+        "bottom_dia_mm":12,"bottom_spacing_cm":20,"top_dia_mm":10,"top_spacing_cm":25,
+    })
+    export_foundation["foundation_bar_marks"] = foundation_bar_marks(export_foundation)
+    with tempfile.TemporaryDirectory() as d:
+        fx = create_excel(export_foundation, "Foundation Bar Marks", os.path.join(d, "foundation.xlsx"))
+        from openpyxl import load_workbook
+        book = load_workbook(fx, read_only=True)
+        assert L("bar_mark","fa")[:31] in book.sheetnames
+        sheet = book[L("bar_mark","fa")[:31]]
+        assert sheet.max_row == len(export_foundation["foundation_bar_marks"]) + 1
+        book.close()
+        fp = create_pdf(export_foundation, "Foundation Bar Marks", os.path.join(d, "foundation.pdf"))
+        assert os.path.getsize(fp) > 0
+
     # Exporters must generate valid files from the current result schema.
     full_result = estimate_members([{
         "section": "سقف",
