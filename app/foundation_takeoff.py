@@ -98,6 +98,10 @@ def calculate_foundation_takeoff(data):
                       "rebar_kg":sum(x.get("weight_kg",0) for x in result["reinforcement"])}
     return result
 
+def foundation_bar_marks(result):
+    from app.bar_marks import build_foundation_schedule
+    return build_foundation_schedule(result)
+
 def foundation_components(result):
     comps=[]
     for q in result["quantities"]:
