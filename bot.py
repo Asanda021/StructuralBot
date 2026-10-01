@@ -520,11 +520,11 @@ def calc_member(section,typ,v):
                 comps += rcomps("میلگرد شبکه بالا - Y",grid_direction_rebar(L,W,td,ts,"Y",n,top_bar=True))
         else:
             if bd and bs:
-                comps += rcomps("میلگرد پایین - راستای طول",grid_direction_rebar(L,W,bd,bs,"X",n))
-                comps += rcomps("میلگرد پایین - راستای عرض",grid_direction_rebar(L,W,bd,bs,"Y",n))
+                comps += rcomps("میلگرد شبکه پایین - X" if typ=="پی منفرد" else "میلگرد پایین - راستای طول",grid_direction_rebar(L,W,bd,bs,"X",n))
+                comps += rcomps("میلگرد شبکه پایین - Y" if typ=="پی منفرد" else "میلگرد پایین - راستای عرض",grid_direction_rebar(L,W,bd,bs,"Y",n))
             if td and ts:
-                comps += rcomps("میلگرد بالا - راستای طول",grid_direction_rebar(L,W,td,ts,"X",n,top_bar=True))
-                comps += rcomps("میلگرد بالا - راستای عرض",grid_direction_rebar(L,W,td,ts,"Y",n,top_bar=True))
+                comps += rcomps("میلگرد شبکه بالا - X" if typ=="پی منفرد" else "میلگرد بالا - راستای طول",grid_direction_rebar(L,W,td,ts,"X",n,top_bar=True))
+                comps += rcomps("میلگرد شبکه بالا - Y" if typ=="پی منفرد" else "میلگرد بالا - راستای عرض",grid_direction_rebar(L,W,td,ts,"Y",n,top_bar=True))
         if rcount and rlen and rd:
             comps += rcomps("میلگرد تقویتی",repeated_bar_rebar(n*rcount,rlen,rd))
         if ecount and elen and ed:
