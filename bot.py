@@ -192,7 +192,7 @@ FOUNDATION_READY = {
 
 # Exact common isolated-footing presets requested for fast drawing entry.
 FOOTING_PRESETS = {
- "پی منفرد":[(1.5,1.5,0.50),(1.8,1.8,0.50),(2.0,2.0,0.50)]
+ "پی منفرد":[(1.20,1.20,0.40),(1.50,1.50,0.50),(1.80,1.80,0.50),(2.00,2.00,0.50),(2.50,2.50,0.60),(3.00,3.00,0.70)]
 }
 
 COMPOUND_PRESETS = {
@@ -203,7 +203,7 @@ def compound_options(section, typ, label):
     if section in ("ستون","تیر") and typ in COMPOUND_PRESETS.get(section,{}) and label in ("عرض ستون","عرض تیر"):
         return [(typ, COMPOUND_PRESETS[section][typ])]
     if section=="فونداسیون" and typ=="پی منفرد" and label=="طول":
-        return [("1.50×1.50×0.50",[1.50,1.50,0.50]),("1.80×1.80×0.50",[1.80,1.80,0.50]),("2.00×2.00×0.50",[2.00,2.00,0.50])]
+        return [("1.20×1.20×0.40",[1.20,1.20,0.40]),("1.50×1.50×0.50",[1.50,1.50,0.50]),("1.80×1.80×0.50",[1.80,1.80,0.50]),("2.00×2.00×0.50",[2.00,2.00,0.50]),("2.50×2.50×0.60",[2.50,2.50,0.60]),("3.00×3.00×0.70",[3.00,3.00,0.70])]
     return []
 def apply_compound_preset(context, values):
     queue=context.user_data.get("current_queue",[])
