@@ -350,7 +350,7 @@ def ask_text(name,fields,section,typ,values=None,compound=None,context=None):
     return f"🏗 <b>{name}</b>\n\n<b>مرحله {current} از {total}</b>  {bar}\n\n🎯 <b>{label}</b> ({unit}){ready}{filled}\n\nیکی از گزینه‌های آماده را بزن یا «✏️ ورود دستی» را انتخاب کن.\n⚠️ گزینه‌های آماده فقط میانبر ورود هستند؛ مقدار نهایی باید با نقشه کنترل شود."
 
 def english_report(result, lang=None):
-    """Fully localized, structured Telegram takeoff report."""
+    """Professional localized Telegram takeoff report with a clean Persian-first table layout."""
     lang=lang_code(lang or result.get("project_settings",{}).get("language","fa"))
     members=result.get("members",[])
     concrete=float(result.get("concrete_total_m3",0) or 0)
@@ -366,37 +366,57 @@ def english_report(result, lang=None):
             elif name.endswith(" - طول اجرا"): g["length"]+=float(comp.get("value",0) or 0)
             elif name.endswith(" - وزن اجرا"): g["weight"]+=float(comp.get("value",0) or 0)
             elif name.endswith(" - شاخه خرید"):
-                g["bars"]+=int(comp.get("value",0) or 0); g["buy_weight"]+=float(comp.get("procurement_weight_kg",0) or 0)
+                g["bars"]+=int(comp.get("value",0) or 0)
+                g["buy_weight"]+=float(comp.get("procurement_weight_kg",0) or 0)
             elif name.endswith(" - طول خرید"): g["buy_length"]+=float(comp.get("value",0) or 0)
-    for dia,data in result.get("rebar_by_diameter",{}).items(): by_dia[float(dia)]=data
+    for dia,data in result.get("rebar_by_diameter",{}).items():
+        by_dia[float(dia)]=data
+
     total_w=sum(float(x.get("weight_kg",0) or 0) for x in by_dia.values())
     total_bw=sum(float(x.get("procurement_weight_kg",0) or 0) for x in by_dia.values())
     total_bars=sum(int(x.get("branches",0) or 0) for x in by_dia.values())
-    lines=[f"📋 <b>{L('report',lang)}</b>","",
-           f"🏗 <b>{L('project',lang)}:</b> {item_label(result.get('project_name',''),lang)}",
-           f"🔹 <b>{L('members',lang)}:</b> {len(members):,}",
-           f"🧱 <b>{L('concrete',lang)}:</b> {concrete:,.2f}",
-           f"🔩 <b>{L('rebar_exec',lang)}:</b> {total_w:,.2f}",
-           f"📦 <b>{L('stock',lang)}:</b> {total_bars:,}",
-           f"⚖️ <b>{L('rebar_buy',lang)}:</b> {total_bw:,.2f}","",
-           f"🔩 <b>{L('detail',lang)}</b>"]
-    for (base,dia),g in sorted(by_type.items(),key=lambda x:(x[0][0],x[0][1])):
-        lines += [f"• <b>{item_label(base,lang)} — Φ{dia:g}</b>",
-                  f"  {L('pieces',lang)}: {g['pieces']:,} | {L('exec_len',lang)}: {g['length']:,.2f}",
-                  f"  {L('exec_weight',lang)}: {g['weight']:,.2f} | {L('stock_bars',lang)}: {g['bars']:,}",
-                  f"  {L('buy_len',lang)}: {g['buy_length']:,.2f} | {L('buy_weight',lang)}: {g['buy_weight']:,.2f}"]
+
+    # Keep the report readable in Telegram: summary first, then one consistent
+    # row structure for every rebar type. This avoids broken RTL pseudo-columns.
+    lines=[
+        f"📋 <b>{L('report',lang)}</b>",
+        "━━━━━━━━━━━━━━━━━━━━",
+        f"🏗 <b>{L('project',lang)}:</b> {html.escape(item_label(result.get('project_name',''),lang))}",
+        f"🔹 <b>{L('members',lang)}:</b> {len(members):,}",
+        "",
+        f"🧱 <b>{L('concrete',lang)}:</b> {concrete:,.2f}",
+        f"🔩 <b>{L('rebar_exec',lang)}:</b> {total_w:,.2f}",
+        f"📦 <b>{L('stock',lang)}:</b> {total_bars:,}",
+        f"⚖️ <b>{L('rebar_buy',lang)}:</b> {total_bw:,.2f}",
+        "",
+        f"🔩 <b>{L('detail',lang)}</b>",
+        f"📊 <b>{L('row_no',lang)} | {L('rebar_type',lang)} | Φ | {L('pieces',lang)} | {L('exec_len',lang)} | {L('exec_weight',lang)}</b>"
+    ]
+
+    for idx,((base,dia),g) in enumerate(sorted(by_type.items(),key=lambda x:(x[0][0],x[0][1])),1):
+        lines += [
+            "────────────────────",
+            f"<b>{idx:02d}</b> | <b>{html.escape(item_label(base,lang))}</b> | <b>Φ{dia:g}</b>",
+            f"  • {L('pieces',lang)}: {g['pieces']:,}  |  {L('exec_len',lang)}: {g['length']:,.2f}",
+            f"  • {L('exec_weight',lang)}: {g['weight']:,.2f}  |  {L('stock_bars',lang)}: {g['bars']:,}",
+            f"  • {L('buy_len',lang)}: {g['buy_length']:,.2f}  |  {L('buy_weight',lang)}: {g['buy_weight']:,.2f}"
+        ]
+
     if by_dia:
-        lines += ["",f"📦 <b>{L('procurement',lang)}</b>"]
-        for dia,d in sorted(by_dia.items()):
-            lines += [f"• <b>Φ{dia:g}</b>",
-                      f"  {L('exec_len',lang)}: {float(d.get('length_m',0)):,.2f} | {L('exec_weight',lang)}: {float(d.get('weight_kg',0)):,.2f}",
-                      f"  {L('stock_bars',lang)}: {int(d.get('branches',0)):,} | {L('buy_len',lang)}: {float(d.get('procurement_length_m',0)):,.2f}",
-                      f"  {L('buy_weight',lang)}: {float(d.get('procurement_weight_kg',0)):,.2f}"]
+        lines += ["","📦 <b>"+L("procurement",lang)+"</b>",
+                  f"📊 <b>{L('row_no',lang)} | Φ | {L('exec_len',lang)} | {L('exec_weight',lang)} | {L('stock_bars',lang)} | {L('buy_weight',lang)}</b>"]
+        for idx,(dia,d) in enumerate(sorted(by_dia.items()),1):
+            lines += [
+                f"{idx:02d} | <b>Φ{dia:g}</b> | {float(d.get('length_m',0)):,.2f} | {float(d.get('weight_kg',0)):,.2f} | {int(d.get('branches',0)):,} | {float(d.get('procurement_weight_kg',0)):,.2f}"
+            ]
+
     qa=result.get("qa",{})
-    lines += ["",f"✅ <b>{L('qa',lang)}</b>",f"• {L('status',lang)}: {L('ok',lang) if qa.get('ok') else L('check',lang)}"]
+    lines += ["","━━━━━━━━━━━━━━━━━━━━",f"✅ <b>{L('qa',lang)}</b>",
+              f"• {L('status',lang)}: {L('ok',lang) if qa.get('ok') else L('check',lang)}"]
     if qa.get("warnings"):
         lines.append(f"• {L('warning',lang)}: {len(qa['warnings']):,}")
-        for warning in qa["warnings"][:8]: lines.append(f"  ⚠️ {item_label(warning,lang)}")
+        for warning in qa["warnings"][:8]:
+            lines.append(f"  ⚠️ {html.escape(item_label(warning,lang))}")
     lines += ["",f"ℹ️ {L('final_note',lang)}"]
     return "\n".join(lines)
 
