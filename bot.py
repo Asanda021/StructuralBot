@@ -212,6 +212,19 @@ def apply_compound_preset(context, values):
         context.user_data.setdefault("current_history",[]).append(queue.pop(0))
         context.user_data.setdefault("current_values",[]).append(value)
     return len(values)
+
+# Broad fallback presets for schema fields not explicitly listed above.
+FALLBACK_READY = {
+    "count":[0,1,2,3,4,5,6,8,10,12,16,20,24,32,40],
+    "length":[0.30,0.50,0.60,0.80,1.00,1.20,1.50,1.80,2.00,2.50,3.00,4.00,5.00,6.00,8.00,10.00],
+    "width":[0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50,0.60,0.80,1.00,1.20,1.50,2.00,2.50,3.00],
+    "depth":[0.30,0.40,0.50,0.60,0.80,1.00,1.20,1.50,2.00,2.50,3.00],
+    "height":[0.20,0.30,0.40,0.45,0.50,0.60,0.70,0.80,1.00,1.20,1.50,2.00,2.50,3.00,3.20,3.50,4.00],
+    "diameter":[8,10,12,14,16,18,20,22,25,28,32],
+    "spacing":[8,10,12.5,15,17.5,20,22.5,25,30,35,40],
+    "area":[1,2,3,4,5,6,8,10,12,15,20,25],
+}
+
 def ready_options(section,typ,label):
     if section=="فونداسیون":
         if typ=="پی منفرد" and label in ("طول","عرض","ضخامت"):
@@ -221,9 +234,21 @@ def ready_options(section,typ,label):
         if label in FOUNDATION_READY:
             return FOUNDATION_READY[label]
     if label=="ضریب بتن":
-        if "دوبل" in typ: return [0.23]
-        if "تک" in typ: return [0.18]
-    return READY_OPTIONS.get(label, [])
+        if "دوبل" in typ: return [0.18,0.20,0.21,0.22,0.23,0.24,0.25]
+        if "تک" in typ: return [0.15,0.16,0.17,0.18,0.19,0.20,0.21]
+        return [0.15,0.18,0.20,0.21,0.23,0.25]
+    direct=READY_OPTIONS.get(label, [])
+    if direct: return direct
+    s=str(label)
+    if "قطر" in s: return FALLBACK_READY["diameter"]
+    if "فاصله" in s: return FALLBACK_READY["spacing"]
+    if "تعداد" in s or s.startswith("شماره"): return FALLBACK_READY["count"]
+    if "مساحت" in s: return FALLBACK_READY["area"]
+    if "عمق" in s: return FALLBACK_READY["depth"]
+    if "ارتفاع" in s: return FALLBACK_READY["height"]
+    if "عرض" in s: return FALLBACK_READY["width"]
+    if "طول" in s: return FALLBACK_READY["length"]
+    return []
 
 def ready_value(section,typ,label):
     vals=ready_options(section,typ,label)
