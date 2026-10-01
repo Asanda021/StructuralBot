@@ -162,7 +162,7 @@ def create_excel(result,project_name,path,lang=None):
         bm=wb.create_sheet(L("bar_mark",lang)[:31])
         bm.append([L("bar_mark",lang),L("item",lang),L("dia",lang),L("spacing",lang),L("direction",lang),
                    L("pieces",lang),L("cut_lengths",lang),L("exec_len",lang),L("exec_weight",lang),
-                   L("stock_bars",lang),L("buy_len",lang)])
+                   L("stock_bars",lang),L("buy_len",lang),L("buy_weight",lang)])
         for row in bm_rows: bm.append(row)
         _style_sheet(bm,lang)
 
@@ -268,10 +268,10 @@ def create_pdf(result,project_name,path,lang=None):
         story += [rt,PageBreak(),Paragraph(_rtl_pdf_text(L("bar_mark",lang)),head)]
         bm=[[L("bar_mark",lang),L("item",lang),L("dia",lang),L("spacing",lang),L("direction",lang),
              L("pieces",lang),L("cut_lengths",lang),L("exec_len",lang),L("exec_weight",lang),
-             L("stock_bars",lang),L("buy_len",lang)]]
+             L("stock_bars",lang),L("buy_len",lang),L("buy_weight",lang)]]
         bm += bm_rows
         bm=[[Paragraph(_rtl_pdf_text(x),body) for x in row] for row in bm]
-        bmt=Table(bm,repeatRows=1,colWidths=[45,125,40,50,55,50,120,65,65,55,65])
+        bmt=Table(bm,repeatRows=1,colWidths=[42,112,38,48,50,45,112,60,62,52,60,62])
         bmt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),
                                  ("FONTNAME",(0,0),(-1,-1),font),("VALIGN",(0,0),(-1,-1),"TOP"),
                                  ("ALIGN",(2,1),(-1,-1),"CENTER")]))
