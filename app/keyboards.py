@@ -77,7 +77,8 @@ def type_menu(section):
 def report_menu():
     return InlineKeyboardMarkup([
       [InlineKeyboardButton("📤 دریافت Excel / PDF",callback_data="exports"),InlineKeyboardButton("📋 گزارش متنی قابل کپی",callback_data="copy_output")],
-      [InlineKeyboardButton("✏️ افزودن یا ویرایش عضو",callback_data="continue_project"),InlineKeyboardButton("📋 گزارش جامع متره",callback_data="table")],
+      [InlineKeyboardButton("➡️ ادامه ورود",callback_data="choose_section"),InlineKeyboardButton("✏️ افزودن / ویرایش عضو",callback_data="continue_project")],
+      [InlineKeyboardButton("📋 گزارش جامع متره",callback_data="table")],
       [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home"),InlineKeyboardButton("🔄 بازنشانی فرآیند",callback_data="restart")]
     ])
 
