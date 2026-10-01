@@ -14,6 +14,7 @@ import re
 import arabic_reshaper
 from bidi.algorithm import get_display
 from app.i18n import L, item_label, lang_code
+from app.foundation_takeoff import foundation_bar_marks
 
 def _rtl_pdf_text(text):
     """Shape Arabic/Persian text and apply bidi ordering for ReportLab."""
@@ -83,6 +84,30 @@ def _rebar_type_rows(result,lang):
                 g["buy_length"] += float(c.get("value",0))
     return [(k[0],k[1],v) for k,v in groups.items()]
 
+def _foundation_bar_mark_rows(result, lang):
+    marks = result.get("foundation_bar_marks")
+    if marks is None and result.get("reinforcement"):
+        marks = foundation_bar_marks(result)
+    if not marks:
+        return []
+    out = []
+    for m in marks:
+        cuts = ", ".join(f"{float(x):.2f}" for x in (m.get("cut_lengths_m") or []))
+        out.append([
+            m.get("bar_mark",""),
+            item_label(m.get("name",""),lang),
+            f"Φ{float(m.get("diameter_mm",0)):g}",
+            f"{float(m.get("spacing_cm",0)):.0f}" if m.get("spacing_cm") is not None else "",
+            item_label(m.get("direction",""),lang),
+            int(m.get("count",0)),
+            cuts,
+            f"{float(m.get("length_m",0)):.2f}",
+            f"{float(m.get("weight_kg",0)):.2f}",
+            int(m.get("branches",0)),
+            f"{float(m.get("procurement_length_m",0)):.2f}",
+        ])
+    return out
+
 def _rebar_diameter_rows(result):
     out=[]
     for dia,data in result.get("rebar_by_diameter",{}).items():
@@ -128,6 +153,15 @@ def create_excel(result,project_name,path,lang=None):
     detail.append(["No.",L("section",lang),L("member",lang),L("item",lang),L("quantity",lang),L("unit",lang),L("notes",lang)])
     for row in rows(result,lang): detail.append(row)
     _style_sheet(detail)
+
+    bm_rows = _foundation_bar_mark_rows(result, lang)
+    if bm_rows:
+        bm=wb.create_sheet(L("bar_mark",lang)[:31])
+        bm.append([L("bar_mark",lang),L("item",lang),L("dia",lang),L("spacing",lang),L("direction",lang),
+                   L("pieces",lang),L("cut_lengths",lang),L("exec_len",lang),L("exec_weight",lang),
+                   L("stock_bars",lang),L("buy_len",lang)])
+        for row in bm_rows: bm.append(row)
+        _style_sheet(bm)
 
     rb=wb.create_sheet(L("rebar_type",lang)[:31])
     rb.append([L("rebar_type",lang),L("dia",lang),L("pieces",lang),L("exec_len",lang),L("exec_weight",lang),L("stock_bars",lang),L("buy_len",lang),L("buy_weight",lang)])
@@ -226,7 +260,20 @@ def create_pdf(result,project_name,path,lang=None):
     rb=[[Paragraph(_rtl_pdf_text(x),body) for x in row] for row in rb]
     rt=Table(rb,repeatRows=1,colWidths=[150,45,65,75,75,65,75,75])
     rt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),("FONTNAME",(0,0),(-1,-1),font),("ALIGN",(1,1),(-1,-1),"CENTER")]))
-    story += [rt,Spacer(1,14),Paragraph(L("procurement",lang),head)]
+    bm_rows = _foundation_bar_mark_rows(result, lang)
+    if bm_rows:
+        story += [rt,PageBreak(),Paragraph(L("bar_mark",lang),head)]
+        bm=[[L("bar_mark",lang),L("item",lang),L("dia",lang),L("spacing",lang),L("direction",lang),
+             L("pieces",lang),L("cut_lengths",lang),L("exec_len",lang),L("exec_weight",lang),
+             L("stock_bars",lang),L("buy_len",lang)]]
+        bm += bm_rows
+        bm=[[Paragraph(_rtl_pdf_text(x),body) for x in row] for row in bm]
+        bmt=Table(bm,repeatRows=1,colWidths=[45,125,40,50,55,50,120,65,65,55,65])
+        bmt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.lightgrey),("GRID",(0,0),(-1,-1),0.35,colors.grey),
+                                 ("FONTNAME",(0,0),(-1,-1),font),("VALIGN",(0,0),(-1,-1),"TOP"),
+                                 ("ALIGN",(2,1),(-1,-1),"CENTER")]))
+        story.append(bmt)
+    story += [Spacer(1,14),Paragraph(L("procurement",lang),head)]
     rd=[[L("dia",lang),L("exec_len",lang),L("exec_weight",lang),L("stock_bars",lang),L("buy_len",lang),L("buy_weight",lang)]]
     for row in _rebar_diameter_rows(result): rd.append([str(x) for x in row])
     rd=[[Paragraph(_rtl_pdf_text(x),body) for x in row] for row in rd]
