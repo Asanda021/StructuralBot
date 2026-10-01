@@ -1242,6 +1242,43 @@ async def message(update,context):
     if context.user_data.get("awaiting_project_name"):
         if not text or len(text)>120: await update.message.reply_text("❌ نام پروژه نامعتبر است."); return
         reset(context,text); await update.message.reply_text(f"🏗 پروژه «{text}» ساخته شد.",reply_markup=section_menu()); return
+    if text=="➕ ادامه برآورد":
+        uid=update.effective_user.id
+        try:
+            saved=db.last_estimate(uid)
+        except Exception as e:
+            log.exception("continue estimate message load failed: %s",e)
+            saved=None
+        if not saved:
+            await update.message.reply_text("📂 برآورد قابل ادامه پیدا نشد. ابتدا یک عضو را ثبت کن یا از 📂 پروژه‌ها یک پروژه ذخیره‌شده را باز کن.")
+            return
+        inputs=saved.get("inputs") or {}
+        members=inputs.get("members",[]) if isinstance(inputs,dict) else []
+        context.user_data.clear()
+        context.user_data.update({
+            "project_id":saved.get("project_id"),
+            "project_name":saved.get("project_name") or "پروژه جدید",
+            "members":members if isinstance(members,list) else [],
+            "last_result":saved.get("result") or None,
+            "history":[]
+        })
+        if context.user_data["members"]:
+            await update.message.reply_text(
+                f"📂 ادامه برآورد: «{context.user_data['project_name']}»\n"
+                f"تعداد اعضای ثبت‌شده: {len(context.user_data['members'])}\n\n"
+                "از منوی بازبینی می‌توانی اصلاح کنی یا عضو جدید اضافه کنی.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("➕ افزودن عضو",callback_data="choose_section")],
+                    [InlineKeyboardButton("📋 گزارش جامع متره",callback_data="table")],
+                    [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+                ])
+            )
+        else:
+            await update.message.reply_text(
+                f"📂 پروژه «{context.user_data['project_name']}» بازیابی شد؛ هنوز عضوی ثبت نشده.",
+                reply_markup=section_menu()
+            )
+        return
     # Professional actions from the keyboard attached to Telegram's typing area.
     if text=="✏️ ورود دستی":
         queue=context.user_data.get("current_queue",[])
