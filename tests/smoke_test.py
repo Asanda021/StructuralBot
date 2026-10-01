@@ -12,6 +12,7 @@ from app.engine import (
 )
 from app.exporter import create_excel, create_pdf
 from app.i18n import L
+from app.foundation_takeoff import calculate_foundation_takeoff, foundation_bar_marks
 
 
 def main():
@@ -78,6 +79,18 @@ def main():
     assert abs(concrete["value"] - 3.24) < 1e-9
     assert bottom["value"] > 0
     assert top["value"] > 0
+
+    # Foundation Bar Marks: every calculated reinforcement item gets a stable traceable mark.
+    fr = calculate_foundation_takeoff({
+        "foundation_type":"پی منفرد","count":2,"length":2.0,"width":1.8,"thickness":0.45,
+        "bottom_dia_mm":12,"bottom_spacing_cm":20,"top_dia_mm":10,"top_spacing_cm":25,
+    })
+    marks = foundation_bar_marks(fr)
+    assert len(marks) == 4
+    assert marks[0]["bar_mark"] == "F-001"
+    assert marks[1]["bar_mark"] == "F-002"
+    assert all(m["cut_lengths_m"] for m in marks)
+    assert all(m["diameter_mm"] > 0 for m in marks)
 
     # U-Boot/waffle geometric takeoff path is expected to be supplied by bot.
     # Here we validate the generic slab engine remains usable for solid slabs.
