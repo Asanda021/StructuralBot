@@ -105,6 +105,7 @@ def _foundation_bar_mark_rows(result, lang):
             f"{float(m.get("weight_kg",0)):.2f}",
             int(m.get("branches",0)),
             f"{float(m.get("procurement_length_m",0)):.2f}",
+            f"{float(m.get("procurement_weight_kg",0)):.2f}",
         ])
     return out
 
