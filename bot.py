@@ -131,10 +131,8 @@ READY_OPTIONS = {
  "مساحت":[2.0,3.0,4.0,5.0,6.0,8.0,10.0,12.0],
  "ضخامت مگر":[0.08,0.10,0.12,0.15],
  "طول هر خاموت":[0.80,1.00,1.20,1.40,1.60,1.80,2.00],
- "عرض فضای کار اطراف پی":[0,0.10,0.15,0.20,0.25,0.30],
- "عمق خاکبرداری":[0.50,0.60,0.80,1.00,1.20,1.50,2.00],
- "حجم خاک جانشین":[0], "قالب‌بندی":[0,1], "تعداد خرک":[0,4,8,12,16,20,24,32,40],
- "تعداد اسپیسر":[0,10,20,30,40,60,80,100,120], "تعداد انکربولت":[0,4,6,8,12,16],
+ "تعداد خرک":[0,4,8,12,16,20,24,32,40],
+
  "طول هر سنجاقی":[0.50,0.60,0.80,1.00,1.20],
  "طول هر سنجاقی ژوئن":[0.30,0.40,0.50,0.60,0.80],
  "طول هر کلاف/ژوئن":[2.0,3.0,4.0,5.0,6.0],
@@ -272,28 +270,18 @@ def schema(section,typ):
         return [("طول سقف","m"),("عرض سقف","m"),("ضخامت/ارتفاع مؤثر سقف","m"),
                 ("قطر حرارتی","mm"),("فاصله حرارتی","cm"),("تعداد بازشو","عدد"),("طول بازشو","m"),("عرض بازشو","m")]
     if section=="فونداسیون":
-        extra=[("ضخامت مگر","m"),("عرض فضای کار اطراف پی","m"),("عمق خاکبرداری","m"),
-               ("حجم خاک جانشین","m³"),("قالب‌بندی","0/1"),("تعداد خرک","عدد"),("تعداد اسپیسر","عدد"),("تعداد انکربولت","عدد")]
         if typ=="بتن مگر":
             return [("تعداد","عدد"),("طول","m"),("عرض","m"),("ضخامت مگر","m")]
         if typ=="شناژ":
-            return [("تعداد","عدد"),("طول","m"),("عرض","m"),("ارتفاع","m"),
-                    ("تعداد میلگرد طولی هر شناژ","عدد"),("قطر میلگرد طولی","mm"),("قطر خاموت","mm"),
-                    ("فاصله خاموت","cm"),("طول هر خاموت","m"),("تعداد میلگرد انتظار","عدد"),
-                    ("طول هر انتظار","m"),("قطر میلگرد انتظار","mm")]+extra
+            return [("تعداد","عدد"),("طول","m"),("عرض","m"),("ارتفاع","m"),("تعداد میلگرد طولی هر شناژ","عدد"),("قطر میلگرد طولی","mm"),("قطر خاموت","mm"),("فاصله خاموت","cm"),("طول هر خاموت","m"),("تعداد میلگرد انتظار","عدد"),("طول هر انتظار","m"),("قطر میلگرد انتظار","mm")]
         common=[("تعداد","عدد"),("طول","m"),("عرض","m"),("ضخامت","m")]
         if typ=="پی نواری":
-            return common+[("قطر میلگرد طولی","mm"),("فاصله میلگرد طولی","cm"),("قطر میلگرد عرضی","mm"),
-                ("فاصله میلگرد عرضی","cm"),("تعداد میلگرد تقویتی","عدد"),("طول هر میلگرد تقویتی","m"),
-                ("قطر میلگرد تقویتی","mm"),("تعداد میلگرد انتظار ستون","عدد"),("طول هر انتظار ستون","m"),
-                ("قطر انتظار ستون","mm"),("تعداد انتظار راه‌پله","عدد"),("طول هر انتظار راه‌پله","m"),
-                ("قطر انتظار راه‌پله","mm"),("تعداد چاله آسانسور","عدد"),("طول چاله آسانسور","m"),
-                ("عرض چاله آسانسور","m"),("عمق چاله آسانسور","m")]+extra
-        return common+[("قطر میلگرد شبکه پایین","mm"),("فاصله میلگرد شبکه پایین","cm"),("قطر میلگرد شبکه بالا","mm"),
-                ("فاصله میلگرد شبکه بالا","cm"),("تعداد میلگرد تقویتی","عدد"),("طول هر میلگرد تقویتی","m"),
-                ("قطر میلگرد تقویتی","mm"),("تعداد میلگرد انتظار ستون","عدد"),("طول هر انتظار ستون","m"),
-                ("قطر انتظار ستون","mm"),("تعداد چاله آسانسور","عدد"),("طول چاله آسانسور","m"),
-                ("عرض چاله آسانسور","m"),("عمق چاله آسانسور","m")]+extra
+            return common+[("قطر میلگرد طولی","mm"),("فاصله میلگرد طولی","cm"),("قطر میلگرد عرضی","mm"),("فاصله میلگرد عرضی","cm"),("تعداد میلگرد تقویتی","عدد"),("طول هر میلگرد تقویتی","m"),("قطر میلگرد تقویتی","mm"),("تعداد میلگرد انتظار ستون","عدد"),("طول هر انتظار ستون","m"),("قطر انتظار ستون","mm"),("تعداد انتظار راه‌پله","عدد"),("طول هر انتظار راه‌پله","m"),("قطر انتظار راه‌پله","mm"),("تعداد چاله آسانسور","عدد"),("طول چاله آسانسور","m"),("عرض چاله آسانسور","m"),("عمق چاله آسانسور","m")]
+        if typ=="پی رادیه":
+            return common+[("قطر میلگرد شبکه پایین","mm"),("فاصله میلگرد شبکه پایین","cm"),("قطر میلگرد شبکه بالا","mm"),("فاصله میلگرد شبکه بالا","cm"),("تعداد میلگرد تقویتی","عدد"),("طول هر میلگرد تقویتی","m"),("قطر میلگرد تقویتی","mm"),("تعداد میلگرد انتظار ستون","عدد"),("طول هر انتظار ستون","m"),("قطر انتظار ستون","mm"),("تعداد چاله آسانسور","عدد"),("طول چاله آسانسور","m"),("عرض چاله آسانسور","m"),("عمق چاله آسانسور","m")]
+        if typ=="پی مرکب":
+            return common+[("قطر میلگرد شبکه پایین","mm"),("فاصله میلگرد شبکه پایین","cm"),("قطر میلگرد شبکه بالا","mm"),("فاصله میلگرد شبکه بالا","cm"),("تعداد میلگرد تقویتی","عدد"),("طول هر میلگرد تقویتی","m"),("قطر میلگرد تقویتی","mm"),("تعداد میلگرد انتظار ستون","عدد"),("طول هر انتظار ستون","m"),("قطر میلگرد انتظار ستون","mm")]
+        return common+[("قطر میلگرد شبکه پایین","mm"),("فاصله میلگرد شبکه پایین","cm"),("قطر میلگرد شبکه بالا","mm"),("فاصله میلگرد شبکه بالا","cm"),("تعداد میلگرد تقویتی","عدد"),("طول هر میلگرد تقویتی","m"),("قطر میلگرد تقویتی","mm"),("تعداد میلگرد انتظار ستون","عدد"),("طول هر انتظار ستون","m"),("قطر انتظار ستون","mm"),("تعداد چاله آسانسور","عدد"),("طول چاله آسانسور","m"),("عرض چاله آسانسور","m"),("عمق چاله آسانسور","m")]
     if section=="ستون":
         return [("تعداد ستون","عدد"),("عرض ستون","m"),("عمق ستون","m"),("ارتفاع","m"),
                 ("تعداد میلگرد طولی هر ستون","عدد"),("قطر میلگرد طولی","mm"),("قطر خاموت","mm"),
@@ -362,7 +350,7 @@ def ask_text(name,fields,section,typ,values=None,compound=None,context=None):
     return f"🏗 <b>{name}</b>\n\n<b>مرحله {current} از {total}</b>  {bar}\n\n🎯 <b>{label}</b> ({unit}){ready}{filled}\n\nیکی از گزینه‌های آماده را بزن یا «✏️ ورود دستی» را انتخاب کن.\n⚠️ گزینه‌های آماده فقط میانبر ورود هستند؛ مقدار نهایی باید با نقشه کنترل شود."
 
 def english_report(result, lang=None):
-    """Localized compact engineering takeoff report for Telegram output."""
+    """Fully localized, structured Telegram takeoff report."""
     lang=lang_code(lang or result.get("project_settings",{}).get("language","fa"))
     members=result.get("members",[])
     concrete=float(result.get("concrete_total_m3",0) or 0)
@@ -384,16 +372,32 @@ def english_report(result, lang=None):
     total_w=sum(float(x.get("weight_kg",0) or 0) for x in by_dia.values())
     total_bw=sum(float(x.get("procurement_weight_kg",0) or 0) for x in by_dia.values())
     total_bars=sum(int(x.get("branches",0) or 0) for x in by_dia.values())
-    lines=[L("report",lang),"",f"{L('members',lang)}: {len(members)}",f"{L('concrete',lang)}: {concrete:,.2f}",
-           f"{L('rebar_exec',lang)}: {total_w:,.2f}",f"{L('stock',lang)}: {total_bars:,}",f"{L('rebar_buy',lang)}: {total_bw:,.2f}","",
-           L("rebar_type",lang),"",f"{L('rebar_type',lang)} | {L('dia',lang)} | {L('pieces',lang)} | {L('exec_len',lang)} | {L('exec_weight',lang)} | {L('stock_bars',lang)} | {L('buy_len',lang)} | {L('buy_weight',lang)}"]
+    lines=[f"📋 <b>{L('report',lang)}</b>","",
+           f"🏗 <b>{L('project',lang)}:</b> {item_label(result.get('project_name',''),lang)}",
+           f"🔹 <b>{L('members',lang)}:</b> {len(members):,}",
+           f"🧱 <b>{L('concrete',lang)}:</b> {concrete:,.2f}",
+           f"🔩 <b>{L('rebar_exec',lang)}:</b> {total_w:,.2f}",
+           f"📦 <b>{L('stock',lang)}:</b> {total_bars:,}",
+           f"⚖️ <b>{L('rebar_buy',lang)}:</b> {total_bw:,.2f}","",
+           f"🔩 <b>{L('detail',lang)}</b>"]
     for (base,dia),g in sorted(by_type.items(),key=lambda x:(x[0][0],x[0][1])):
-        lines.append(f"{item_label(base,lang)} | Φ{dia:g} | {g['pieces']:,} | {g['length']:,.2f} | {g['weight']:,.2f} | {g['bars']:,} | {g['buy_length']:,.2f} | {g['buy_weight']:,.2f}")
-    lines += ["",L("procurement",lang),"",f"{L('dia',lang)} | {L('exec_len',lang)} | {L('exec_weight',lang)} | {L('stock_bars',lang)} | {L('buy_len',lang)} | {L('buy_weight',lang)}"]
-    for dia,d in sorted(by_dia.items()):
-        lines.append(f"Φ{dia:g} | {float(d.get('length_m',0)):,.2f} | {float(d.get('weight_kg',0)):,.2f} | {int(d.get('branches',0)):,} | {float(d.get('procurement_length_m',0)):,.2f} | {float(d.get('procurement_weight_kg',0)):,.2f}")
+        lines += [f"• <b>{item_label(base,lang)} — Φ{dia:g}</b>",
+                  f"  {L('pieces',lang)}: {g['pieces']:,} | {L('exec_len',lang)}: {g['length']:,.2f}",
+                  f"  {L('exec_weight',lang)}: {g['weight']:,.2f} | {L('stock_bars',lang)}: {g['bars']:,}",
+                  f"  {L('buy_len',lang)}: {g['buy_length']:,.2f} | {L('buy_weight',lang)}: {g['buy_weight']:,.2f}"]
+    if by_dia:
+        lines += ["",f"📦 <b>{L('procurement',lang)}</b>"]
+        for dia,d in sorted(by_dia.items()):
+            lines += [f"• <b>Φ{dia:g}</b>",
+                      f"  {L('exec_len',lang)}: {float(d.get('length_m',0)):,.2f} | {L('exec_weight',lang)}: {float(d.get('weight_kg',0)):,.2f}",
+                      f"  {L('stock_bars',lang)}: {int(d.get('branches',0)):,} | {L('buy_len',lang)}: {float(d.get('procurement_length_m',0)):,.2f}",
+                      f"  {L('buy_weight',lang)}: {float(d.get('procurement_weight_kg',0)):,.2f}"]
     qa=result.get("qa",{})
-    lines += ["",L("qa",lang),f"{L('status',lang)}: {L('ok',lang) if qa.get('ok') else L('check',lang)}"]
+    lines += ["",f"✅ <b>{L('qa',lang)}</b>",f"• {L('status',lang)}: {L('ok',lang) if qa.get('ok') else L('check',lang)}"]
+    if qa.get("warnings"):
+        lines.append(f"• {L('warning',lang)}: {len(qa['warnings']):,}")
+        for warning in qa["warnings"][:8]: lines.append(f"  ⚠️ {item_label(warning,lang)}")
+    lines += ["",f"ℹ️ {L('final_note',lang)}"]
     return "\n".join(lines)
 
 def rcomps(title,r,note=""):
@@ -425,30 +429,6 @@ def grid_direction_rebar(L,W,dia,spacing,direction,count=1,top_bar=False):
     r["lap_m"]=plan["lap_m"]
     r["development"]=plan["development"]
     return r
-
-def foundation_extra_components(typ,n,L,W,T,extras):
-    """Add full foundation takeoff layers without duplicating the existing BBS logic."""
-    # extras: blinding thickness, working space, excavation depth, replacement soil,
-    # formwork flag, chairs, spacers, anchor bolts.
-    x=list(extras or [])+[0]*8
-    blinding,working,exc_depth,replacement,formwork_flag,chairs,spacers,anchors=x[:8]
-    try:
-        result=calculate_foundation_takeoff({
-            "foundation_type":typ,"count":n,"length":L,"width":W,"thickness":T,
-            "blinding_thickness":blinding or 0,
-            "working_space_m":working or 0,
-            "excavation_depth_m":exc_depth or T,
-            "replacement_soil_m3":replacement or 0,
-            "formwork_mode":"all" if formwork_flag else "free",
-            "chair_count":chairs or 0,"spacer_count":spacers or 0,
-            "anchor_bolt_count":anchors or 0,
-        })
-        comps=foundation_components(result)
-        skip={"بتن فونداسیون","مساحت فونداسیون"}
-        return [c for c in comps if c.get("name") not in skip]
-    except (TypeError,ValueError,KeyError) as exc:
-        return [{"name":"هشدار متره فونداسیون","value":0,"unit":"عدد",
-                 "note":f"ورودی تکمیلی نامعتبر: {exc}"}]
 
 def repeated_grid_for_foundation(n,L,W,dia,spacing):
     """Repeat a drawing-defined two-way foundation mesh for each footing/unit."""
@@ -530,7 +510,6 @@ def calc_member(section,typ,v):
                 comps += rcomps("خاموت شناژ",repeated_bar_rebar(cnt,slen,sd),f"تعداد خاموت از طول و فاصله نقشه؛ طول قطعه از دیتیل")
             if en and elen and ed:
                 comps += rcomps("میلگرد انتظار شناژ",repeated_bar_rebar(n*en,elen,ed))
-            comps += foundation_extra_components(typ,n,L,W,H,v[12:])
             return comps
         if typ=="پی نواری":
             n,L,W,T,ld,ls,wd,ws,rcount,rlen,rd,ecount,elen,ed,secount,selen,sed,pc,pL,pW,pD=v[:21]
@@ -547,7 +526,6 @@ def calc_member(section,typ,v):
                 comps += rcomps("انتظار راه‌پله",repeated_bar_rebar(n*secount,selen,sed))
             if pc and pL and pW and pD:
                 comps.append({"name":"چاله آسانسور","value":n*pc*pL*pW*pD,"unit":"m³","note":f"{pc:g} عدد | {pL:g}×{pW:g}m | عمق {pD:g}m"})
-            comps += foundation_extra_components(typ,n,L,W,T,v[21:])
             return comps
 
         n,L,W,T,bd,bs,td,ts,rcount,rlen,rd,ecount,elen,ed,pc,pL,pW,pD=v[:18]
@@ -572,7 +550,6 @@ def calc_member(section,typ,v):
             comps += rcomps("میلگرد انتظار ستون",repeated_bar_rebar(n*ecount,elen,ed))
         if pc and pL and pW and pD:
             comps.append({"name":"چاله آسانسور","value":n*pc*pL*pW*pD,"unit":"m³","note":f"{pc:g} عدد | {pL:g}×{pW:g}m | عمق {pD:g}m"})
-        comps += foundation_extra_components(typ,n,L,W,T,v[18:])
         return comps
 
     if section=="ستون":
@@ -754,13 +731,11 @@ async def callback(update,context):
         await q.edit_message_text("📦 <b>انتخاب نوع متره</b>",parse_mode="HTML",reply_markup=takeoff_menu()); return
     if data.startswith("takeoff|"):
         kind=data.split("|",1)[1]
-        titles={"concrete":"🧱 بتن","rebar":"🔩 میلگرد","formwork":"🪵 قالب‌بندی","materials":"🧱 مصالح"}
+        titles={"concrete":"🧱 بتن","rebar":"🔩 میلگرد","materials":"🧱 مصالح"}
         if kind=="rebar":
             await q.edit_message_text("🔩 <b>میلگرد</b>\\n\\nمتره میلگرد از روی دیتیل نقشه انجام می‌شود. برای معادل‌سازی قطرها از گزینه زیر استفاده کن.",parse_mode="HTML",reply_markup=rebar_equivalency_menu()); return
         if kind=="concrete":
-            await q.edit_message_text("🧱 <b>بتن</b>\\n\\nهندسه اعضا یک‌بار از روی نقشه وارد می‌شود و حجم بتن در همان عضو محاسبه می‌گردد.",parse_mode="HTML",reply_markup=section_menu()); return
-        if kind=="formwork":
-            await q.edit_message_text("🪵 <b>قالب‌بندی</b>\\n\\nساختار منوی قالب‌بندی فعال شد؛ مقادیر باید از هندسه واقعی عضو و دیتیل اجرایی پروژه استخراج شوند.",parse_mode="HTML",reply_markup=section_menu()); return
+            await q.edit_message_text("🧱 <b>بتن</b>\\n\\nهندسه اعضا یک‌بار از روی نقشه وارد می‌شود و حجم بتن در همان عضو محاسبه می‌گردد.",parse_mode="HTML",reply_markup=section_menu()); return 
         await q.edit_message_text("🧱 <b>مصالح</b>\\n\\nمصالح متره‌شده شامل بتن، میلگرد، تیرچه/یونولیت و اجزای اجرایی در گزارش جامع جمع می‌شوند.",parse_mode="HTML",reply_markup=report_menu()); return
     if data=="units":
         await q.edit_message_text("📏 <b>سیستم واحد</b>",parse_mode="HTML",reply_markup=units_menu()); return
