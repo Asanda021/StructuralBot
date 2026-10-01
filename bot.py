@@ -1059,9 +1059,10 @@ async def callback(update,context):
         m=ms[idx]
         await q.edit_message_text(f"✅ <b>{m['member']}</b> با موفقیت تأیید نهایی شد.\n\nاین عضو در متره پروژه ثبت شد و آماده ورود به عضو بعدی یا بازبینی کامل پروژه است.",parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("➕ افزودن عضو بعدی",callback_data="choose_section")],
-                [InlineKeyboardButton("✏️ ویرایش عضو",callback_data="member_edit")],
-                [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home")]
+                [InlineKeyboardButton("📤 Excel / PDF",callback_data="exports"),InlineKeyboardButton("📋 کپی گزارش",callback_data="copy_output")],
+                [InlineKeyboardButton("➡️ ادامه ورود",callback_data="choose_section"),InlineKeyboardButton("✏️ ویرایش عضو",callback_data="member_edit")],
+                [InlineKeyboardButton("📋 گزارش جامع متره",callback_data="table")],
+                [InlineKeyboardButton("🏠 منوی اصلی",callback_data="home"),InlineKeyboardButton("🔄 بازنشانی فرآیند",callback_data="restart")]
             ])); return
     if data=="member_edit":
         idx=context.user_data.get("current_member_index"); ms=context.user_data.get("members",[])
